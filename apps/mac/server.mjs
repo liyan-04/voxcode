@@ -23,14 +23,15 @@ export function createServer(options) {
         });
       let body;
       const read = async () => {
-        let data = "";
+        const chunks = [];
+        let bytes = 0;
         for await (const chunk of req) {
-          data += chunk;
-          if (Buffer.byteLength(data) > 65536)
-            throw new ApiError(400, "invalid");
+          bytes += chunk.length;
+          if (bytes > 65536) throw new ApiError(400, "invalid");
+          chunks.push(chunk);
         }
         try {
-          return JSON.parse(data);
+          return JSON.parse(Buffer.concat(chunks, bytes).toString("utf8"));
         } catch {
           throw new ApiError(400, "invalid");
         }
@@ -48,8 +49,11 @@ export function createServer(options) {
       }
       if (url.pathname === "/api/settings") {
         if (req.method === "GET") return send(res, 200, service.settings());
-        if (req.method === "POST")
-          return send(res, 200, service.configure(await read()));
+        if (req.method === "POST") {
+          body = await read();
+          service.authorize(req.headers.authorization);
+          return send(res, 200, service.configure(body));
+        }
       }
       if (req.method === "GET" && url.pathname === "/api/monitor") {
         const peer = req.socket.remoteAddress;
@@ -65,10 +69,13 @@ export function createServer(options) {
       if (url.pathname === "/api/tasks") {
         if (req.method === "GET")
           return send(res, 200, { tasks: service.list() });
-        if (req.method === "POST")
+        if (req.method === "POST") {
+          body = await read();
+          service.authorize(req.headers.authorization);
           return send(res, 200, {
-            task: service.mutate("create", await read()),
+            task: service.mutate("create", body),
           });
+        }
       }
       const match = url.pathname.match(
         /^\/api\/tasks\/([^/]+)(?:\/(events|messages|cancel|accept)|\/(approvals|criteria)\/([^/]+))?$/,
@@ -89,7 +96,9 @@ export function createServer(options) {
         ["messages", "cancel", "accept", "approvals", "criteria"].includes(
           action,
         )
-      )
+      ) {
+        body = await read();
+        service.authorize(req.headers.authorization);
         return send(res, 200, {
           task: service.mutate(
             action === "approvals"
@@ -97,11 +106,12 @@ export function createServer(options) {
               : action === "criteria"
                 ? "criterion"
                 : action,
-            await read(),
+            body,
             id,
             resourceId,
           ),
         });
+      }
       throw new ApiError(404, "unknown");
     } catch (e) {
       send(res, e.status ?? 500, {
