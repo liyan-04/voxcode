@@ -16,6 +16,9 @@ final class SnapshotOrderingTests: XCTestCase {
         XCTAssertFalse(SnapshotOwnership.prefer(try task(version: 3, date: "2026-10-23T00:00:02Z"), over: current))
         XCTAssertTrue(SnapshotOwnership.prefer(try task(version: 3, date: "2026-10-23T00:00:04Z"), over: current))
         XCTAssertTrue(SnapshotOwnership.prefer(current, over: current))
+        XCTAssertFalse(SnapshotOwnership.prefer(current, over: current, allowEqualTimestamp: false))
+        XCTAssertTrue(SnapshotOwnership.prefer(try task(version: 3, date: "2026-10-23T00:00:04Z"), over: current, allowEqualTimestamp: false))
+        XCTAssertTrue(SnapshotOwnership.prefer(try task(version: 4, date: "2026-10-23T00:00:03Z"), over: current, allowEqualTimestamp: false))
         XCTAssertFalse(SnapshotOwnership.prefer(try task(version: 3, date: "invalid"), over: current))
         XCTAssertFalse(SnapshotOwnership.prefer(current, over: try task(version: 3, date: "invalid")))
     }

@@ -106,3 +106,31 @@ SHA-256 values recorded before coordinator commit:
 The cleanup barrier covers known-session re-record cleanup on the same Recorder. An old create still in flight can temporarily occupy a provider's single-active-session slot; the next create may receive a transient `429` until stale-session cleanup completes. User re-recording can recover using the fresh attempt ID. No startup serialization or general retry framework was added, and the native late-success fixture does not certify elimination of that remote window.
 
 Coordinator next steps: commit these explicit iOS paths plus this handoff, rerun exact-revision core coverage and unsigned iOS build/native XCTest, and retain two independent targeted review resolutions. Signing, microphone/audible audio, actual private-CA URLSession matrix, real Linx/Codex, native navigation and outdoor cellular gates remain pending. No deployment or production trust material is part of IOS-004. iOS source edits are frozen at this handoff pending coordinator/CI feedback.
+
+## IOS-005 equal-timestamp mutation replay follow-up
+
+Date: 2026-10-24. Base: coordinator-committed IOS-004 `452411f5e037984a4a3ca197d4551860157ffd7c`. The independent platform reviewer identified a residual P2: Mac can save queued and running/completed snapshots with the same version and millisecond `updatedAt`; the original inclusive timestamp comparison could apply an old mutation replay over the newer locally observed state. IOS-004 CI cannot be treated as verification of this follow-up.
+
+The coordinator authorized a focused policy split. `SnapshotOwnership.prefer` now accepts `allowEqualTimestamp` (default true), preserving the authoritative refresh behavior and its existing generation protection. `Session.mutate` explicitly passes false, preserving an existing snapshot when version and timestamp are equal. Newer versions still apply, and strictly newer same-version timestamps apply. This adds no server timestamp change, revision field, terminal-state ranking or retry framework.
+
+Changed paths: `apps/ios/Sources/VoxCodeCore/Core.swift`, `apps/ios/VoxCode/Session.swift`, `apps/ios/Scripts/OrderingChecks.swift`, `apps/ios/Tests/VoxCodeCoreTests/SnapshotOrderingTests.swift`, `apps/ios/NativeTests/SessionOrderingTests.swift`, plus this existing handoff.
+
+Actual focused local RED: after authoring the new policy assertions and adding only the parameter while retaining the old `>=` comparison, the compiled OrderingChecks binary exited 133 with `Equal-time mutation replays must preserve the current snapshot`. After implementing the parameter-specific strict/inclusive comparison, these commands from `apps/ios` compiled and executed exit 0/PASS:
+
+```sh
+swiftc -module-cache-path /private/tmp/voxcode-swift Sources/VoxCodeCore/Core.swift Scripts/OrderingChecks.swift -o /private/tmp/voxcode-ios005-OrderingChecks
+/private/tmp/voxcode-ios005-OrderingChecks
+swiftc -frontend -parse VoxCode/*.swift NativeTests/*.swift Tests/VoxCodeCoreTests/*.swift
+```
+
+`git diff --check -- apps/ios` also exited 0 after the final source change. Core assertions cover equal-timestamp rejection for mutation, default equal-timestamp refresh acceptance, newer same-version time and newer version acceptance. The new actual-Session native fixture starts with version 2/running, returns an old version 2/queued mutation replay at the identical timestamp and expects running to remain; an ensuing refresh at that same timestamp is allowed to advance to completed. Native/core XCTest remain authored but unexecuted locally because this machine has Command Line Tools only. Exact-revision SDK CI and targeted independent review must be rerun.
+
+Final IOS-005 SHA-256 snapshot, source frozen for coordinator commit:
+
+```text
+f7a3980fb0a8d4f1ec495b85d7d61bdcd0178a8b5b0dc48b6105d4b77bca2483  apps/ios/Sources/VoxCodeCore/Core.swift
+e453a1ba5bd3f1861a6624d89bc887199e1b393bd329dab5f13b87a6f62544fe  apps/ios/VoxCode/Session.swift
+97b018e8119f8ba46af73b9b04a7116041b1bb876c1d3be9e1cafe2e5ac388f6  apps/ios/Scripts/OrderingChecks.swift
+cc0fc2e6b5b409926d9cdfaa28f28494ebe55cb1c007e4739e691322e599eab3  apps/ios/Tests/VoxCodeCoreTests/SnapshotOrderingTests.swift
+dc1ce1578414d1587d5678efe8d4001d37f95e90c1c0ceb6545592c47c49e2e2  apps/ios/NativeTests/SessionOrderingTests.swift
+```

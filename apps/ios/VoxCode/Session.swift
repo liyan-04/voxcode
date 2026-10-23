@@ -77,7 +77,7 @@ struct EventsEnvelope: Decodable { var events: [TaskEvent]; var cursor: Int }
             let result = try await api.json(TaskEnvelope.self, path, method: "POST", mutation: mutation)
             guard revision == current else { return .uncertain }
             if snapshots.allows(request) {
-                if let index = tasks.firstIndex(where: { $0.id == result.task.id }) { if SnapshotOwnership.prefer(result.task, over: tasks[index]) { tasks[index] = result.task } }
+                if let index = tasks.firstIndex(where: { $0.id == result.task.id }) { if SnapshotOwnership.prefer(result.task, over: tasks[index], allowEqualTimestamp: false) { tasks[index] = result.task } }
                 else { tasks.append(result.task) }
             }
             error = nil; outcome = .succeeded
