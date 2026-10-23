@@ -73,3 +73,23 @@ Final changed-file SHA-256 values, superseding those two entries in the initial 
 3205027658ef928b57ceb91cad822f6ce7a940c38696af719b0c6c24f3919553  apps/integration/voice.mjs
 0d209c64c85e42ce98c5649ce38ed5c0e7f979b9f0659cfd648c7c0686157fd9  apps/integration/test/voice-v1.test.mjs
 ```
+
+## Criteria-inheritance follow-up
+
+Date: 2026-10-24. Independently reviewed coordinator fix `bdd7f2999aec752a8cda308f1e0c8f2354821bca`. Verification integration HEAD: `3b5af3d0e6762a1c5805e737cdd0f4e5398d7b60`; source/test difference from `bdd7f29` for the two affected files was empty, and unrelated dirty review/architecture documents were excluded.
+
+The follow-up draft tool now copies only `{text, required}` from the frozen current task when the caller omits `criteria`. This retains the user's existing conditions without carrying passed/failed status, criterion IDs or evidence into a proposed new execution. Explicit caller conditions still pass through the existing count/text/type validation; `null` is rejected. The existing target/version/owner/expiry guard remains before proposal construction. Inspection found no new actionable issue in this narrow change.
+
+Independent local command:
+
+```sh
+node --test --test-name-pattern 'follow-up drafts inherit existing manual criteria' apps/integration/test/voice-v1.test.mjs
+# Node v26.0.0, local macOS controlled provider: 1/1 passed, 0 failed/skipped; exit 0
+```
+
+The regression verifies optional/required conditions are inherited, the original task conditions remain unchanged, explicit edits replace the inherited proposal and null is rejected. The full voice/runtime suite was not repeated for this targeted confirmation. No live/native/device/outdoor inference is made.
+
+```text
+02e6092d4602d069c53bcfe600f20140ae8ed3892ec8bc2f47556fefbcca18d5  apps/integration/voice-tools.mjs
+666ee9a66c687cbd00f8e2f0999f6621b942092dcba3c0b9ed38ce8b815e720e  apps/integration/test/voice-v1.test.mjs
+```
