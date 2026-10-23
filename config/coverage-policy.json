@@ -1,0 +1,17 @@
+{
+  "changedLines": 80,
+  "changedBranches": 70,
+  "allowOverallDecrease": false,
+  "languages": {
+    "node": {
+      "include": ["apps/mac/", "apps/relay/", "apps/integration/", "packages/voice/src/"],
+      "extensions": [".mjs", ".js"],
+      "exclude": ["/test/", "/node_modules/"]
+    },
+    "swift": {
+      "include": ["apps/ios/Sources/VoxCodeCore/"],
+      "extensions": [".swift"],
+      "exclude": []
+    }
+  }
+}

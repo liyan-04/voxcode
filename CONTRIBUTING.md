@@ -68,6 +68,7 @@ Prefer squash merge after review, using the conventional PR title. Do not automa
 ## Verification and independent review
 
 - Run checks appropriate to the change. Security, replay, cancellation, recording races and isolation changes require focused regressions. Documentation-only changes need link/content review; avoid meaningless tests that mirror implementation.
+- PR unit coverage follows [coverage policy](docs/coverage.md): changed executable lines >=80%, changed branch arms >=70% where emitted, and no overall decrease from the PR base; Node and Swift core are checked separately. Critical authorization/isolation/replay/cancellation/recording scenarios need positive and negative regressions. Coverage never replaces live/device/benchmark acceptance.
 - Label evidence as `simulation`, `fixture`, `local`, `live`, `device` or `outdoor`. Include the command, result, revision/environment and limitations. A local fixture pass cannot prove real Linx, Codex model execution, signing or outdoor connectivity.
 - Each implementation component (iOS, Mac, relay, voice/integration, preview when added) requires two reviewers independent of its implementation. Cover correctness/security and platform/product behavior. Reviewers inspect requirements and code, not just the author's summary.
 - Findings use P0 (critical), P1 (high), P2 (normal), P3 (minor), with file/line, reproduction or reasoning, impact and a proposed fix. Resolve P0/P1 before ready-for-review claims; explicitly track deferred P2/P3 with reason and acceptance impact.

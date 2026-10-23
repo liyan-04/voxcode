@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "engines": { "node": ">=22" },
-  "devDependencies": { "marked": "18.1.1" },
+  "devDependencies": { "c8": "10.1.3", "marked": "18.1.1" },
   "scripts": {
     "test": "node --test scripts/test/*.test.mjs apps/mac/test/*.test.mjs packages/voice/test/*.test.js apps/relay/test/*.test.mjs apps/integration/test/*.test.mjs",
     "test:policy": "node --test scripts/test/*.test.mjs",
+    "test:coverage:node": "node scripts/coverage.mjs collect-node --output coverage/node",
+    "test:coverage:swift": "node scripts/coverage.mjs collect-swift --output coverage/swift",
     "hooks:install": "git config --local core.hooksPath .githooks",
     "start": "node apps/integration/cli.mjs",
     "relay": "node apps/relay/relay-cli.mjs",
