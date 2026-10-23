@@ -9,6 +9,7 @@ These paths are relative to the original VoxCode checkout, not the parent reposi
 | Mac `/root/mac_v1` | `.worktrees/mac` | `codex/mac-phone-demo` | M1 / MAC-002+003, MAC-004 fixes; PR #3 |
 | Relay `/root/relay_v1` | `.worktrees/relay` | `codex/relay-phone-demo` | M2 / RELAY-002, RELAY-003 fixes; PR #4 |
 | Coordinator `/root` | `.worktrees/integration` | `codex/integration-phone-demo` | M3 / voice, runtime, benchmarks and integration |
+| Architect `/root/architect` | `.worktrees/architecture` | `codex/architecture-checkpoint` | ARCH-003 / cross-component checkpoint, baseline d6eac09 |
 
 The original `codex/phone-demo` checkout retains all pre-migration implementation
 files as a recovery snapshot. Do not use it for new source edits or copy it over
@@ -18,8 +19,9 @@ dependencies/build products were excluded. `.worktrees/` is committed as ignored
 
 The native desktop worktree tool cannot select this nested repository and the
 parent repository has no commits. The coordinator therefore used `git worktree
-add` in the actual VoxCode repository. `git worktree list` identifies all four
-linked checkouts. No unrelated repository state was imported.
+add` in the actual VoxCode repository. `git worktree list` identifies the original
+checkout plus five linked worktrees, including the later architect worktree.
+No unrelated repository state was imported.
 
 Workers edit only their worktree and assigned paths, and may inspect another
 component for review. They do not stage, commit, switch, reset, clean or push.
