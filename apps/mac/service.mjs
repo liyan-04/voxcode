@@ -605,7 +605,7 @@ export function createService(options) {
         if (t.codexReconciliationRequired)
           fail(503, "unavailable", DISPATCH_RECOVERY_MESSAGE);
         if (!text(b.prompt)) fail(400, "invalid");
-        if (active.has(id) || t.status === "queued") fail(409, "conflict");
+        if (active.has(id) || t.status === "queued") fail(409, "blocked");
         const criteria = criteriaFor(b.criteria, t.version + 1, t.criteria);
         t.prompt = b.prompt;
         t.version++;
@@ -621,21 +621,21 @@ export function createService(options) {
       } else if (action === "cancel") {
         if (t.status === "stopping") return publicTask(t);
         if (["completed", "failed", "interrupted"].includes(t.status))
-          fail(409, "conflict");
+          fail(409, "blocked");
         approvals.get(id)?.reply("decline");
         approvals.delete(id);
         t.approval = null;
         active.get(id)?.controller.abort();
         update(t, active.has(id) ? "stopping" : "interrupted");
       } else if (action === "accept") {
-        if (t.status !== "completed") fail(409, "conflict");
+        if (t.status !== "completed") fail(409, "blocked");
         if (
           t.currentFailedCheck ||
           t.criteria.some((c) => c.required && c.status !== "passed")
         )
           fail(
             409,
-            "conflict",
+            "blocked",
             "Required criteria and trusted checks must pass before acceptance.",
           );
         t.acceptance = "accepted";
@@ -645,10 +645,10 @@ export function createService(options) {
           criteria: copy(t.criteria),
         };
       } else if (action === "criterion") {
-        if (t.status !== "completed") fail(409, "conflict");
+        if (t.status !== "completed") fail(409, "blocked");
         const criterion = t.criteria.find((c) => c.id === approvalId);
         if (!criterion) fail(404, "unknown");
-        if (criterion.verification !== "manual") fail(409, "conflict");
+        if (criterion.verification !== "manual") fail(409, "blocked");
         if (
           !["pass", "fail"].includes(b.decision) ||
           (b.note !== undefined && !text(b.note, 2000))
@@ -674,7 +674,7 @@ export function createService(options) {
           a.expires < Date.now() ||
           t.status !== "waiting_approval"
         )
-          fail(409, "conflict");
+          fail(409, "blocked");
         if (!["accept", "decline"].includes(b.decision)) fail(400, "invalid");
         approvals.delete(id);
         t.approval = null;

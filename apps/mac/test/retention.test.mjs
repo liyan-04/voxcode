@@ -120,7 +120,7 @@ test("bounded pending approval decisions accept and decline at the mutation cap 
             block.id,
             approvalId,
           ),
-        { status: 409, code: "conflict" },
+        { status: 409, code: "blocked" },
       );
       saved.push({ body, approvalId, result });
     }
