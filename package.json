@@ -1,0 +1,11 @@
+{
+  "name": "voxcode",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test apps/mac/test/*.test.mjs packages/voice/test/*.test.mjs",
+    "start": "node apps/mac/src/cli.mjs"
+  }
+}
