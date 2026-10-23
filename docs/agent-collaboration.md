@@ -21,11 +21,16 @@ Keep tasks small enough to verify independently. Parallelize independent paths; 
 | Role | Responsibility |
 | --- | --- |
 | Human product owner | Requirements, scope tradeoffs, final acceptance and authorized external actions |
-| Coordinator | Task decomposition, dependencies, contracts, ownership ledger, integration, scoped commits/PRs |
+| Coordinator | Product/user communication, shared-file integration, ownership enforcement, reproducible verification, scoped commits/PRs |
+| Architect agent | Coordinate the three developers: technical decomposition, interface/dependency decisions, blockers, cross-component checks and integration recommendations |
 | Implementer | Assigned paths, meaningful checks, concise handoff; surface uncertainty and blockers |
 | Independent reviewer | Inspect requirements/code/evidence, report defects and residual risk; do not self-approve |
 
 The user has authorized parallel agent development for this project. Keep concurrency within available tool slots and independently owned work. Two reviews means two independent reviewers, not one implementer reviewing its own output twice. A reviewer may review multiple components it did not implement; targeted rereview follows material fixes.
+
+The architect directs the existing iOS, Mac and Relay agents through bounded task briefs and receives their handoffs. See [architect role](architecture/README.md). Contract changes are proposed by the architect and applied to shared files by the coordinator before affected developers proceed. The architect's cross-component check is additional to each component's two independent reviews.
+
+Agent roles do not require every agent to stay active continuously. This session has four execution slots including the coordinator: while the architect is actively coordinating, at most two developers can execute; after a checkpoint the architect can become idle so all three developers run concurrently. Never create duplicate workers or silently drop a developer to work around the limit.
 
 Prefer isolated worktrees for new independent work. For the current shared checkout, workers must never run staging, commit, stash, checkout/switch, reset, cleanup or push commands. They may inspect status/diffs. Only the coordinator performs Git mutations, after workers are quiescent for branch switches. Never remove another agent's untracked files.
 
@@ -33,10 +38,11 @@ Current write boundaries (2026-10-23; update before reallocating):
 
 | Owner | Exclusive paths / task |
 | --- | --- |
-| iOS worker | `apps/ios/**`; native task/voice/transport UI and core tests |
+| iOS worker | `apps/ios/**`; native task/voice/transport/results UI and core tests |
 | Mac worker | `apps/mac/**`; scheduling, persistent sessions, evidence and acceptance |
-| Relay worker | `apps/relay/**`, `scripts/create-local-tls.*`; TLS and bounded transport |
-| Coordinator | Shared docs/contracts/CI, `apps/integration/**`, `packages/voice/**`, `apps/preview/**`, demo; allocate later audio work explicitly |
+| Relay worker | `apps/relay/**`, `scripts/create-local-tls.*`; TLS and bounded core transport |
+| Architect | Assigned `docs/architecture/**` coordination records; no implementation/shared-contract/Git mutations |
+| Coordinator | Shared docs/contracts/CI, `apps/integration/**`, `packages/voice/**`, benchmark scripts/reports and demo; allocate later audio work explicitly; `apps/preview/**` deferred |
 
 This table is a coordination record, not a CI-enforced access control list. A worker needing another path sends the coordinator a proposed change and waits for ownership reassignment. Shared documentation is updated from handoffs by the coordinator. Every handoff names actual changed paths so integration can detect overlap.
 

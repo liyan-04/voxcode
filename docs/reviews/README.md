@@ -10,15 +10,19 @@ Historical initial reviews below are evidence for their original snapshots only.
 | --- | --- | --- | --- |
 | Phone client v1 | pending | pending | incomplete native integration |
 | Mac executor v1 | pending | pending | incomplete scheduling/session changes |
-| Relay v1 | pending | pending | TLS/preview work pending |
+| Relay v1 | pending | pending | TLS/core transport work pending |
 | Linx voice/integration v1 | pending | pending | tools/audio work pending |
-| Preview v1 | pending | pending | implementation pending |
+| Preview (deferred) | not scheduled | not scheduled | Outside the first phone-demo scope; review required if resumed |
 
 ## Repository policy
 
 | Scope | Correctness/security | Collaboration/process | Resolution |
 | --- | --- | --- | --- |
 | Commit/PR and multi-agent policy | [report](policy-security.md) | [report](policy-workflow.md) | Three P2 findings fixed and rereviewed; local policy tests 13/13. Remote CI tracked in docs/progress.md. |
+
+## Phone-demo scope and architect role
+
+Two independent document-only [reviews](phone-demo-scope.md) cover the scope reduction and architect coordination rules. Three findings were fixed; both targeted rereviews reported no residual findings or conflicts. These checks do not approve the unfinished iOS, Mac, Relay or voice implementations. The architect's own coordination record is not an independent component review.
 
 ## Historical initial reports
 

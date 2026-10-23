@@ -2,7 +2,7 @@
 
 iPhone voice control for Codex running on your Mac, with Linx AI (灵矽 AI) handling voice interaction.
 
-Approved product direction: [中文参赛方案](docs/product-proposal.zh-CN.md). Implementation resumed on 2026-10-23 with configurable concurrency and fixed-IP TLS. Deployment remains deferred until the user resumes it explicitly.
+Approved product direction: [手机演示版方案](docs/phone-demo-scope.zh-CN.md). The first demo runs inside the native VoxCode app; generated-site interactive preview and a full Mac workbench are deferred. Configurable concurrency, Linx voice, outdoor access, result inspection and reproducible benchmarks remain in scope. Deployment remains deferred until the user resumes it explicitly.
 
 Status: initial native client, Mac bridge, remote relay and voice adapter implemented with local tests. End-to-end device verification remains pending; see the requirements audit before treating this as a delivered app.
 

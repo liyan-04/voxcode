@@ -2,12 +2,14 @@
 
 ## Scope
 - Build a two-day hackathon MVP: iPhone voice controller, Mac Codex executor, Linx AI voice integration.
-- Read CONTRIBUTING.md and docs/agent-collaboration.md for mandatory commit/PR and multi-agent rules. Read docs/product-proposal.zh-CN.md, docs/contract.md and docs/implementation-v1.md before implementation; docs/plan.md is historical.
+- Read CONTRIBUTING.md and docs/agent-collaboration.md for mandatory commit/PR and multi-agent rules. Read docs/phone-demo-scope.zh-CN.md, docs/contract.md and docs/implementation-v1.md before implementation; docs/product-proposal.zh-CN.md and docs/plan.md are historical broader plans.
 - Record decisions, alternatives, evidence, limitations and optimization proposals in docs/. Do not record private internal reasoning or credentials.
 - Never claim mock output is real Codex or Linx output.
+- The first demo is the native VoxCode app with real task progress/diff/checks/acceptance. Interactive generated-site preview, full Mac workbench and custom AirPlay control are deferred. Preserve benchmark scripts and lightweight authenticated monitoring; do not build a monitoring platform before the core loop. Original competition AirPlay compliance remains unconfirmed.
 
 ## Collaboration
 - Workers edit only their assigned paths. The coordinator owns shared contracts and integration.
+- A dedicated architect agent coordinates the iOS, Mac and Relay developers: technical task briefs, interfaces, dependency order, blockers and cross-component checks. Read docs/architecture/README.md. The coordinator retains Git/PR, integration and shared-file mutation ownership; architect checks do not replace the two independent component reviews.
 - Before dispatch, record goal, writable paths, contract/dependencies and verification criteria. Use separate worktrees for new independent work; in the current shared checkout, workers must not stage, commit, stash, switch branches or push.
 - Do not commit another worker's changes. Coordinator makes scoped commits after verification.
 - Each implementation component requires two reviews independent of its implementer; save reviewed revision, findings and resolutions under docs/reviews/. AI reports are not human GitHub approvals or user acceptance.
