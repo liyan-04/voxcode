@@ -32,9 +32,11 @@ The editable pairing address is independent from the existing Keychain origin/to
 
 Before the first permission/network await, Recorder freezes task ID, version and request ID. Actual startup failure/final callbacks, tap uploads and poll results use the same generation owner. Discard immediately cancels uploads and clears state; deletion is best effort. Old permission/request/poll callbacks cannot discard a newer recording or overwrite its transcript/error. Stop drains ordered PCM uploads; interruption/background/input changes invalidate callbacks and stop capture/playback without automatically resuming.
 
+Re-recording preserves the composer text, waits for the prior session's bounded DELETE attempt, and uses a new recording request ID for the same task/version. This avoids reusing a closed voice-session replay ID. Starting while cleanup is pending also waits at the Recorder boundary; local audio/state cleanup remains immediate. Snapshot refreshes use one current request owner, invalidated at mutation start and settlement. Old refreshes and late replay responses cannot replace newer observed task versions/timestamps.
+
 VoiceDraft events must match the frozen task/version, have valid conditions and remain unexpired when consumed. They populate the same editable composer, retaining explicit user edits. Focus events only display a suggestion. No tool, STT or draft submits execution. New task/follow-up confirmation includes edited conditions; an active turn prevents follow-up execution. A version change preserves text and requires explicit rereview of the current version with a new request ID.
 
-The first submission freezes its route, text, version, conditions and request ID. An uncertain response locks editing and Retry sends the identical payload. A small local submission journal survives closing/relaunch and is scoped by a hash of the paired origin plus credential; it does not duplicate the bearer outside Keychain. The journal contains the confirmed prompt/conditions in app-local preferences and is removed after success or local forgetting. Pending settings also retain their original request ID/value for retry within the session.
+The first submission freezes its route, text, version, conditions and request ID. An uncertain response locks editing and Retry sends the identical payload. A small local submission journal survives closing/relaunch and is scoped by a hash of the paired origin plus credential; it does not duplicate the bearer outside Keychain. The journal contains the confirmed prompt/conditions in app-local preferences. Success or explicit pre-mutation rejection clears the matching journal. Structured `400 invalid`, `409 stale` and `409 blocked` responses restore editing while preserving the confirmed text/conditions; stale versions require explicit rereview and a new request ID. Auth/visibility failures, `409 conflict`, `429`, `5xx`, malformed responses and transport failures remain uncertain and retain the original request for reconciliation. A revoked retry cannot prove whether an earlier lost response already executed. Local forgetting also clears the journal. Pending settings follow the same rejection/uncertainty distinction within the session.
 
 Mac-decoded signed int16 little-endian mono PCM at negotiated 16 or 24 kHz is converted to Float32 and scheduled through AVAudioEngine/AVAudioPlayerNode. No native Opus dependency exists. Sequence/cursor validation rejects gaps, regressions and oversized batches. Frame sizes and queued audio (four seconds) are bounded. Audio received while recording is discarded to prevent feedback. Recording start clears output; abort, aborted TTS, discard and interruption stop queued playback immediately. `outputSupported` means the server codec supports the stream, not that a speaker was heard. Native/device audible speech and actual input conversion remain separate acceptance gates.
 
@@ -57,6 +59,10 @@ swiftc -module-cache-path /private/tmp/voxcode-swift Sources/VoxCodeCore/Core.sw
 /private/tmp/voxcode-v1-checks
 swiftc -module-cache-path /private/tmp/voxcode-swift Sources/VoxCodeCore/Core.swift Scripts/AudioChecks.swift -o /private/tmp/voxcode-audio-checks
 /private/tmp/voxcode-audio-checks
+swiftc -module-cache-path /private/tmp/voxcode-swift Sources/VoxCodeCore/Core.swift Scripts/SubmissionChecks.swift -o /private/tmp/voxcode-submission-checks
+/private/tmp/voxcode-submission-checks
+swiftc -module-cache-path /private/tmp/voxcode-swift Sources/VoxCodeCore/Core.swift Scripts/OrderingChecks.swift -o /private/tmp/voxcode-ordering-checks
+/private/tmp/voxcode-ordering-checks
 ```
 
 Actual simulation transport without an iOS SDK:

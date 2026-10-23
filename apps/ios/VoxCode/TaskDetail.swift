@@ -21,6 +21,7 @@ struct TaskDetail: View {
                         LabeledContent("验收", value: task.acceptance == "accepted" ? "已验收" : "待验收")
                         LabeledContent("版本", value: "v\(task.version) · \(task.shortID)")
                         if !task.summary.isEmpty { Text(task.summary) }
+                        if let error = session.error { Text(error).font(.caption).foregroundStyle(.red) }
                         if !session.connected { Label("离线 · 当前为缓存快照", systemImage: "wifi.slash").foregroundStyle(.red) }
                         if task.status == "queued" { Text(task.waitingReason ?? (session.settings.recoveryRequired ? "Mac 需要恢复旧执行" : "等待执行名额")).font(.caption).foregroundStyle(.secondary) }
                         Picker("详情", selection: $tab) { Text("动态").tag(0); Text("结果").tag(1) }.pickerStyle(.segmented)
@@ -80,7 +81,7 @@ struct TaskDetail: View {
         let submission = PendingSubmission(path: "/api/tasks/\(task.id)/\(endpoint)", mutation: Mutation(version: version ?? task.version, decision: decision))
         pending = submission; perform(submission)
     }
-    private func perform(_ submission: PendingSubmission) { busy = true; Task { if await session.mutate(submission.path, submission.mutation) { pending = nil }; busy = false; await session.refresh() } }
+    private func perform(_ submission: PendingSubmission) { busy = true; Task { let outcome = await session.mutate(submission.path, submission.mutation); if !outcome.retainsPending { pending = nil }; busy = false; await session.refresh() } }
     private func pollEvents() async {
         var cursor = 0
         while !Task.isCancelled {
@@ -123,10 +124,11 @@ private struct CriterionReview: View {
             Section("v\(decision.version) · 人工检查") { Text(decision.criterion.text); TextField("检查记录（可选）", text: $note, axis: .vertical).disabled(pending != nil || busy) }
             Section {
                 if stale { Text("任务版本已变化").foregroundStyle(.red) }
+                if let error = session.error { Text(error).font(.caption).foregroundStyle(.red) }
                 if pending != nil { Button("原样重试") { send(pending!) }.disabled(busy || !session.connected) }
                 else { Button("检查通过") { send(Mutation(version: decision.version, decision: "pass", note: note)) }; Button("检查失败", role: .destructive) { send(Mutation(version: decision.version, decision: "fail", note: note)) } }
             }.disabled(busy || !session.connected || (pending == nil && stale))
         }.safeAreaInset(edge: .top, spacing: 0) { SimulationBanner() }.navigationTitle("人工验收").toolbar { Button("关闭") { dismiss() }.disabled(busy) } }
     }
-    private func send(_ mutation: Mutation) { pending = mutation; busy = true; Task { let success = await session.mutate("/api/tasks/\(decision.taskID)/criteria/\(decision.criterion.id)", mutation); busy = false; if success { dismiss() } } }
+    private func send(_ mutation: Mutation) { pending = mutation; busy = true; Task { let outcome = await session.mutate("/api/tasks/\(decision.taskID)/criteria/\(decision.criterion.id)", mutation); busy = false; if !outcome.retainsPending { pending = nil }; if outcome == .succeeded { dismiss() } else { await session.refresh() } } }
 }
