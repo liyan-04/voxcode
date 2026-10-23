@@ -1,0 +1,43 @@
+name: Verify VoxCode
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bridge-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --prefix packages/voice
+      - run: npm ci --ignore-scripts --prefix apps/relay
+      - run: npm test
+
+  native-build:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Swift core with the full Xcode toolchain
+        working-directory: apps/ios
+        run: swift test
+      - name: Install verified XcodeGen 2.44.1 release
+        run: |
+          curl --fail --location --retry 2 https://github.com/yonaskolb/XcodeGen/releases/download/2.44.1/xcodegen.zip --output "$RUNNER_TEMP/xcodegen.zip"
+          echo 'a2e905fb68446e9bb4008cdfe2e13e3f176d0cbcca828b71770f8e53fca91b73  '"$RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP/xcodegen"
+          find "$RUNNER_TEMP/xcodegen" -type f -name xcodegen -exec chmod +x {} \;
+      - name: Generate and build unsigned iOS simulator app
+        working-directory: apps/ios
+        run: |
+          XCODEGEN_BIN=$(find "$RUNNER_TEMP/xcodegen" -type f -name xcodegen | head -n 1)
+          "$XCODEGEN_BIN" generate --spec project.yml
+          xcodebuild -project VoxCode.xcodeproj -scheme VoxCode -sdk iphonesimulator -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/voxcode-derived" CODE_SIGNING_ALLOWED=NO build
