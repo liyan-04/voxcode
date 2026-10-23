@@ -1,5 +1,6 @@
 import SwiftUI
 import Security
+import CryptoKit
 import VoxCodeCore
 
 enum TokenVault {
@@ -16,15 +17,56 @@ struct EventsEnvelope: Decodable { var events: [TaskEvent]; var cursor: Int }
     var address: String { paired?.origin.absoluteString ?? "https://" }
     var token: String { paired?.token ?? "" }
     var tasks: [TaskSnapshot] = []; var error: String?; var connected = false; var health = ConnectionHealth()
-    var api: BridgeAPI { get throws { guard let paired else { throw APIError(message: "Pair with your Mac first") }; return BridgeAPI(base: paired.origin, token: paired.token) } }
-    func pair(address draftAddress: String, code: String) async -> Bool {
-        do { guard let url = URL(string: draftAddress) else { throw APIError(message: "Invalid HTTPS bridge URL") }; let origin = try BridgeAPI.validateOrigin(url); let client = BridgeAPI(base: origin, token: ""); let data = try JSONSerialization.data(withJSONObject: ["code": code]); struct Pair: Decodable { var sessionToken: String }; let result = try JSONDecoder().decode(Pair.self, from: await client.request("/api/pair", method: "POST", body: data)); let binding = try PairedBridge(origin: origin, token: result.sessionToken); try TokenVault.save(binding); paired = binding; tasks = []; connected = false; health = ConnectionHealth(); await refresh(); return true } catch { self.error = error.localizedDescription; return false }
+    var settings = BridgeSettings(); var pendingSettings: SettingsMutation?
+    private(set) var pendingSubmission: PendingSubmission?
+    private(set) var simulation = false
+    private let fixture = SimulationBridge()
+    private var revision = UUID()
+    init() { restoreSubmission() }
+    private var submissionKey: String? {
+        guard !simulation, let paired else { return nil }
+        let digest = SHA256.hash(data: Data((paired.origin.absoluteString + "\n" + paired.token).utf8)).map { String(format: "%02x", $0) }.joined()
+        return "voxcode.pending.\(digest)"
     }
-    func refresh() async { let binding = paired; do { let result = try await api.json(TasksEnvelope.self, "/api/tasks").tasks; guard paired == binding else { return }; tasks = result; connected = true; health.succeeded() } catch { guard paired == binding else { return }; connected = false; health.failed(error.localizedDescription) } }
+    private func restoreSubmission() { pendingSubmission = submissionKey.flatMap { UserDefaults.standard.data(forKey: $0) }.flatMap { try? JSONDecoder().decode(PendingSubmission.self, from: $0) } }
+    func retainSubmission(_ pending: PendingSubmission?) {
+        pendingSubmission = pending
+        guard let key = submissionKey else { return }
+        if let pending, let data = try? JSONEncoder().encode(pending) { UserDefaults.standard.set(data, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) }
+    }
+    var api: BridgeAPI { get throws {
+        if simulation { return BridgeAPI(base: URL(string: "https://simulation.invalid")!, token: "simulation", transport: { [fixture] in try await fixture.send($0) }) }
+        guard let paired else { throw APIError(message: "请先配对 Mac") }
+        return try BridgeTransport.api(origin: paired.origin, token: paired.token)
+    } }
+    func setSimulation(_ enabled: Bool) async { guard simulation != enabled else { return }; simulation = enabled; revision = UUID(); tasks = []; pendingSettings = nil; restoreSubmission(); connected = false; health = ConnectionHealth(); settings = BridgeSettings(); if enabled || paired != nil { await refresh() } }
+    func pair(address draftAddress: String, code: String) async -> Bool {
+        do { guard let url = URL(string: draftAddress) else { throw APIError(message: "请输入有效的 HTTPS 地址") }; let origin = try BridgeAPI.validateOrigin(url); let client = try BridgeTransport.api(origin: origin, token: ""); let data = try JSONSerialization.data(withJSONObject: ["code": code]); struct Pair: Decodable { var sessionToken: String }; let result = try JSONDecoder().decode(Pair.self, from: await client.request("/api/pair", method: "POST", body: data)); let binding = try PairedBridge(origin: origin, token: result.sessionToken); try TokenVault.save(binding); paired = binding; revision = UUID(); simulation = false; tasks = []; connected = false; pendingSettings = nil; restoreSubmission(); health = ConnectionHealth(); await refresh(); return true } catch { self.error = error.localizedDescription; return false }
+    }
+    func refresh() async {
+        let current = revision
+        do {
+            let client = try api
+            async let snapshot = client.json(TasksEnvelope.self, "/api/tasks")
+            async let configuration = client.json(BridgeSettings.self, "/api/settings")
+            let (result, updatedSettings) = try await (snapshot, configuration)
+            guard revision == current else { return }
+            tasks = result.tasks; settings = updatedSettings; connected = true; health.succeeded()
+        } catch { guard revision == current else { return }; connected = false; health.failed(error.localizedDescription) }
+    }
+    func saveSettings(limit: Int) async -> Bool {
+        let current = revision
+        do {
+            if pendingSettings == nil { pendingSettings = try SettingsMutation(executionLimit: limit) }
+            let body = try JSONEncoder().encode(pendingSettings!)
+            let result = try JSONDecoder().decode(BridgeSettings.self, from: await api.request("/api/settings", method: "POST", body: body))
+            guard revision == current else { return false }; settings = result; pendingSettings = nil; return true
+        } catch { guard revision == current else { return false }; self.error = error.localizedDescription; return false }
+    }
     func mutate(_ path: String, _ mutation: Mutation) async -> Bool {
-        let binding = paired
-        do { let result = try await api.json(TaskEnvelope.self, path, method: "POST", mutation: mutation); guard paired == binding else { return false }; if let index = tasks.firstIndex(where: { $0.id == result.task.id }) { tasks[index] = result.task } else { tasks.append(result.task) }; return true } catch { self.error = error.localizedDescription; return false }
+        let current = revision
+        do { let result = try await api.json(TaskEnvelope.self, path, method: "POST", mutation: mutation); guard revision == current else { return false }; if let index = tasks.firstIndex(where: { $0.id == result.task.id }) { tasks[index] = result.task } else { tasks.append(result.task) }; return true } catch { guard revision == current else { return false }; self.error = error.localizedDescription; return false }
     }
     func unpair() async -> Bool { let binding = paired; do { _ = try await api.request("/api/unpair", method: "POST"); guard paired == binding else { return false }; forgetLocally(); return true } catch { self.error = "Could not revoke pairing: \(error.localizedDescription). Local forgetting leaves the Mac credential active."; return false } }
-    func forgetLocally() { TokenVault.clear(); paired = nil; tasks = []; connected = false; health = ConnectionHealth() }
+    func forgetLocally() { retainSubmission(nil); TokenVault.clear(); paired = nil; revision = UUID(); tasks = []; settings = BridgeSettings(); pendingSettings = nil; connected = false; health = ConnectionHealth() }
 }

@@ -8,6 +8,16 @@
 <key>CFBundleVersion</key><string>1</string>
 <key>CFBundleShortVersionString</key><string>0.1.0</string>
 <key>UILaunchScreen</key><dict/>
+<key>NSAppTransportSecurity</key><dict>
+<key>NSExceptionDomains</key><dict>
+<key>121.52.250.201</key><dict>
+<key>NSIncludesSubdomains</key><false/>
+<key>NSExceptionAllowsInsecureHTTPLoads</key><true/>
+<key>NSExceptionRequiresForwardSecrecy</key><false/>
+<key>NSExceptionMinimumTLSVersion</key><string>TLSv1.2</string>
+</dict>
+</dict>
+</dict>
 <key>NSMicrophoneUsageDescription</key><string>Record instructions for your selected Mac development task.</string>
 <key>NSLocalNetworkUsageDescription</key><string>Connect to your paired Mac bridge on your local network.</string>
 <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
