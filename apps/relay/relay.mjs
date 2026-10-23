@@ -1,7 +1,8 @@
 import {createServer} from 'node:http';
+import {createServer as createSecureServer} from 'node:https';
 import {randomUUID, timingSafeEqual} from 'node:crypto';
 import {WebSocketServer, WebSocket} from 'ws';
-import {credentials,bounded,route,bearer,requestType,decodeBody,responseType,readBody,DEFAULT_BODY_LIMIT,DEFAULT_RESPONSE_LIMIT,FRAME_LIMIT,MAX_INFLIGHT} from './protocol.mjs';
+import {credentials,bounded,route,bearer,requestType,decodeBody,responseType,readBody,atCapacity,DEFAULT_BODY_LIMIT,DEFAULT_RESPONSE_LIMIT,FRAME_LIMIT} from './protocol.mjs';
 
 export function createRelay(options) {
   const {machineId,machineKey} = options; credentials(machineId,machineKey);
@@ -9,6 +10,13 @@ export function createRelay(options) {
   const maxResponse = bounded(options.maxResponseBytes,DEFAULT_RESPONSE_LIMIT,DEFAULT_RESPONSE_LIMIT);
   const timeout = bounded(options.requestTimeoutMs,15000,60000);
   const pairLimit = bounded(options.pairLimit,5,100);
+  let tls;
+  if (options.tls !== undefined) {
+    const input = options.tls;
+    const material = value => (typeof value === 'string' || Buffer.isBuffer(value)) && value.length > 0;
+    if (!input || !material(input.key) || !material(input.cert) || (input.ca !== undefined && !material(input.ca))) throw new Error('Invalid TLS configuration');
+    tls = {key:input.key,cert:input.cert,ca:input.ca,minVersion:'TLSv1.2'};
+  }
   let connector, closing = false;
   const pending = new Map(), expired = new Set();
   const rates = new Map();
@@ -24,8 +32,8 @@ export function createRelay(options) {
   }
   function retire(id) { expired.add(id); if (expired.size > 1024) expired.delete(expired.values().next().value); }
   function remove(id) { const entry = pending.get(id); if (entry) { pending.delete(id); clearTimeout(entry.timer); retire(id); } return entry; }
-  function cancel(id) { if (connector?.readyState === WebSocket.OPEN) connector.send(JSON.stringify({type:'cancel',id})); }
-  const server = createServer(async (req,res) => {
+  function cancel(id,target) { if (target?.readyState === WebSocket.OPEN) target.send(JSON.stringify({type:'cancel',id})); }
+  const handleRequest = async (req,res) => {
     const allowed = route(req.method,req.url);
     if (!allowed) { req.resume(); return sendError(res,404,'Unknown relay route'); }
     if (allowed.error) { req.resume(); return sendError(res,400,'Invalid query'); }
@@ -34,21 +42,21 @@ export function createRelay(options) {
     if (!requestType(req.method,allowed.kind,req.headers['content-type'])) { req.resume(); return sendError(res,415,'Unsupported content type'); }
     if ((allowed.kind === 'pair' && !rate('pair',pairLimit)) || (allowed.kind === 'health' && !rate('health',60))) { req.resume(); return sendError(res,429,'Relay request limit reached'); }
     if (closing || !connector || connector.readyState !== WebSocket.OPEN) { req.resume(); return sendError(res,503,'Mac is offline'); }
-    if (pending.size >= MAX_INFLIGHT) { req.resume(); return sendError(res,429,'Too many in-flight requests'); }
+    if (atCapacity(pending,allowed.media)) { req.resume(); return sendError(res,429,'Too many in-flight requests'); }
     if (Number(req.headers['content-length']) > maxBody) { req.resume(); return sendError(res,413,'Request body too large'); }
+    const target = connector, id = randomUUID();
+    const timer = setTimeout(() => { if (remove(id)) { sendError(res,504,'Mac request timed out'); req.resume(); cancel(id,target); } },timeout);
+    pending.set(id,{res,timer,target,media:allowed.media});
+    res.on('close', () => { if (remove(id)) cancel(id,target); });
     let body;
-    try { body = await readBody(req,maxBody); } catch { return sendError(res,413,'Request body invalid or too large'); }
-    if (req.method !== 'POST' && body.length) return sendError(res,400,'Unexpected request body');
-    const target = connector;
-    if (!target || target.readyState !== WebSocket.OPEN) return sendError(res,503,'Mac is offline');
-    if (pending.size >= MAX_INFLIGHT) return sendError(res,429,'Too many in-flight requests');
-    const id = randomUUID();
-    const timer = setTimeout(() => { if (remove(id)) { sendError(res,504,'Mac request timed out'); cancel(id); } },timeout);
-    pending.set(id,{res,timer,target});
-    res.on('close', () => { if (remove(id)) cancel(id); });
+    try { body = await readBody(req,maxBody); } catch { remove(id); return sendError(res,413,'Request body invalid or too large'); }
+    if (!pending.has(id)) return;
+    if (req.method !== 'POST' && body.length) { remove(id); return sendError(res,400,'Unexpected request body'); }
+    if (target !== connector || target.readyState !== WebSocket.OPEN) { remove(id); return sendError(res,503,'Mac is offline'); }
     try { if (target.bufferedAmount > FRAME_LIMIT * 2) throw new Error('Backpressure'); target.send(JSON.stringify({type:'request',id,method:req.method,path:req.url,authorization:allowed.public?undefined:auth,contentType:req.headers['content-type'],body:body.toString('base64')})); }
     catch { remove(id); sendError(res,503,'Mac connection failed'); }
-  });
+  };
+  const server = tls ? createSecureServer(tls,handleRequest) : createServer(handleRequest);
   server.requestTimeout = 15000; server.headersTimeout = 10000; server.maxConnections = 128;
   const wss = new WebSocketServer({noServer:true,maxPayload:FRAME_LIMIT,perMessageDeflate:false});
   server.on('upgrade',(req,socket,head) => {
