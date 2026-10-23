@@ -67,3 +67,37 @@ b0674bca39961fde94348a67d1efed69705cd7d77796fca294c5c7b997ae3585  apps/mac/test/
 ```
 
 Suggested commit subject: `fix(mac): recheck mutation authorization and bind command approvals to owned turns`.
+
+## MAC-005: distinguish no-effect business rejection from idempotency conflict
+
+Date: 2026-10-24. Base: `fecd68f12c1dec4254e7379436fc6543143fe081` plus the content snapshot below. Implementer: `/root/mac_v1`. The coordinator owns the shared-contract update and commits; this section is remediation evidence, not independent review.
+
+The architect identified that using `409 conflict` both for request-ID identity collisions and business precondition rejection prevents clients from deciding when editing can safely resume. As explicitly assigned by the coordinator, seven existing synchronous business-precondition failures now return `409 blocked`: follow-up while active/queued; cancellation of a terminal task; acceptance before completion or before required criteria/trusted checks pass; criterion decisions before completion or for a nonmanual criterion; and unavailable/mismatched/expired approval identities. Their checks remain before their respective mutation effects. The four request-ID fingerprint/cross-budget collision sites still return `409 conflict`; replay ordering and approval/authentication execution logic did not change.
+
+Changed paths: `apps/mac/service.mjs`, new `apps/mac/test/blocked.test.mjs`, and existing `apps/mac/test/{service,retention,v1-http}.test.mjs`. Existing approval tests now expect the new business error code; the HTTP acceptance test checks both status and JSON code.
+
+The new focused regression table compares the complete persisted `state.json` bytes before and after each business rejection, including task/evidence/events/replay state, and checks that the rejected request ID is absent from the replay journal. It covers running/queued follow-up, completed/failed/interrupted cancellation, early criterion/acceptance, unverified conditions, sticky trusted check failure, wrong/expired approval IDs, and no extra approval callback. The control case verifies task/settings fingerprint and cross-budget collisions remain `conflict` and the original successful replay remains identical.
+
+Actual commands from `apps/mac`:
+
+| Phase | Command | Result |
+| --- | --- | --- |
+| RED | `node --test test/blocked.test.mjs` before production edits | 7 failed (`conflict` instead of `blocked`), 1 idempotency control passed |
+| Focused GREEN | `node --test test/blocked.test.mjs test/service.test.mjs test/criteria.test.mjs test/v1-http.test.mjs` | 22/22 |
+| Final full | `npm test` | 74/74; 0 failed/skipped/cancelled |
+| Formatting | Prettier `3.6.2 --write` on service and changed/new tests | exit 0 |
+| Whitespace | `git diff --check` from worktree root | exit 0 |
+
+An initial expanded full run had 73/74: an existing retention regression still expected `conflict` for an already-consumed approval with a fresh request ID. Its expected code was updated to `blocked`; successful exact replay and callback-count assertions were preserved. The final full run above includes that correction.
+
+Evidence environment: local macOS, Node `v26.0.0`, controlled executors and real service persistence/loopback HTTP. No live Codex/Linx, native device, deployment or outdoor checks. No Git mutation by the implementer. Source frozen for coordinator/independent follow-up.
+
+```text
+d44703fbf7f213794448fd5c5bf395097b11af9a8c677d27a3999c25d01dbfb1  apps/mac/service.mjs
+e0b529e9590e9426192bf0bbc3eb2991938608bf02970c4a1691d056d5d6a539  apps/mac/test/blocked.test.mjs
+6618d8ab3c7b02c4c865d2cc38c4522bbddc0fa532fa63c994dc0c9beccc6af3  apps/mac/test/service.test.mjs
+71dfc00beb516939970e79522ca98b4d736044a094eb3040b3aa390fa979472b  apps/mac/test/retention.test.mjs
+d478287ffd739aa8be160b2cdbafda8b098129606c83ab9ada4cecddd852fd66  apps/mac/test/v1-http.test.mjs
+```
+
+Suggested subject: `fix(mac): distinguish blocked mutations from idempotency conflicts`.
