@@ -1,1 +1,1 @@
-{"name":"@voxcode/relay","private":true,"version":"0.1.0","type":"module","engines":{"node":">=22"},"scripts":{"start":"node relay-cli.mjs","connector":"node connector-cli.mjs","test":"node --test test/*.test.mjs"},"dependencies":{"ws":"8.18.3"}}
+{"name":"@voxcode/relay","private":true,"version":"0.1.0","type":"module","engines":{"node":">=22"},"scripts":{"start":"node relay-cli.mjs","connector":"node connector-cli.mjs","test":"node --test test/*.test.mjs"},"dependencies":{"ws":"8.22.0"}}

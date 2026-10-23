@@ -6,9 +6,9 @@ router port forwarding or inbound Mac firewall rule is needed. This is a single
 configured Mac MVP. Node >=22 and exact-pinned `ws` are required on both hosts.
 
 ```
-iPhone -- HTTPS --> public server reverse proxy --> relay (127.0.0.1:8788)
-                                                     |
-company Mac connector -- outbound WSS ----------------+
+iPhone -- HTTPS --> fixed-IP TLS relay (:9899)
+                               |
+company Mac connector -- WSS --+
        |
        +-- HTTP --> Mac bridge (127.0.0.1:8787)
 ```
@@ -25,28 +25,67 @@ The key must be 32-256 base64url characters; use a generated random value. This
 key belongs only to the relay and connector, never to the phone. Keep the env
 file private and outside commits.
 
-On the public server, set `VOXCODE_RELAY_HOST=127.0.0.1` and
-`VOXCODE_RELAY_PORT=8788`, then run:
+Deployment remains deferred. Do not start a public listener or access the remote
+server until the user resumes deployment; immediately recheck `bili-xs8:9899`
+and stop if occupied. The intended endpoint is `https://121.52.250.201:9899`,
+with WSS upgrades on the same port. No domain or additional public port is needed.
+
+### Local trust material
+
+From the repository root, this opt-in helper creates an entirely new ignored
+directory and refuses existing output. OpenSSL 3+ and Git are required:
+
+```sh
+node scripts/create-local-tls.mjs --ip 127.0.0.1
+```
+
+This command is a local fixture. A later authorized deployment uses the actual
+IPv4 in place of loopback. Default output is `.voxcode-tls/<IP>/`; optional
+`--out` must name a new direct child of the repository's ignored `.voxcode-tls/`.
+The helper validates the IPv4, uses structured OpenSSL arguments, verifies the
+issued leaf against that IP, and writes:
+
+- `VoxCodeCA.pem` and `VoxCodeCA.der`: public root certificates for the Mac and
+  signed iOS app respectively. These contain no private key.
+- `relay.pem` and `relay.key`: IP-SAN server certificate and its private key.
+- `VoxCodeCA.key`: private signing key, never a client asset.
+
+The output directory is mode 0700 and keys are mode 0600. The CA is EC P-256,
+SHA-256, valid for ten years; the server leaf is valid for one year and only the
+supplied IP. On generation failure, any partial ignored directory is retained;
+inspect it before choosing a new output directory. Never commit generated
+material. Transfer only reviewed public trust through the signed app or an
+independently verified channel; do not bootstrap trust over public HTTP. Rotation
+requires the corresponding reviewed client trust update.
+
+### Process configuration
+
+`VOXCODE_TLS_CERT` and `VOXCODE_TLS_KEY` are file paths loaded by the relay CLI.
+Both are required together. `VOXCODE_TLS_CA` is the public PEM file path loaded
+by the connector CLI. Factory callers pass bytes/PEM directly:
+
+```js
+createRelay({machineId, machineKey, tls: {key, cert, ca}});
+createConnector({machineId, machineKey, relayURL, bridgeURL, ca});
+```
+
+`tls.ca` is optional server trust material and does not enable mutual TLS;
+the connector still authenticates using its machine credential. Connector
+certificate-chain, hostname/IP and expiry checks are always enabled, including
+when a custom CA is supplied. TLS 1.2 or later is required. Missing custom CA uses
+system roots; it does not accept a private CA automatically. No credentials,
+bodies, private key material or WebSocket frames are logged by these CLIs.
+
+For local TLS verification, keep `VOXCODE_RELAY_HOST=127.0.0.1`, set the local
+certificate/key paths and select an available local port. From `apps/relay`:
 
 ```sh
 node --env-file=.env relay-cli.mjs
 ```
 
-Run a TLS reverse proxy on the user-provided domain with a trusted certificate.
-For example, a Caddy site proxies both HTTP and WebSocket upgrades automatically:
-
-```caddyfile
-your-domain.example {
-    reverse_proxy 127.0.0.1:8788
-}
-```
-
-Only the reverse proxy needs a public listener. Keep port 8788 on loopback. The
-relay itself does not issue certificates. Avoid logging Authorization headers,
-request/response bodies or WebSocket frames in the proxy and observability tools.
-
 On the company Mac, start the normal Mac bridge on loopback. Set
-`VOXCODE_RELAY_URL=wss://your-domain.example/connector` and set
+`VOXCODE_RELAY_URL=wss://121.52.250.201:9899/connector`, set `VOXCODE_TLS_CA`
+to the reviewed public CA PEM and set
 `VOXCODE_BRIDGE_URL` to its actual loopback HTTP origin, then run:
 
 ```sh
@@ -64,8 +103,10 @@ outbound network policy or stopped processes can make the Mac unavailable.
 Plain `ws:` is accepted only for literal loopback/localhost development URLs;
 remote connectors must use `wss:`. Local bridge destinations must be HTTP on
 `127.0.0.1`, `[::1]`, or `localhost`, with no path, credentials or query.
+The relay CLI refuses a non-loopback plaintext listener. Factory callers omitting
+`tls` must also bind their HTTP test server to loopback. No redirect is followed.
 
-On iPhone, use `https://your-domain.example` as the bridge base URL, then pair
+On iPhone, use the configured fixed-IP HTTPS origin and reviewed bundled CA, then pair
 using the expiring code displayed by the Mac bridge. `POST /api/pair` is forwarded
 to that one Mac and returns the bridge-issued **phone session token**. All task
 and voice calls use that token as `Authorization: Bearer <sessionToken>`.
@@ -79,12 +120,14 @@ Only these exact method/path families are forwarded:
 
 - `GET /api/health`, `POST /api/pair`.
 - `POST /api/unpair` (requires the phone session bearer).
+- `GET|POST /api/settings`.
 - `GET|POST /api/tasks`, `GET /api/tasks/:id`.
 - `GET /api/tasks/:id/events?after=N`.
 - `POST /api/tasks/:id/messages|cancel|accept`.
 - `POST /api/tasks/:id/approvals/:approvalId`.
+- `POST /api/tasks/:id/criteria/:criterionId`.
 - `POST /api/voice/sessions`.
-- `POST /api/voice/sessions/:id/audio|stop`.
+- `POST /api/voice/sessions/:id/audio|stop|abort`.
 - `GET /api/voice/sessions/:id/events?after=N`.
 - `DELETE /api/voice/sessions/:id`.
 
@@ -92,7 +135,9 @@ IDs contain only letters, digits, underscores and hyphens. Only events routes
 allow a query, and only a nonnegative integer `after` is accepted. No remote
 destination, arbitrary path, file serving, generic proxy or Codex App Server
 endpoint is exposed. Evidence in task JSON is forwarded; there is no preview
-file/port tunnel, and this module does not claim that a real preview exists.
+file/port tunnel. Preview bootstrap/cookies/static routes are deferred and are
+not exposed. `/api/monitor` remains authenticated Mac loopback-only and is not
+in this relay's allowlist.
 
 POST bodies require `application/json` (optional UTF-8 charset); audio uploads
 require `application/octet-stream`. GET/DELETE must have no body and may omit
@@ -122,8 +167,12 @@ reconnect. Clients must retain requestId and reconcile task state before retryin
 Aborting an HTTP request or losing connectivity never promises task rollback.
 
 Offline returns JSON 503. Relay request deadline is 15 seconds; the connector's
-local HTTP deadline is 14 seconds, including response body reading. Timeout is
-504. More than 32 active forwarded requests is rejected, and socket queue limits
+local HTTP deadline is 14 seconds, including response body reading. The relay's
+deadline includes public body reading as well as forwarding. Timeout is 504.
+Both sides cap active requests at 32, including at most eight audio uploads or
+voice event polls. Media cannot consume all control capacity; cancellation,
+approval and task status use the remaining global capacity. Overload returns
+429 at the relay or 503 at the connector. Socket queue limits
 prevent unlimited buffering. Public request bodies/headers have timeouts and the
 relay accepts at most 128 concurrent TCP connections. Pairing is limited globally
 to five attempts per minute and health to 60 requests per minute. These limits
@@ -134,10 +183,21 @@ block pairing if someone spends the attempts. No IP forwarding header is trusted
 
 ## Verification
 
-`npm test` runs actual local HTTP/WebSocket round trips, including phone pairing
+`npm test` runs actual local HTTP/HTTPS/WS/WSS round trips, including phone pairing
 and authorization, binary input/output, route/header/size limits, offline,
-deadline, duplicate connector, unsolicited response and disconnect cases. Test
-fixtures are not a live cloud deployment. Deployment, trusted public TLS, company
-Mac outbound access and an outdoor iPhone round trip remain pending until the
-user-provided server/domain is configured. This relay does not decode Linx Opus
-output or change the voice adapter's documented playback limitation.
+deadline, duplicate connector, unsolicited response, reconnect/watchdog, scoped
+core v1 routes, media saturation, strict CA/IP/expiry, CLI TLS paths and helper
+no-overwrite cases. The retained `test/deferred/preview-v1.test.mjs` contains
+unfinished preview expectations from the broader proposal; it is deliberately
+outside `test/*.test.mjs`, remains RED, and can be run explicitly when preview
+scope resumes. It is not counted as passing first-demo coverage.
+
+Fixtures do not prove deployed TLS, company outbound access, signed-device trust,
+live Codex/Linx or an outdoor iPhone round trip. Deployment remains deferred.
+The relay preserves audio bytes; codec negotiation/decoding/playback belong to
+the voice integration and native client.
+
+Benchmark callers can time HTTPS requests and connector `start()`/`close()`,
+observe redacted `onStatus` callbacks, and use the returned Node `server`'s
+connection events/`getConnections()` to check cleanup. Local timings measure
+transport fixtures only. No measurements or latency thresholds are claimed here.
