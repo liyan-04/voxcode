@@ -1,0 +1,23 @@
+name: VoxCode
+options:
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  VoxCodeCore:
+    path: .
+targets:
+  VoxCode:
+    type: application
+    platform: iOS
+    sources:
+      - path: VoxCode
+    info:
+      path: VoxCode/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.voxcode.client
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: NO
+    dependencies:
+      - package: VoxCodeCore
