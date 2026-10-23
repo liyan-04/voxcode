@@ -16,7 +16,9 @@
 - Codex is local to the Mac. Do not automate IDE keystrokes or expose an unauthenticated App Server.
 - Pairing must authorize a specific Mac and project; secrets stay server-side and out of logs.
 - Freeze task target at recording start. Deduplicate mutations using requestId.
-- At most two execution tasks concurrently, with separate worktrees and runtime resources.
+- Default four execution slots, configurable 1–8; each task has at most one active turn. Separate worktrees, data directories and immutable result artifacts. Stopping/waiting-approval turns retain their slots; lowering the limit only affects future dispatch.
+- Native remote transport uses TLS on the fixed IP with explicit certificate trust; no domain or existing HTTPS is required from the user. Do not accept arbitrary certificates or send remote control credentials over plaintext.
+- Deployment remains deferred until the user explicitly resumes it. Recheck bili-xs8:9899 first; if occupied, stop and notify without touching the existing service.
 - Cancellation is asynchronous and never implies rollback.
 - Execution completion, operation approval and user acceptance are distinct.
 - Do not expose preview files, ports or the Mac filesystem without authorization.
