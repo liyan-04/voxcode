@@ -3,6 +3,12 @@ node_modules/
 .env.*
 !.env.example
 .voxcode/
+.voxcode-data/
+.build/
+DerivedData/
+*.ipa
+*.xcarchive
+apps/ios/VoxCode.xcodeproj/
 coverage/
 .DS_Store
 *.log
