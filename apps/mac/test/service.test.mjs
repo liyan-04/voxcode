@@ -106,7 +106,7 @@ test("approval is version bound, single use and cancelled approvals are invalid"
         t.id,
         a.id,
       ),
-    /conflict/,
+    /blocked/,
   );
   s.requestApproval(t.id, { command: "echo again", cwd: tmpdir() }, () => {});
   s.mutate("cancel", { requestId: "c", version: 0 }, t.id);
@@ -195,7 +195,7 @@ test("expired approval declines operation and cannot be consumed", async () => {
         t.id,
         id,
       ),
-    /conflict/,
+    /blocked/,
   );
   await s.close();
 });

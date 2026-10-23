@@ -93,11 +93,12 @@ test("manual criteria HTTP gates current-version acceptance and preserves exact 
     ).status,
     401,
   );
-  assert.equal(
-    (await call(`${path}/accept`, { requestId: "unverified", version: 0 }))
-      .status,
-    409,
-  );
+  const blocked = await call(`${path}/accept`, {
+    requestId: "unverified",
+    version: 0,
+  });
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.error.code, "blocked");
   assert.equal(
     (
       await call(criterion, {
