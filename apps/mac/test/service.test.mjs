@@ -37,6 +37,7 @@ test("pairing code expires", async () => {
 });
 test("deduplicates durable mutations, rejects stale versions and isolates two slots", async () => {
   const s = setup();
+  s.configure({ requestId: "two-slots", executionLimit: 2 });
   const a = s.mutate("create", { requestId: "a", title: "A", prompt: "one" });
   assert.deepEqual(
     s.mutate("create", { requestId: "a", title: "A", prompt: "one" }),
@@ -105,7 +106,7 @@ test("approval is version bound, single use and cancelled approvals are invalid"
         t.id,
         a.id,
       ),
-    /conflict/,
+    /blocked/,
   );
   s.requestApproval(t.id, { command: "echo again", cwd: tmpdir() }, () => {});
   s.mutate("cancel", { requestId: "c", version: 0 }, t.id);
@@ -151,6 +152,7 @@ test("real Git worktrees isolate files and cancellation frees a slot only after 
         );
       }),
   });
+  s.configure({ requestId: "two-slots", executionLimit: 2 });
   const a = s.mutate("create", { requestId: "a", title: "A", prompt: "one" });
   s.mutate("create", { requestId: "b", title: "B", prompt: "two" });
   const c = s.mutate("create", { requestId: "c", title: "C", prompt: "three" });
@@ -193,7 +195,7 @@ test("expired approval declines operation and cannot be consumed", async () => {
         t.id,
         id,
       ),
-    /conflict/,
+    /blocked/,
   );
   await s.close();
 });
