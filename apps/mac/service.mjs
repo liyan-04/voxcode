@@ -26,15 +26,40 @@ const fail = (status, code, message) => {
   throw new ApiError(status, code, message);
 };
 const copy = (x) => structuredClone(x);
+const publicTask = (t) =>
+  copy(
+    Object.fromEntries(
+      [
+        "id",
+        "title",
+        "prompt",
+        "status",
+        "acceptance",
+        "version",
+        "createdAt",
+        "updatedAt",
+        "summary",
+        "previewUrl",
+        "evidence",
+        "approval",
+        "criteria",
+        "acceptanceSnapshot",
+        "preview",
+      ].map((key) => [key, t[key]]),
+    ),
+  );
 const text = (x, max = 32000) =>
   typeof x === "string" && x.trim() && x.length <= max;
 const MAX_TASKS = 32,
   MAX_REQUESTS = 128,
+  MAX_SETTINGS_REQUESTS = 128,
   MAX_EVENTS = 64,
   MAX_APPROVALS_PER_EXECUTION = 16;
 const MAX_EVIDENCE_BYTES = 65536;
 const RECOVERY_MESSAGE =
   "Execution stop is unconfirmed; scheduling is quarantined until the local operator verifies cleanup and runs apps/mac/recover.mjs --confirm-executions-stopped.";
+const DISPATCH_RECOVERY_MESSAGE =
+  "Codex turn dispatch outcome is unknown; this task requires local thread reconciliation before any follow-up. The instruction will not be replayed automatically.";
 function bounded(value, limit) {
   const bytes = Buffer.from(String(value));
   return bytes.length > limit
@@ -51,6 +76,47 @@ function canonical(value) {
     );
   return value;
 }
+function criteriaFor(input, version, previous) {
+  if (input === undefined && previous)
+    return previous.map((c) => ({
+      ...c,
+      status: "unverified",
+      evidenceIds: [],
+      version,
+    }));
+  input ??=
+    input === undefined
+      ? [
+          {
+            text: "Confirm the requested result against evidence.",
+            required: true,
+          },
+        ]
+      : null;
+  if (
+    !Array.isArray(input) ||
+    input.length < 1 ||
+    input.length > 12 ||
+    input.some(
+      (c) =>
+        !c ||
+        !text(c.text, 500) ||
+        (c.required !== undefined && typeof c.required !== "boolean"),
+    )
+  )
+    fail(400, "invalid");
+  return input.map((c) => ({
+    id: randomUUID(),
+    text: c.text,
+    required: c.required ?? true,
+    verification: "manual",
+    status: "unverified",
+    evidenceIds: [],
+    version,
+  }));
+}
+const artifactIdValid = (value) =>
+  typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value);
 export function createService(options) {
   const project = realpathSync(options.project),
     dataDir = resolve(options.dataDir);
@@ -61,6 +127,16 @@ export function createService(options) {
     : { project, tasks: {}, events: {}, requests: {}, sessions: [] };
   // Legacy reusable bearer persistence is retired; existing phones must pair again.
   state.sessions ??= [];
+  state.executionLimit ??= 4;
+  state.settingsRequests ??= {};
+  for (const key of ["tasks", "events", "requests", "settingsRequests"])
+    state[key] = Object.assign(Object.create(null), state[key]);
+  if (
+    !Number.isInteger(state.executionLimit) ||
+    state.executionLimit < 1 ||
+    state.executionLimit > 8
+  )
+    throw new Error("Invalid stored execution limit");
   delete state.tokens;
   if (state.project !== project)
     throw new Error("Stored project differs from selected project");
@@ -70,7 +146,22 @@ export function createService(options) {
       "Invalid execution ownership record; local recovery required",
     );
   // Include old snapshots that predate the durable execution sentinel.
-  for (const t of Object.values(state.tasks))
+  for (const t of Object.values(state.tasks)) {
+    t.evidence ??= [];
+    for (const evidence of t.evidence) evidence.id ??= randomUUID();
+    t.criteria ??= criteriaFor(undefined, t.version ?? 0);
+    t.acceptanceSnapshot ??= null;
+    t.preview ??= null;
+    t.currentFailedCheck ??= t.evidence.some(
+      (e) =>
+        e.version === t.version &&
+        (e.status === "failed" ||
+          (Number.isInteger(e.exitCode) && e.exitCode !== 0)),
+    );
+    if (t.codexDispatchState === "pending") {
+      t.codexReconciliationRequired = true;
+      t.summary = DISPATCH_RECOVERY_MESSAGE;
+    }
     if (
       ["running", "waiting_approval", "stopping", "waiting_input"].includes(
         t.status,
@@ -78,6 +169,7 @@ export function createService(options) {
       !state.unconfirmedExecutions.includes(t.id)
     )
       state.unconfirmedExecutions.push(t.id);
+  }
   let recoveryRequired = state.unconfirmedExecutions.length > 0;
   const active = new Map(),
     approvals = new Map();
@@ -144,13 +236,62 @@ export function createService(options) {
       );
       return cwd;
     });
+  function addEvidence(t, kind, label, value, details = {}) {
+    if (!["test", "screenshot", "diff", "note"].includes(kind))
+      throw new Error("Invalid evidence kind");
+    const evidence = {
+      id: randomUUID(),
+      kind,
+      label: bounded(label, 512),
+      value: bounded(value, 16384),
+      version: t.version,
+    };
+    if (details.status !== undefined) {
+      if (!["passed", "failed"].includes(details.status))
+        throw new Error("Invalid evidence status");
+      evidence.status = details.status;
+    }
+    if (details.command !== undefined)
+      evidence.command = bounded(details.command, 4096);
+    if (details.exitCode !== undefined) {
+      if (!Number.isSafeInteger(details.exitCode))
+        throw new Error("Invalid evidence exit code");
+      evidence.exitCode = details.exitCode;
+      if (details.exitCode !== 0) evidence.status = "failed";
+    }
+    if (details.artifactId !== undefined) {
+      if (!artifactIdValid(details.artifactId))
+        throw new Error("Invalid evidence artifact");
+      evidence.artifactId = details.artifactId;
+    }
+    if (evidence.status === "failed") t.currentFailedCheck = true;
+    t.evidence.push(evidence);
+    let bytes = Buffer.byteLength(JSON.stringify(t.evidence));
+    while (bytes > MAX_EVIDENCE_BYTES && t.evidence.length > 1) {
+      t.evidence.shift();
+      t.summary = "Earlier evidence omitted by retention limit.";
+      bytes = Buffer.byteLength(JSON.stringify(t.evidence));
+    }
+    if (kind === "note" && label === "Codex response")
+      t.summary = bounded(value, 4096);
+    save();
+    return evidence.id;
+  }
   function pump() {
     if (closed || recoveryRequired) return;
     for (const t of Object.values(state.tasks)) {
-      if (active.size >= 2) break;
+      if (active.size >= state.executionLimit) break;
       if (t.status !== "queued") continue;
       const controller = new AbortController();
       const entry = { controller, cwd: null, approvalsRequested: 0 };
+      const assertCurrent = () => {
+        if (
+          controller.signal.aborted ||
+          entry.settled ||
+          active.get(t.id) !== entry
+        )
+          throw new Error("Execution callback is no longer current");
+      };
       active.set(t.id, entry);
       // Persist before preparing a worktree or spawning anything. Only verified
       // executor settlement clears this record; restart never implies teardown.
@@ -171,19 +312,37 @@ export function createService(options) {
             cwd: entry.cwd,
             signal: controller.signal,
             onEvent: (type, message) => event(t.id, type, message),
-            onEvidence: (kind, label, value) => {
-              t.evidence.push({
-                kind,
-                label: bounded(label, 512),
-                value: bounded(value, 16384),
-                version: t.version,
-              });
-              let bytes = Buffer.byteLength(JSON.stringify(t.evidence));
-              while (bytes > MAX_EVIDENCE_BYTES && t.evidence.length > 1) {
-                t.evidence.shift();
-                t.summary = "Earlier evidence omitted by retention limit.";
-                bytes = Buffer.byteLength(JSON.stringify(t.evidence));
+            onEvidence: (kind, label, value, details) => {
+              assertCurrent();
+              addEvidence(t, kind, label, value, details);
+            },
+            onSession: ({ threadId, turnId }) => {
+              assertCurrent();
+              if (
+                !text(threadId, 256) ||
+                (turnId !== undefined && !text(turnId, 256)) ||
+                (t.codexThreadId && t.codexThreadId !== threadId)
+              )
+                throw new Error("Invalid or changed Codex thread identity");
+              t.codexThreadId = threadId;
+              if (turnId !== undefined) {
+                t.codexTurnId = turnId;
+                t.codexDispatchState = "started";
+              } else {
+                delete t.codexTurnId;
+                t.codexDispatchState = "pending";
               }
+              save();
+            },
+            onPreview: ({ artifactId, path }) => {
+              assertCurrent();
+              if (
+                !artifactIdValid(artifactId) ||
+                path !== `/preview/${artifactId}/`
+              )
+                throw new Error("Invalid preview publication");
+              t.preview = { artifactId, version: t.version, path };
+              t.previewUrl = path;
               save();
             },
             onApproval: (details, reply) =>
@@ -194,18 +353,25 @@ export function createService(options) {
         })
         .catch((e) => {
           entry.ownershipUnresolved = !!e.ownershipUnresolved;
+          if (e.dispatchUncertain) {
+            t.codexReconciliationRequired = true;
+            t.summary = DISPATCH_RECOVERY_MESSAGE;
+          }
           if (entry.ownershipUnresolved) recoveryRequired = true;
           update(
             t,
             entry.ownershipUnresolved
               ? "stopping"
-              : controller.signal.aborted
+              : controller.signal.aborted || e.dispatchUncertain
                 ? "interrupted"
                 : "failed",
           );
           event(t.id, "error", e.message);
         })
         .finally(() => {
+          entry.settled = true;
+          if (!t.codexReconciliationRequired && !entry.ownershipUnresolved)
+            delete t.codexDispatchState;
           approvals.get(t.id)?.reply("decline");
           approvals.delete(t.id);
           t.approval = null;
@@ -316,8 +482,79 @@ export function createService(options) {
     save();
     notifyAuthorizationChange();
   }
+  function settings() {
+    return {
+      executionLimit: state.executionLimit,
+      maxExecutionLimit: 8,
+      maxTasks: MAX_TASKS,
+      activeExecutions: active.size,
+      queuedTasks: Object.values(state.tasks).filter(
+        (t) => t.status === "queued",
+      ).length,
+      recoveryRequired:
+        recoveryRequired ||
+        Object.values(state.tasks).some((t) => t.codexReconciliationRequired),
+    };
+  }
+  function monitor() {
+    const counts = {
+      queued: 0,
+      running: 0,
+      waiting_approval: 0,
+      waiting_input: 0,
+      stopping: 0,
+      interrupted: 0,
+      failed: 0,
+      completed: 0,
+      accepted: 0,
+    };
+    for (const t of Object.values(state.tasks)) {
+      const status =
+        t.status === "completed" && t.acceptance === "accepted"
+          ? "accepted"
+          : t.status;
+      if (Object.hasOwn(counts, status)) counts[status]++;
+    }
+    const { rss, heapUsed } = process.memoryUsage();
+    return {
+      generatedAt: new Date().toISOString(),
+      uptimeSeconds: process.uptime(),
+      executionLimit: state.executionLimit,
+      maxTasks: MAX_TASKS,
+      activeExecutions: active.size,
+      recoveryRequired: settings().recoveryRequired,
+      counts,
+      memory: { rssBytes: rss, heapUsedBytes: heapUsed },
+    };
+  }
+  function configure(b) {
+    if (
+      !b ||
+      !text(b.requestId, 128) ||
+      !Number.isInteger(b.executionLimit) ||
+      b.executionLimit < 1 ||
+      b.executionLimit > 8
+    )
+      fail(400, "invalid");
+    const fingerprint = JSON.stringify(canonical(b));
+    const previous = state.settingsRequests[b.requestId];
+    if (previous) {
+      if (previous.fingerprint !== fingerprint) fail(409, "conflict");
+      return copy(previous.settings);
+    }
+    if (state.requests[b.requestId]) fail(409, "conflict");
+    if (Object.keys(state.settingsRequests).length >= MAX_SETTINGS_REQUESTS)
+      fail(429, "throttled");
+    state.executionLimit = b.executionLimit;
+    const result = settings();
+    state.settingsRequests[b.requestId] = { fingerprint, settings: result };
+    save();
+    queueMicrotask(pump);
+    return copy(result);
+  }
   function mutate(action, b, id, approvalId) {
     if (!b || !text(b.requestId, 128)) fail(400, "invalid");
+    if (state.settingsRequests[b.requestId]) fail(409, "conflict");
     const fingerprint = JSON.stringify(canonical([action, id, approvalId, b]));
     const previous = state.requests[b.requestId];
     if (previous) {
@@ -326,7 +563,7 @@ export function createService(options) {
         fingerprint
       )
         fail(409, "conflict");
-      return copy(previous.task);
+      return publicTask(previous.task);
     }
     if (recoveryRequired && ["create", "messages"].includes(action))
       fail(503, "unavailable", RECOVERY_MESSAGE);
@@ -355,6 +592,9 @@ export function createService(options) {
         previewUrl: null,
         evidence: [],
         approval: null,
+        criteria: criteriaFor(b.criteria, 0),
+        acceptanceSnapshot: null,
+        preview: null,
       };
       state.tasks[t.id] = t;
     } else {
@@ -362,15 +602,24 @@ export function createService(options) {
       if (!Number.isInteger(b.version) || b.version !== t.version)
         fail(409, "stale");
       if (action === "messages") {
+        if (t.codexReconciliationRequired)
+          fail(503, "unavailable", DISPATCH_RECOVERY_MESSAGE);
         if (!text(b.prompt)) fail(400, "invalid");
         if (active.has(id) || t.status === "queued") fail(409, "conflict");
+        const criteria = criteriaFor(b.criteria, t.version + 1, t.criteria);
         t.prompt = b.prompt;
         t.version++;
+        t.criteria = criteria;
+        t.currentFailedCheck = false;
         t.acceptance = "pending";
+        t.acceptanceSnapshot = null;
+        t.preview = null;
+        t.previewUrl = null;
+        t.summary = "";
         t.approval = null;
         update(t, "queued");
       } else if (action === "cancel") {
-        if (t.status === "stopping") return copy(t);
+        if (t.status === "stopping") return publicTask(t);
         if (["completed", "failed", "interrupted"].includes(t.status))
           fail(409, "conflict");
         approvals.get(id)?.reply("decline");
@@ -380,7 +629,42 @@ export function createService(options) {
         update(t, active.has(id) ? "stopping" : "interrupted");
       } else if (action === "accept") {
         if (t.status !== "completed") fail(409, "conflict");
+        if (
+          t.currentFailedCheck ||
+          t.criteria.some((c) => c.required && c.status !== "passed")
+        )
+          fail(
+            409,
+            "conflict",
+            "Required criteria and trusted checks must pass before acceptance.",
+          );
         t.acceptance = "accepted";
+        t.acceptanceSnapshot = {
+          version: t.version,
+          acceptedAt: new Date().toISOString(),
+          criteria: copy(t.criteria),
+        };
+      } else if (action === "criterion") {
+        if (t.status !== "completed") fail(409, "conflict");
+        const criterion = t.criteria.find((c) => c.id === approvalId);
+        if (!criterion) fail(404, "unknown");
+        if (criterion.verification !== "manual") fail(409, "conflict");
+        if (
+          !["pass", "fail"].includes(b.decision) ||
+          (b.note !== undefined && !text(b.note, 2000))
+        )
+          fail(400, "invalid");
+        const status = b.decision === "pass" ? "passed" : "failed";
+        const evidenceId = addEvidence(
+          t,
+          "note",
+          `Manual verification ${status}: ${criterion.text}`,
+          b.note ?? `User marked this condition ${status}.`,
+        );
+        criterion.status = status;
+        criterion.evidenceIds = [evidenceId];
+        t.acceptance = "pending";
+        t.acceptanceSnapshot = null;
       } else if (action === "approval") {
         const a = approvals.get(id);
         if (
@@ -399,7 +683,7 @@ export function createService(options) {
       } else fail(404, "unknown");
     }
     t.updatedAt = new Date().toISOString();
-    state.requests[b.requestId] = { fingerprint, task: copy(t) };
+    state.requests[b.requestId] = { fingerprint, task: publicTask(t) };
     save();
     event(
       t.id,
@@ -407,7 +691,7 @@ export function createService(options) {
       action === "create" ? "Task queued." : `Task ${action} received.`,
     );
     queueMicrotask(pump);
-    return copy(t);
+    return publicTask(t);
   }
   save();
   queueMicrotask(pump);
@@ -437,14 +721,17 @@ export function createService(options) {
       return () => authorizationListeners.delete(listener);
     },
     mutate,
+    settings,
+    monitor,
+    configure,
     recovery: () => ({
       required: recoveryRequired,
       taskIds: [...state.unconfirmedExecutions],
     }),
     requestApproval,
     active,
-    get: (id) => copy(get(id)),
-    list: () => Object.values(state.tasks).map(copy),
+    get: (id) => publicTask(get(id)),
+    list: () => Object.values(state.tasks).map(publicTask),
     events: (id, after = 0) => {
       get(id);
       const e = state.events[id] ?? [];

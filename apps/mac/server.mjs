@@ -46,6 +46,17 @@ export function createServer(options) {
         service.revoke(token);
         return send(res, 200, { ok: true });
       }
+      if (url.pathname === "/api/settings") {
+        if (req.method === "GET") return send(res, 200, service.settings());
+        if (req.method === "POST")
+          return send(res, 200, service.configure(await read()));
+      }
+      if (req.method === "GET" && url.pathname === "/api/monitor") {
+        const peer = req.socket.remoteAddress;
+        if (peer !== "::1" && !/^(::ffff:)?127\./.test(peer ?? ""))
+          throw new ApiError(403, "denied");
+        return send(res, 200, service.monitor());
+      }
       if (url.pathname.startsWith("/api/voice")) {
         if (options.voiceHandler)
           return await options.voiceHandler(req, res, token, service);
@@ -60,10 +71,11 @@ export function createServer(options) {
           });
       }
       const match = url.pathname.match(
-        /^\/api\/tasks\/([^/]+)(?:\/(events|messages|cancel|accept|approvals)(?:\/([^/]+))?)?$/,
+        /^\/api\/tasks\/([^/]+)(?:\/(events|messages|cancel|accept)|\/(approvals|criteria)\/([^/]+))?$/,
       );
       if (!match) throw new ApiError(404, "unknown");
-      const [, id, action, approvalId] = match;
+      const [, id, directAction, scopedAction, resourceId] = match;
+      const action = directAction ?? scopedAction;
       if (req.method === "GET" && !action)
         return send(res, 200, { task: service.get(id) });
       if (req.method === "GET" && action === "events") {
@@ -74,14 +86,20 @@ export function createServer(options) {
       }
       if (
         req.method === "POST" &&
-        ["messages", "cancel", "accept", "approvals"].includes(action)
+        ["messages", "cancel", "accept", "approvals", "criteria"].includes(
+          action,
+        )
       )
         return send(res, 200, {
           task: service.mutate(
-            action === "approvals" ? "approval" : action,
+            action === "approvals"
+              ? "approval"
+              : action === "criteria"
+                ? "criterion"
+                : action,
             await read(),
             id,
-            approvalId,
+            resourceId,
           ),
         });
       throw new ApiError(404, "unknown");
