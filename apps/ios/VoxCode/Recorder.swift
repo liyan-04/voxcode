@@ -16,6 +16,8 @@ import VoxCodeCore
     private let permission: @MainActor () async -> Bool
     private let capture: @MainActor (Recorder, UUID) throws -> Void
     private var uploadTasks: [UUID: Task<Void, Never>] = [:]
+    private let cleanup = VoiceCleanupBarrier()
+    private(set) var closedRequestId: String?
     private var engine: AVAudioEngine?; private var sessionId: String?; private var client: BridgeAPI?; private var poll: Task<Void, Never>?; private var uploads: Task<Void, Never>?
     init(permission: @escaping @MainActor () async -> Bool = { await AVAudioApplication.requestRecordPermission() }, capture: @escaping @MainActor (Recorder, UUID) throws -> Void = { recorder, generation in try recorder.startCapture(generation) }) {
         self.permission = permission; self.capture = capture
@@ -24,6 +26,8 @@ import VoxCodeCore
         guard let startingGeneration = lifecycle.begin(target) else { return }
         player.stop(); transcript = ""; transcriptEdited = false; draft = nil; focusSuggestion = nil; outputSupported = false; outputFormat = nil
         do {
+            await cleanup.wait()
+            guard lifecycle.allows(startingGeneration) else { return }
             guard await permission() else { throw APIError(message: "麦克风权限未开启，请在系统设置中允许") }
             guard lifecycle.allows(startingGeneration) else { return }
             let created = try JSONDecoder().decode(VoiceCreated.self, from: await api.request("/api/voice/sessions", method: "POST", body: JSONEncoder().encode(VoiceStart(recording: target))))
@@ -50,7 +54,7 @@ import VoxCodeCore
             } }
         } catch {
             guard lifecycle.failStart(startingGeneration, message: error.localizedDescription) else { return }
-            await discard()
+            await discard(closeAttempt: false)
         }
         lifecycle.finishStart(startingGeneration)
     }
@@ -119,10 +123,11 @@ import VoxCodeCore
         error = message; player.stop(); stopEngine(); cancelUploads(); poll?.cancel(); poll = nil; busy = false
         if let client, let sessionId { Task { _ = try? await client.request("/api/voice/sessions/\(sessionId)/abort", method: "POST"); _ = try? await client.request("/api/voice/sessions/\(sessionId)/stop", method: "POST") } }
     }
-    func discard() async {
+    func discard(closeAttempt: Bool = true) async {
         player.stop(); stopEngine(); cancelUploads(); poll?.cancel(); poll = nil
         let closingClient = client; let closingId = sessionId
+        if closeAttempt || closingId != nil { closedRequestId = frozen?.requestId }
         sessionId = nil; client = nil; lifecycle.discard(); transcript = ""; draft = nil; focusSuggestion = nil; outputFormat = nil; outputSupported = false
-        if let closingClient, let closingId { Task { _ = try? await closingClient.request("/api/voice/sessions/\(closingId)", method: "DELETE") } }
+        if let closingClient, let closingId { let deletion = cleanup.schedule { _ = try? await closingClient.request("/api/voice/sessions/\(closingId)", method: "DELETE") }; await deletion.value }
     }
 }

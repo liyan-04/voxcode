@@ -58,3 +58,51 @@ These numbers do not measure SwiftUI rendering/navigation, network/API responsiv
 5. Deployment remains deferred. Public trust asset review and later deployment authorization/occupied-port checks are separate work.
 
 Suggested milestone subject: `feat(ios): add versioned phone task and voice controls`. A smaller initial race commit is possible only if the coordinator separates the shared core/UI patch coherently; do not commit a broken intermediate state.
+
+## IOS-004 rejection recovery and response ordering
+
+Date: 2026-10-24. Source base: `6745dc03d61d2034a5e58f7ec7dea4bf205b97e2`, branch `codex/ios-phone-demo`. This section describes the uncommitted IOS-004 snapshot handed to the coordinator for a scoped commit, independent targeted review and new SDK CI. The preceding cloud CI result for the base does not validate these additions.
+
+### Changed paths and behavior
+
+- `apps/ios/Sources/VoxCodeCore/Core.swift`: retain HTTP status in `APIError`; classify `MutationOutcome`; add recording-attempt identity, snapshot ownership/version-date preference and queued cleanup helpers.
+- `apps/ios/VoxCode/Session.swift`: injected fixture transport/preferences retain production defaults. Success or a definitive rejection releases only the matching path/request-ID journal. Settings apply the same rejection policy. Refresh ownership and version/date checks prevent older refresh/replay data from replacing newer observed snapshots.
+- `apps/ios/VoxCode/{ComposeView,TaskDetail}.swift`: definitive rejection releases local retry locks and preserves editable content; uncertain responses retain immutable retries. Stale composer versions still require explicit rereview. Detail/criterion errors remain visible.
+- `apps/ios/VoxCode/Recorder.swift`: local state/audio clears immediately; the next create waits for the prior known-session DELETE attempt. A user-discarded recording gets a fresh request ID for the same task/version, including discard while create is pending. Internal cleanup after an unknown failed create preserves its original ID. A late successful stale create deletes only the returned stale session and cannot clear the newer recording.
+- `apps/ios/VoxCode/SimulationBridge.swift`, `apps/ios/{Scripts/SimulationChecks,NativeTests/SimulationTests}.swift`: manual-acceptance precondition uses `409 blocked`; assertions use typed outcomes and preserve true replay `conflict` handling.
+- New `apps/ios/{Scripts/SubmissionChecks,Scripts/OrderingChecks,Tests/VoxCodeCoreTests/MutationRecoveryTests,Tests/VoxCodeCoreTests/SnapshotOrderingTests,NativeTests/SubmissionTests,NativeTests/SessionOrderingTests}.swift`; expanded `NativeTests/RecorderTests.swift`; updated `apps/ios/README.md`.
+
+The explicit no-side-effect whitelist is exactly `(400, invalid)`, `(409, stale)` and `(409, blocked)`, matching the coordinator's shared-contract change and Mac MAC-005. Auth/visibility errors, true identity `409 conflict`, throttling, server/malformed/network errors remain uncertain. In particular a lost response followed by a revoked `401` retry retains the original journal because revocation cannot establish whether the earlier request executed. Older servers returning `conflict` for business preconditions remain conservative.
+
+### Fresh local evidence
+
+Environment reconfirmed: Apple Swift 6.3, arm64 macOS, `xcode-select -p` is `/Library/Developer/CommandLineTools`; there is no local iOS SDK/XCTest execution. Commands below ran in `apps/ios` unless specified.
+
+| Evidence | Command and actual result |
+| --- | --- |
+| local/core | For each of `CoreChecks`, `RecordingRaceChecks`, `V1Checks`, `AudioChecks`, `SubmissionChecks`, `OrderingChecks`: `swiftc -module-cache-path /private/tmp/voxcode-swift Sources/VoxCodeCore/Core.swift Scripts/<Runner>.swift -o /private/tmp/voxcode-ios004-<Runner>`, then that binary. All six compiled exit 0 and executed exit 0/PASS. CoreChecks reports 34 assertions. SubmissionChecks covers HTTP-status classification, immutable persistence and fresh closed-recording identity. OrderingChecks covers ownership/version/date preference and DELETE-before-create gating. |
+| local/fixture | `swiftc -module-cache-path /private/tmp/voxcode-swift -module-name VoxCodeCore -emit-module -emit-library -emit-module-path /private/tmp/VoxCodeCore.swiftmodule Sources/VoxCodeCore/Core.swift -o /private/tmp/libVoxCodeCore.dylib`; then `swiftc -module-cache-path /private/tmp/voxcode-swift -I /private/tmp -L /private/tmp -lVoxCodeCore -Xlinker -rpath -Xlinker /private/tmp VoxCode/SimulationBridge.swift Scripts/SimulationChecks.swift -o /private/tmp/voxcode-simulation-checks`; binary exit 0/PASS. First execution exposed the runner's obsolete `criteria` assertion (exit 133, line 18); updated it to `blocked` plus `.rejected`, recompiled and passed. |
+| local/syntax | After the final Recorder startup-discard refinement and native fixtures: `swiftc -frontend -parse VoxCode/*.swift NativeTests/*.swift Tests/VoxCodeCoreTests/*.swift`, exit 0. This is syntax parsing, not native type checking or XCTest. |
+| local/config | `plutil -lint VoxCode/Info.plist`: OK. `git diff --check -- apps/ios` from the iOS worktree root after the final source change: exit 0. |
+
+Earlier targeted RED evidence remains specific: SubmissionChecks with the old HTTP-status-loss path compiled but failed with `HTTP 400 invalid must resolve as rejected`; passing final runners verify the core fix. The final native Recorder additions were authored before their respective source refinements but cannot establish native red/green without SDK execution.
+
+Native XCTest cases are authored for persisted invalid/stale/blocked rejection, byte-equivalent uncertain relaunch, unrelated-operation journal isolation, lost-network-response then revoked retry, out-of-order refreshes, mutation versus refresh and older replay completion. Actual Recorder fixtures cover VoiceDraft.prompt population and manual-edit preservation, delayed DELETE versus the next create, closed recording identity, late successful discarded create deleting only its own session while the same-target new recording remains owned, and unknown create failure retaining its request ID. They have not executed locally.
+
+### Final snapshot identifiers and limits
+
+SHA-256 values recorded before coordinator commit:
+
+| Path under `apps/ios` | SHA-256 |
+| --- | --- |
+| `Sources/VoxCodeCore/Core.swift` | `dc9fcd663b6f8739b533dcc566e490a3befaac01e26c684784b7755ec58dcfa4` |
+| `VoxCode/Session.swift` | `b0fa193c590ce9b28f664d4f8cffbea957183df081ece4d24cd186b22bc895c6` |
+| `VoxCode/ComposeView.swift` | `d0290ef011b9875c93882d24c7276b16a2a0b42c1c3c4c7ed1e216495eb2ebf1` |
+| `VoxCode/Recorder.swift` | `4134bce384827ff105c115607d2b173077ba576fb4cce00ba16fb664bdf46c00` |
+| `NativeTests/RecorderTests.swift` | `9eb4c4e353fbf53141b644c3e7b55bef54fffbfed942a09d16dc390c3a4ff750` |
+| `NativeTests/SubmissionTests.swift` | `455cb3cf2a74a724124247ae94d04349b8c26525d239857a9e3836b006920821` |
+| `NativeTests/SessionOrderingTests.swift` | `7010cc048ce9d9e036b4ed3a28a375d9548d10da76d89a3aa0954c53e22811fa` |
+
+The cleanup barrier covers known-session re-record cleanup on the same Recorder. An old create still in flight can temporarily occupy a provider's single-active-session slot; the next create may receive a transient `429` until stale-session cleanup completes. User re-recording can recover using the fresh attempt ID. No startup serialization or general retry framework was added, and the native late-success fixture does not certify elimination of that remote window.
+
+Coordinator next steps: commit these explicit iOS paths plus this handoff, rerun exact-revision core coverage and unsigned iOS build/native XCTest, and retain two independent targeted review resolutions. Signing, microphone/audible audio, actual private-CA URLSession matrix, real Linx/Codex, native navigation and outdoor cellular gates remain pending. No deployment or production trust material is part of IOS-004. iOS source edits are frozen at this handoff pending coordinator/CI feedback.

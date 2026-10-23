@@ -90,6 +90,7 @@ struct ComposeView: View {
     private func startRecording() {
         Task {
             if recorder.frozen != nil { text = instruction; await recorder.discard() }
+            base = base.nextAttempt(afterClosing: recorder.closedRequestId)
             do { try await recorder.start(api: session.api, target: base) } catch { recorder.error = error.localizedDescription }
         }
     }
@@ -107,6 +108,17 @@ struct ComposeView: View {
             recorder.transcriptEdited = true; session.retainSubmission(pending)
         }
         guard let pending else { return }; sending = true
-        Task { let success = await session.mutate(pending.path, pending.mutation); sending = false; if success { session.retainSubmission(nil); await recorder.discard(); dismiss() } else { await session.refresh() } }
+        Task {
+            let outcome = await session.mutate(pending.path, pending.mutation)
+            if outcome == .succeeded { await recorder.discard(); dismiss() }
+            else if outcome == .rejected {
+                let saved = instruction
+                await recorder.discard()
+                text = saved; self.pending = nil
+                base = FrozenRecording(taskId: base.taskId, version: base.version)
+            }
+            sending = false
+            if outcome != .succeeded { await session.refresh() }
+        }
     }
 }

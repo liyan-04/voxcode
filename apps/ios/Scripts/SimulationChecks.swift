@@ -15,7 +15,7 @@ import VoxCodeCore
         let saved = try JSONDecoder().decode(BridgeSettings.self, from: await api.request("/api/settings", method: "POST", body: settingsBody))
         precondition(saved.executionLimit == 1 && saved.activeExecutions == 4)
         let target = tasks.last!
-        do { _ = try await api.json(Result.self, "/api/tasks/\(target.id)/accept", method: "POST", mutation: Mutation(version: 1)); fatalError("Unverified result accepted") } catch let error as APIError { precondition(error.code == "criteria") }
+        do { _ = try await api.json(Result.self, "/api/tasks/\(target.id)/accept", method: "POST", mutation: Mutation(version: 1)); fatalError("Unverified result accepted") } catch let error as APIError { precondition(error.code == "blocked" && MutationOutcome.failure(error) == .rejected) }
         let passed = try await api.json(Result.self, "/api/tasks/\(target.id)/criteria/manual", method: "POST", mutation: Mutation(requestId: "manual-fixed", version: 1, decision: "pass"))
         precondition(passed.task.canAccept)
         let accepted = try await api.json(Result.self, "/api/tasks/\(target.id)/accept", method: "POST", mutation: Mutation(requestId: "accept-fixed", version: 1))
