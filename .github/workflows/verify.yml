@@ -113,3 +113,17 @@ jobs:
           XCODEGEN_BIN=$(find "$RUNNER_TEMP/xcodegen" -type f -name xcodegen | head -n 1)
           "$XCODEGEN_BIN" generate --spec project.yml
           xcodebuild -project VoxCode.xcodeproj -scheme VoxCode -sdk iphonesimulator -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/voxcode-derived" CODE_SIGNING_ALLOWED=NO build
+      - name: Run native recorder and client regressions on an iPhone simulator
+        working-directory: apps/ios
+        run: |
+          VOXCODE_SIMULATOR_ID=$(xcrun simctl list devices available --json | node -e 'let input="";process.stdin.on("data",part=>input+=part);process.stdin.on("end",()=>{const device=Object.values(JSON.parse(input).devices).flat().find(value=>value.isAvailable&&value.name.startsWith("iPhone"));if(!device)process.exit(1);process.stdout.write(device.udid);});')
+          xcodebuild test -project VoxCode.xcodeproj -scheme VoxCode -configuration Debug -destination "platform=iOS Simulator,id=$VOXCODE_SIMULATOR_ID" -derivedDataPath "$RUNNER_TEMP/voxcode-derived" -resultBundlePath "$RUNNER_TEMP/voxcode-native-tests.xcresult" CODE_SIGNING_ALLOWED=NO
+      - name: Upload unsigned simulator build and native test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-ios-simulator
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/voxcode-derived/Build/Products/Debug-iphonesimulator/VoxCode.app
+            ${{ runner.temp }}/voxcode-native-tests.xcresult
