@@ -5,6 +5,16 @@ options:
 packages:
   VoxCodeCore:
     path: .
+schemes:
+  VoxCode:
+    build:
+      targets:
+        VoxCode: all
+        VoxCodeTests: [test]
+    test:
+      gatherCoverageData: true
+      targets:
+        - name: VoxCodeTests
 targets:
   VoxCode:
     type: application
@@ -20,4 +30,16 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: NO
     dependencies:
+      - package: VoxCodeCore
+  VoxCodeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: NativeTests
+    settings:
+      base:
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: VoxCode
       - package: VoxCodeCore

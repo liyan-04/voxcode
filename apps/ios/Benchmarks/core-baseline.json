@@ -1,0 +1,41 @@
+{
+  "environment" : "Version 26.3.2 (Build 25D2150)",
+  "evidence" : "local synthetic core",
+  "executionLimit" : 4,
+  "limitations" : [
+    "No SwiftUI rendering\/navigation timing",
+    "No microphone, playback, network or device measurements",
+    "No performance threshold established"
+  ],
+  "processorCount" : 15,
+  "results" : [
+    {
+      "errors" : 0,
+      "name" : "decode_filter_24_tasks",
+      "p50" : 0.081167000000000003,
+      "p95" : 0.14108299999999999,
+      "p99" : 0.16487499999999999,
+      "samples" : 1000,
+      "unit" : "ms"
+    },
+    {
+      "errors" : 0,
+      "name" : "decode_filter_32_tasks",
+      "p50" : 0.084125000000000005,
+      "p95" : 0.092457999999999999,
+      "p99" : 0.104458,
+      "samples" : 1000,
+      "unit" : "ms"
+    },
+    {
+      "errors" : 0,
+      "name" : "recording_epoch_race",
+      "p50" : 0.00070799999999999997,
+      "p95" : 0.00070899999999999999,
+      "p99" : 0.00075000000000000002,
+      "samples" : 1000,
+      "unit" : "ms"
+    }
+  ],
+  "revision" : "a352757+ios-working-tree"
+}
