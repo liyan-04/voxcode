@@ -65,3 +65,29 @@ b7102ce6eabe9c4c1c6a3623b6fada4876fb0f18e09e8737d95b3b7cb3aa18a1  apps/relay/tes
 88f54e1c4d281f82fce8daca7835f7940c6a6e40beea2b259f321cdb62c6e8fa  scripts/create-local-tls.mjs
 5a3c8b6ca7ded51ac712b111905e7e0c926ffa01dea3967d23950486660d77c3  docs/contract.md
 ```
+
+## Targeted follow-up: accepted pre-handshake TCP sockets
+
+Date: 2026-10-24. Reviewer: `/root/mac_v1`. Reviewed fix: `de8fc2df0c969fa1e56ef316d0121a8399916ebd`. Verification worktree HEAD was `3a0fc4b3cc61b8628601995393f94983461591e8` (a subsequent review-document commit); `git diff de8fc2d HEAD -- apps/relay scripts/create-local-tls.mjs` was empty. Relay source was clean; an unrelated untracked Mac review document was excluded.
+
+Correction to the initial review's shutdown coverage above: the original fixture awaited only the client `connect` event. That did not establish that the Relay had accepted the server-side socket before shutdown. Its local pass was a false negative for an accepted raw socket that never completes TLS. The coordinator's Linux CI run exposed this missing ownership; the initial no-finding conclusion does not cover that defect at `c26fb62`.
+
+The fix tracks raw sockets from the server `connection` event, immediately destroys a connection arriving while closing, removes tracked sockets on close, stops the listener and destroys the accepted raw sockets before awaiting server closure. It retains connector termination, pending request cleanup and WebSocket server cleanup. The changed regression now waits for the accepted server socket, retains the 500 ms close deadline, checks the peer is destroyed before test-side client cleanup and confirms zero server connections afterward. Code inspection found no new actionable issue in this narrow change.
+
+Independent command from `apps/relay`:
+
+```sh
+/private/tmp/voxcode-node22-npm-cache/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern 'relay shutdown closes TCP connections' test/v1.test.mjs
+# Node 22.23.4, local macOS: 1/1 passed, 0 failed/skipped; exit 0
+```
+
+The full 28-test Node 22 suite was already separately verified by the implementer and iOS independent reviewer; this follow-up did not rerun that full suite or Linux CI. Local TCP/TLS fixture evidence does not establish deployed/device/outdoor behavior. No implementation or Git mutation was made by this reviewer.
+
+Confirmed fix SHA-256:
+
+```text
+cc294bd4c703bcd418d252caa7023f6eefe0bcf03b6f12a44988e2458a59467e  apps/relay/relay.mjs
+98784599ec9e8d0ab9620f0b37d1d6f0cd5670027a27bc8efd0543c458614e1f  apps/relay/test/v1.test.mjs
+```
+
+Status: targeted independent follow-up resolved the reported accepted-socket shutdown defect in `de8fc2d`; no open finding remains in this changed behavior. Human approval and external acceptance gates remain separate.
