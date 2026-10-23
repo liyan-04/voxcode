@@ -5,8 +5,8 @@ These paths are relative to the original VoxCode checkout, not the parent reposi
 
 | Role | Worktree | Branch | Milestone |
 | --- | --- | --- | --- |
-| iOS `/root/ios_v1` | `.worktrees/ios` | `codex/ios-phone-demo` | M4 / IOS-002+003 |
-| Mac `/root/mac_v1` | `.worktrees/mac` | `codex/mac-phone-demo` | M1 / MAC-002+003, MAC-004 fixes; PR #3 |
+| iOS `/root/ios_v1` | `.worktrees/ios` | `codex/ios-phone-demo` | M4 / IOS-002+003, IOS-004+005 fixes; PR #5 |
+| Mac `/root/mac_v1` | `.worktrees/mac` | `codex/mac-phone-demo` | M1 / MAC-002+003, MAC-004+005 fixes; PR #3 |
 | Relay `/root/relay_v1` | `.worktrees/relay` | `codex/relay-phone-demo` | M2 / RELAY-002, RELAY-003 fixes; PR #4 |
 | Coordinator `/root` | `.worktrees/integration` | `codex/integration-phone-demo` | M3 / voice, runtime, benchmarks and integration |
 | Architect `/root/architect` | `.worktrees/architecture` | `codex/architecture-checkpoint` | ARCH-003 / cross-component checkpoint, baseline d6eac09 |
