@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "engines": { "node": ">=22" },
+  "devDependencies": { "marked": "18.1.1" },
   "scripts": {
-    "test": "node --test apps/mac/test/*.test.mjs packages/voice/test/*.test.js apps/relay/test/*.test.mjs apps/integration/test/*.test.mjs",
+    "test": "node --test scripts/test/*.test.mjs apps/mac/test/*.test.mjs packages/voice/test/*.test.js apps/relay/test/*.test.mjs apps/integration/test/*.test.mjs",
+    "test:policy": "node --test scripts/test/*.test.mjs",
+    "hooks:install": "git config --local core.hooksPath .githooks",
     "start": "node apps/integration/cli.mjs",
     "relay": "node apps/relay/relay-cli.mjs",
     "connector": "node apps/relay/connector-cli.mjs"

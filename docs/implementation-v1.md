@@ -12,7 +12,7 @@
 - Native app, real Linx integration, outdoor access and inspectable results remain acceptance gates.
 - At least 20 managed tasks; default four execution slots, configurable 1–8; one active turn/task.
 - No plaintext remote credentials, arbitrary trust, public App Server, automatic merge/deployment, or fixture-as-live claims.
-- Keep existing dirty work; continue on codex/mvp. Deployment only after explicit later resumption, and never replace an occupied 9899 service.
+- Keep existing dirty work; use focused codex/ branches and PRs targeting the verified integration base (currently codex/mvp). Follow CONTRIBUTING.md and docs/agent-collaboration.md. Deployment only after explicit later resumption, and never replace an occupied 9899 service.
 - Two independent expert reviews per component; targeted red/green regressions; coordinator commits only after verification.
 
 ## Task 1: Durable execution and configurable scheduling
