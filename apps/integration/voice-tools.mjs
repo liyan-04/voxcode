@@ -39,8 +39,10 @@ export function createVoiceTools({ entry, service, emit }) {
     if (!string(args.prompt, 12000) || (!followup && !string(args.title, 120)) || (args.title !== undefined && !string(args.title, 120)))
       throw new Error('Invalid draft text');
     if (entry.drafts.size >= 16) throw new Error('Draft limit reached');
+    const criteria = args.criteria === undefined && task?.criteria
+      ? task.criteria.map(({ text, required }) => ({ text, required })) : args.criteria;
     const draft = { id: randomUUID(), taskId: entry.taskId, version: entry.version, title: args.title?.trim() ?? task.title,
-      prompt: args.prompt.trim(), criteria: conditions(args.criteria), expiresAt: new Date(Math.min(entry.expiresAt, Date.now() + 90000)).toISOString() };
+      prompt: args.prompt.trim(), criteria: conditions(criteria), expiresAt: new Date(Math.min(entry.expiresAt, Date.now() + 90000)).toISOString() };
     entry.drafts.set(draft.id, draft);
     emit({ type: 'draft', draft });
     return structuredClone(draft);

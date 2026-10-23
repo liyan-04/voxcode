@@ -57,6 +57,21 @@ test('registered Linx tools read real task state and propose frozen drafts witho
   await assert.rejects(async () => tool('propose_followup').invoke({ prompt: 'Stale' }));
 });
 
+test('follow-up drafts inherit existing manual criteria unless explicitly edited', async t => {
+  const h = await harness(t);
+  const original = [{ id: 'checks', text: 'All requested checks pass', required: true, status: 'passed' },
+    { id: 'layout', text: 'Review mobile layout', required: false, status: 'pending' }];
+  h.tasks.get('task-a').criteria = structuredClone(original);
+  await h.open();
+  const tool = h.args.tools.find(item => item.name === 'propose_followup');
+  const inherited = tool.invoke({ prompt: 'Improve the title' });
+  assert.deepEqual(inherited.criteria, original.map(({ text, required }) => ({ text, required })));
+  assert.deepEqual(h.tasks.get('task-a').criteria, original);
+  const edited = tool.invoke({ prompt: 'Improve the title', criteria: [{ text: 'New manual check', required: true }] });
+  assert.deepEqual(edited.criteria, [{ text: 'New manual check', required: true }]);
+  assert.throws(() => tool.invoke({ prompt: 'Invalid criteria', criteria: null }));
+});
+
 test('new-task drafts validate schemas and closed or revoked tools cannot access state', async t => {
   const h = await harness(t);
   const voice = await h.open(null, null);
