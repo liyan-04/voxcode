@@ -172,10 +172,10 @@ public struct SnapshotOwnership: Sendable {
     public mutating func begin() -> UUID { generation = UUID(); return generation }
     public mutating func invalidate() { generation = UUID() }
     public func allows(_ candidate: UUID) -> Bool { generation == candidate }
-    public static func prefer(_ incoming: TaskSnapshot, over current: TaskSnapshot) -> Bool {
+    public static func prefer(_ incoming: TaskSnapshot, over current: TaskSnapshot, allowEqualTimestamp: Bool = true) -> Bool {
         if incoming.version != current.version { return incoming.version > current.version }
         guard let next = WireDate.parse(incoming.updatedAt), let previous = WireDate.parse(current.updatedAt) else { return false }
-        return next >= previous
+        return allowEqualTimestamp ? next >= previous : next > previous
     }
 }
 @MainActor public final class VoiceCleanupBarrier {

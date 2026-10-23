@@ -44,6 +44,26 @@ import VoxCodeCore
         XCTAssertEqual(session.tasks.first?.version, 4)
         XCTAssertEqual(session.tasks.first?.status, "completed")
     }
+    func testEqualTimestampReplayPreservesCurrentTaskWhileRefreshCanAdvanceIt() async throws {
+        let transport = OrderedSnapshots()
+        let session = try session(transport)
+        let current = Task { await session.refresh() }; await wait(transport, count: 2)
+        await transport.refresh(start: 0, version: 2, status: "running", limit: 4)
+        await current.value
+        let replay = Task { await session.mutate("/api/tasks/task-a/messages", Mutation(requestId: "original", version: 1, prompt: "Confirmed instruction")) }
+        await wait(transport, count: 3)
+        await transport.mutation(index: 2, version: 2, status: "queued")
+        let outcome = await replay.value
+        XCTAssertEqual(outcome, .succeeded)
+        XCTAssertEqual(session.tasks.first?.version, 2)
+        XCTAssertEqual(session.tasks.first?.updatedAt, "2026-10-23T00:00:02Z")
+        XCTAssertEqual(session.tasks.first?.status, "running")
+        let next = Task { await session.refresh() }; await wait(transport, count: 5)
+        await transport.refresh(start: 3, version: 2, status: "completed", limit: 4)
+        await next.value
+        XCTAssertEqual(session.tasks.first?.updatedAt, "2026-10-23T00:00:02Z")
+        XCTAssertEqual(session.tasks.first?.status, "completed")
+    }
     private func session(_ transport: OrderedSnapshots) throws -> Session {
         Session(binding: try PairedBridge(origin: URL(string: "https://fixture.invalid")!, token: "synthetic-token"), transport: { request in await transport.send(request) })
     }
