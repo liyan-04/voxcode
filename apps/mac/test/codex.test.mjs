@@ -6,6 +6,7 @@ import {
   writeFileSync,
   symlinkSync,
   realpathSync,
+  existsSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -280,4 +281,102 @@ test("resume history and foreign completion notifications cannot complete the ne
     }),
     /fixture turn failed/,
   );
+});
+
+const approvalFixture = fileURLToPath(
+  new URL("./fixtures/approval-ownership.mjs", import.meta.url),
+);
+for (const mode of [
+  "foreign-before-dispatch",
+  "owned-before-dispatch",
+  "foreign-thread",
+  "old-turn",
+  "missing-identity",
+])
+  test(`adapter declines ${mode} approvals without asking the task owner`, async () => {
+    const cwd = repository();
+    let calls = 0;
+    await execute(cwd, mode, {
+      task: { prompt: mode, codexThreadId: "thread" },
+      args: [approvalFixture, mode],
+      onApproval(_details, reply) {
+        calls++;
+        reply("accept");
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(
+      JSON.parse(readFileSync(`${cwd}/decision.json`)).result.decision,
+      "decline",
+    );
+  });
+
+test("adapter waits for the dispatched turn identity before exposing a legitimate early approval", async () => {
+  const cwd = repository();
+  let calls = 0;
+  await execute(cwd, "early", {
+    task: { prompt: "early", codexThreadId: "thread" },
+    args: [approvalFixture, "early"],
+    onApproval(_details, reply) {
+      assert.equal(existsSync(`${cwd}/turn-response.json`), true);
+      calls++;
+      reply("accept");
+    },
+  });
+  assert.equal(calls, 1);
+  assert.equal(
+    JSON.parse(readFileSync(`${cwd}/decision.json`)).result.decision,
+    "accept",
+  );
+});
+
+test("an approval decision arriving after its turn completes cannot authorize the command", async () => {
+  const cwd = repository();
+  await execute(cwd, "late-decision", {
+    task: { prompt: "late-decision", codexThreadId: "thread" },
+    args: [approvalFixture, "late-decision"],
+    onApproval(_details, reply) {
+      setTimeout(() => reply("accept"), 10);
+    },
+  });
+  assert.equal(
+    JSON.parse(readFileSync(`${cwd}/decision.json`)).result.decision,
+    "decline",
+  );
+});
+
+test("a rejected dispatch never exposes its buffered command approval", async () => {
+  const cwd = repository();
+  let calls = 0;
+  await assert.rejects(
+    execute(cwd, "early-rejected", {
+      task: { prompt: "early-rejected", codexThreadId: "thread" },
+      args: [approvalFixture, "early-rejected"],
+      onApproval() {
+        calls++;
+      },
+    }),
+    /fixture dispatch denied/,
+  );
+  assert.equal(calls, 0);
+  assert.equal(
+    JSON.parse(readFileSync(`${cwd}/decision.json`)).result.decision,
+    "decline",
+  );
+});
+
+test("early approvals share the bounded dispatch buffer and overflow without exposing commands", async () => {
+  let calls = 0;
+  await assert.rejects(
+    execute(repository(), "early-overflow", {
+      task: { prompt: "early-overflow", codexThreadId: "thread" },
+      args: [approvalFixture, "early-overflow"],
+      requestTimeoutMs: 500,
+      onApproval() {
+        calls++;
+      },
+    }),
+    /exceeded the dispatch buffer/,
+  );
+  assert.equal(calls, 0);
 });

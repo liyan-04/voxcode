@@ -88,6 +88,8 @@ createInterface({ input: process.stdin }).on("line", (line) => {
         id: 901,
         method: "item/commandExecution/requestApproval",
         params: {
+          threadId: "thread",
+          turnId: "turn",
           command: "echo hello",
           cwd: process.cwd(),
           reason: "run command",
