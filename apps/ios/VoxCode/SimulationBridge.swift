@@ -52,7 +52,7 @@ actor SimulationBridge {
                 guard tasks[index].status == "completed", tasks[index].acceptance != "accepted", parts.count == 5, let c = tasks[index].criteria?.firstIndex(where: { $0.id == parts[4] }), ["pass", "fail"].contains(body["decision"] as? String ?? "") else { return try failure(url, "invalid", "[模拟] 条件不可修改", 400) }
                 tasks[index].criteria![c].status = body["decision"] as? String == "pass" ? "passed" : "failed"
             case "accept":
-                guard tasks[index].canAccept else { return try failure(url, "criteria", "[模拟] 必选条件尚未通过", 409) }
+                guard tasks[index].canAccept else { return try failure(url, "blocked", "[模拟] 必选条件尚未通过", 409) }
                 tasks[index].acceptance = "accepted"
                 tasks[index].acceptanceSnapshot = AcceptanceSnapshot(version: tasks[index].version, acceptedAt: ISO8601DateFormatter().string(from: Date()), criteria: tasks[index].criteria!)
             case "cancel": tasks[index].status = "interrupted"

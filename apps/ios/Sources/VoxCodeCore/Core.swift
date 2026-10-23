@@ -58,6 +58,7 @@ public struct FrozenRecording: Codable, Equatable, Sendable {
     public let taskId: String?; public let version: Int?; public let requestId: String
     public init(taskId: String?, version: Int?, requestId: String = UUID().uuidString) { self.taskId = taskId; self.version = version; self.requestId = requestId }
     public func matches(taskId: String?, version: Int?) -> Bool { self.taskId == taskId && self.version == version }
+    public func nextAttempt(afterClosing closedRequestId: String?) -> Self { requestId == closedRequestId ? FrozenRecording(taskId: taskId, version: version) : self }
 }
 public struct Mutation: Codable, Sendable {
     public var requestId: String; public var version: Int?; public var prompt: String?; public var title: String?; public var decision: String?; public var taskId: String?; public var criteria: [CriterionInput]?; public var note: String?
@@ -130,7 +131,22 @@ public struct PreviewScope: Sendable {
         return components.percentEncodedPath.hasPrefix(path)
     }
 }
-public struct APIError: Error, LocalizedError, Sendable { public var message: String; public var code: String?; public init(message: String, code: String? = nil) { self.message = message; self.code = code }; public var errorDescription: String? { message } }
+public struct APIError: Error, LocalizedError, Sendable {
+    public var message: String; public var code: String?; public var statusCode: Int?
+    public init(message: String, code: String? = nil, statusCode: Int? = nil) { self.message = message; self.code = code; self.statusCode = statusCode }
+    public var errorDescription: String? { message }
+}
+public enum MutationOutcome: Equatable, Sendable {
+    case succeeded, rejected, uncertain
+    public var retainsPending: Bool { self == .uncertain }
+    public static func failure(_ error: Error) -> Self {
+        guard let error = error as? APIError else { return .uncertain }
+        switch (error.statusCode, error.code) {
+        case (400, "invalid"), (409, "stale"), (409, "blocked"): return .rejected
+        default: return .uncertain
+        }
+    }
+}
 public struct VoiceStart: Encodable, Sendable {
     public let recording: FrozenRecording
     public init(recording: FrozenRecording) { self.recording = recording }
@@ -149,6 +165,29 @@ public struct PairedBridge: Codable, Equatable, Sendable {
 public struct PendingSubmission: Codable, Sendable {
     public let path: String; public let mutation: Mutation; public let target: FrozenRecording?
     public init(path: String, mutation: Mutation, target: FrozenRecording? = nil) { self.path = path; self.mutation = mutation; self.target = target }
+}
+public struct SnapshotOwnership: Sendable {
+    private var generation = UUID()
+    public init() {}
+    public mutating func begin() -> UUID { generation = UUID(); return generation }
+    public mutating func invalidate() { generation = UUID() }
+    public func allows(_ candidate: UUID) -> Bool { generation == candidate }
+    public static func prefer(_ incoming: TaskSnapshot, over current: TaskSnapshot) -> Bool {
+        if incoming.version != current.version { return incoming.version > current.version }
+        guard let next = WireDate.parse(incoming.updatedAt), let previous = WireDate.parse(current.updatedAt) else { return false }
+        return next >= previous
+    }
+}
+@MainActor public final class VoiceCleanupBarrier {
+    private var pending: Task<Void, Never>?
+    public init() {}
+    @discardableResult public func schedule(_ operation: @escaping @Sendable () async -> Void) -> Task<Void, Never> {
+        let previous = pending
+        let task = Task { await previous?.value; await operation() }
+        pending = task
+        return task
+    }
+    public func wait() async { await pending?.value }
 }
 public struct RecordingEpoch: Sendable {
     public private(set) var id = UUID()
@@ -207,7 +246,7 @@ public struct BridgeAPI: Sendable {
         guard (200..<300).contains(response.statusCode) else {
             struct Failure: Decodable { struct Detail: Decodable { var message: String; var code: String? }; var error: Detail }
             let failure = try? JSONDecoder().decode(Failure.self, from: data).error
-            throw APIError(message: failure?.message ?? "HTTP \(response.statusCode)", code: failure?.code)
+            throw APIError(message: failure?.message ?? "HTTP \(response.statusCode)", code: failure?.code, statusCode: response.statusCode)
         }
         return data
     }
