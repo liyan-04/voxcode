@@ -22,3 +22,25 @@ test('MCP only invokes explicitly registered tools and deduplicates IDs',async()
 test('MCP cannot invoke a tool before a validated server hello',async t=>{let calls=0;const {session}=setup({tools:[{name:'task.submit',inputSchema:{type:'object'},invoke:()=>{calls++;return 'ok';}}]});t.after(()=>session.close());const pending=session.connect();pending.catch(()=>{});const s=Socket.last;const call={type:'mcp',payload:{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'task.submit',arguments:{}}}};s.message(call);s.emit('open');s.message(call);await new Promise(r=>setImmediate(r));assert.equal(calls,0);s.message(hello);await pending;s.message(call);await new Promise(r=>setImmediate(r));assert.equal(calls,1);});
 test('closing synchronously from ready settles connect without a listener exception',async()=>{let session;session=createLinxSession({config,WebSocketImpl:Socket,onEvent:event=>{if(event.type==='ready')session.close();}});const pending=session.connect();pending.catch(()=>{});const s=Socket.last;s.emit('open');assert.doesNotThrow(()=>s.message(hello));await pending;assert.equal(s.closed,true);assert.throws(()=>session.startListening(),/not ready/);});
 test('closing from an MCP callback prevents later tool execution',async()=>{let session,calls=0;session=createLinxSession({config,WebSocketImpl:Socket,onEvent:event=>{if(event.type==='mcp')session.close();},tools:[{name:'task.submit',inputSchema:{type:'object'},invoke:()=>{calls++;return 'ok';}}]});const pending=session.connect();const s=Socket.last;s.emit('open');s.message(hello);await pending;s.message({type:'mcp',payload:{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'task.submit',arguments:{}}}});await new Promise(r=>setImmediate(r));assert.equal(calls,0);});
+test('documented hello placeholders and aborted TTS metadata are preserved', async t => {
+  const { session, events } = setup({ config: { ...config, promptContext: { voxcode_target: 'task-a version 2' } } });
+  t.after(() => session.close());
+  const pending = session.connect(); const socket = Socket.last;
+  pending.catch(() => {});
+  socket.emit('open');
+  assert.deepEqual(JSON.parse(socket.sent[0]).agent_params, { custom_replace_prompt: { voxcode_target: 'task-a version 2' } });
+  socket.message(hello); await pending;
+  socket.message({ type: 'tts', state: 'stop', is_aborted: true });
+  assert.equal(events.at(-1).is_aborted, true); session.close();
+  assert.throws(() => setup({ config: { ...config, promptContext: { bad: 'x'.repeat(10001) } } }));
+});
+test('conflicting MCP retries never invoke a second tool or return the old result', async () => {
+  let calls = 0;
+  const { session } = await ready({ tools: [{ name: 'read', inputSchema: { type: 'object' }, invoke: args => { calls++; return args; } }] });
+  const socket = Socket.last;
+  for (const value of [1, 2]) socket.message({ type: 'mcp', payload: { jsonrpc: '2.0', id: 42, method: 'tools/call', params: { name: 'read', arguments: { value } } } });
+  await new Promise(resolve => setImmediate(resolve));
+  const replies = socket.sent.slice(1).map(value => JSON.parse(value).payload);
+  assert.equal(calls, 1); assert(replies.some(value => value.id === 42 && value.error));
+  session.close();
+});
