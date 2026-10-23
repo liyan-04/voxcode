@@ -2,7 +2,7 @@
 
 This file is coordinator-owned. Implementers propose changes before changing a shared field.
 
-Current delivery scope: docs/phone-demo-scope.zh-CN.md. The first demo uses native task/results/voice views. Preview routes, preview cookie transport, WKWebView and onPreview publication below are reserved future interfaces, not phone-demo implementation or acceptance requirements; optional preview fields may remain null. Monitoring is currently a proposed aggregate-only capability; add its exact interface here before implementing consumers.
+Current delivery scope: docs/phone-demo-scope.zh-CN.md. The first demo uses native task/results/voice views. Preview routes, preview cookie transport, WKWebView and onPreview publication below are reserved future interfaces, not phone-demo implementation or acceptance requirements; optional preview fields may remain null.
 
 ## HTTP
 All `/api/*` except health and pair require `Authorization: Bearer <sessionToken>`.
@@ -11,6 +11,7 @@ JSON errors: `{ "error": { "code": "string", "message": "string" } }`.
 - GET /api/health -> `{name:"VoxCode", version:"0.1.0", codexAvailable:boolean, voiceConfigured:boolean}`; no secrets.
 - POST /api/pair `{code:string}` -> `{sessionToken:string}`. Expiring local pairing code, rate limited.
 - GET /api/settings -> `Settings` (authenticated).
+- GET /api/monitor -> `MonitorSnapshot` (authenticated, local Mac only; no relay exposure in the first demo).
 - POST /api/settings `{requestId,executionLimit}` -> `Settings`; durable replay, integer 1–8. Default four. Lowering does not stop existing turns.
 - GET /api/tasks -> `{tasks:Task[]}`.
 - POST /api/tasks `{requestId,title,prompt}` -> `{task:Task}`. Selected server project only.
@@ -23,6 +24,7 @@ JSON errors: `{ "error": { "code": "string", "message": "string" } }`.
 - POST /api/tasks/:id/criteria/:criterionId `{requestId,version,decision:"pass"|"fail",note?}` -> `{task:Task}`; manual criteria only, completed current version. Reject accept while required criteria remain failed/unverified.
 
 Settings: `{executionLimit:integer,maxExecutionLimit:8,maxTasks:32,activeExecutions:integer,queuedTasks:integer,recoveryRequired:boolean}`.
+MonitorSnapshot: `{generatedAt:ISODate,uptimeSeconds:number,executionLimit:integer,maxTasks:32,activeExecutions:integer,recoveryRequired:boolean,counts:{queued,running,waiting_approval,waiting_input,stopping,interrupted,failed,completed,accepted},memory:{rssBytes:integer,heapUsedBytes:integer}}`. Counts are nonnegative integers; completed excludes accepted tasks. Use actual task-state names from design.md for the counts, including zero values. These are current aggregates, not durable throughput counters. Do not include task IDs/titles, prompts, paths, raw events, credentials or per-task labels. A future local status page must obtain this JSON using explicit authentication and keep tokens only in memory.
 Create/follow-up bodies may additionally include `criteria:[{text:string,required?:boolean}]` (1–12 items, text <=500 characters). Omitted create criteria produces one manual criterion: confirm the requested result against evidence. Omitted follow-up criteria carries forward the prior conditions with unverified status for the new version.
 
 ## Shapes
@@ -49,7 +51,7 @@ Errors use 400 invalid, 401 unauthenticated, 403 denied, 404 unknown, 409 stale/
 
 ## Voice v1 additions
 
-Voice-create response adds `outputFormat:{format:"opus"|"pcm",sample_rate,channels,frame_duration?}` and truthful `outputSupported`; receiving wire audio does not prove native playback. Events include ready/TTS/STT plus `{type:"audio",seq,data:<base64 frame>}` with retained frame boundaries, and `{type:"draft",seq,draft:VoiceDraft}` / `{type:"focus",seq,taskId}`. Use bounded polling batches, explicit cursor-expired errors, and never replay old audio into a new recording epoch.
+Voice-create response adds `outputFormat:null|{format:"pcm",sample_rate:16000|24000,channels:1}` and truthful `outputSupported`; receiving wire audio does not prove native playback. The Mac decodes negotiated provider Opus using pinned opusscript before returning signed int16 little-endian PCM to the phone. Events include ready/TTS/STT plus `{type:"audio",seq,data:<base64 PCM frame>}` with retained frame boundaries, and `{type:"draft",seq,draft:VoiceDraft}` / `{type:"focus",seq,taskId}`. TTS stop events preserve `is_aborted` when supplied. Use bounded polling batches, explicit 409 `cursor_expired` errors, and never replay old audio into a new recording epoch. Abort stops output for this voice session; the client discards queued playback immediately. Recording start also clears playback to prevent feedback.
 VoiceDraft: `{id,taskId:null|string,version:null|integer,title,prompt,criteria:[{text,required}],expiresAt}`. Stored per voice session/owner; only proposes work. Client edits/explicitly confirms using standard task mutation with a persistent request ID. STT and MCP draft share one composer; no automatic mutation from tools. Registered tools: list_tasks, get_task_status, get_task_evidence, propose_task, propose_followup, propose_focus, all schema/size/owner/version checked server-side.
 Voice session also accepts authenticated POST `/api/voice/sessions/:id/abort` (empty JSON) to stop provider speech without cancelling Codex. Closing/revoking expires all associated tools/drafts/audio. Short-lived prompt context uses documented hello.agent_params placeholders only; no arbitrary prompt fields or provider credentials are exposed.
 

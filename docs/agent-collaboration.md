@@ -28,11 +28,13 @@ Keep tasks small enough to verify independently. Parallelize independent paths; 
 
 The user has authorized parallel agent development for this project. Keep concurrency within available tool slots and independently owned work. Two reviews means two independent reviewers, not one implementer reviewing its own output twice. A reviewer may review multiple components it did not implement; targeted rereview follows material fixes.
 
+The user additionally requires a PR at every verifiable milestone. Follow [milestone publication](milestones.md): the coordinator publishes a scoped Draft PR after relevant checks pass, identifying the implementation agent, task and pending reviews. Review proceeds on that visible snapshot; do not wait until all components finish to publish a combined PR. Keep the source PR draft until the two independent review gates are resolved.
+
 The architect directs the existing iOS, Mac and Relay agents through bounded task briefs and receives their handoffs. See [architect role](architecture/README.md). Contract changes are proposed by the architect and applied to shared files by the coordinator before affected developers proceed. The architect's cross-component check is additional to each component's two independent reviews.
 
 Agent roles do not require every agent to stay active continuously. This session has four execution slots including the coordinator: while the architect is actively coordinating, at most two developers can execute; after a checkpoint the architect can become idle so all three developers run concurrently. Never create duplicate workers or silently drop a developer to work around the limit.
 
-Prefer isolated worktrees for new independent work. For the current shared checkout, workers must never run staging, commit, stash, checkout/switch, reset, cleanup or push commands. They may inspect status/diffs. Only the coordinator performs Git mutations, after workers are quiescent for branch switches. Never remove another agent's untracked files.
+The user requires independent worktrees for each developer. The coordinator migrates the retained component snapshots into separate component branches/worktrees and keeps the original shared checkout intact. Workers must never run staging, commit, stash, checkout/switch, reset, cleanup or push commands; they may inspect status/diffs. Only the coordinator performs Git mutations. Never remove another agent's untracked files.
 
 Current write boundaries (2026-10-23; update before reallocating):
 

@@ -10,7 +10,7 @@
 ## Collaboration
 - Workers edit only their assigned paths. The coordinator owns shared contracts and integration.
 - A dedicated architect agent coordinates the iOS, Mac and Relay developers: technical task briefs, interfaces, dependency order, blockers and cross-component checks. Read docs/architecture/README.md. The coordinator retains Git/PR, integration and shared-file mutation ownership; architect checks do not replace the two independent component reviews.
-- Before dispatch, record goal, writable paths, contract/dependencies and verification criteria. Use separate worktrees for new independent work; in the current shared checkout, workers must not stage, commit, stash, switch branches or push.
+- Before dispatch, record goal, writable paths, contract/dependencies and verification criteria. Each developer uses an independent worktree and component branch; preserve the original checkout during migration. Workers must not stage, commit, stash, switch branches or push.
 - Do not commit another worker's changes. Coordinator makes scoped commits after verification.
 - Each implementation component requires two reviews independent of its implementer; save reviewed revision, findings and resolutions under docs/reviews/. AI reports are not human GitHub approvals or user acceptance.
 - Record real verification commands and outcomes in docs/progress.md. Pending verification stays pending.

@@ -12,3 +12,5 @@ apps/ios/VoxCode.xcodeproj/
 coverage/
 .DS_Store
 *.log
+.voxcode-tls/
+.worktrees/
