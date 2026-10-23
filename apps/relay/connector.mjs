@@ -1,7 +1,7 @@
 import {request as httpRequest} from 'node:http';
 import {randomUUID} from 'node:crypto';
 import WebSocket from 'ws';
-import {credentials,bounded,route,bearer,requestType,decodeBody,responseType,readBody,DEFAULT_BODY_LIMIT,DEFAULT_RESPONSE_LIMIT,FRAME_LIMIT,MAX_INFLIGHT} from './protocol.mjs';
+import {credentials,bounded,route,bearer,requestType,decodeBody,responseType,readBody,atCapacity,DEFAULT_BODY_LIMIT,DEFAULT_RESPONSE_LIMIT,FRAME_LIMIT} from './protocol.mjs';
 
 function loopback(hostname) { return ['localhost','127.0.0.1','[::1]'].includes(hostname); }
 export function createConnector(options) {
@@ -26,7 +26,7 @@ export function createConnector(options) {
     let body;
     try { body = decodeBody(message.body,DEFAULT_BODY_LIMIT); if (message.method !== 'POST' && body.length) throw new Error('Unexpected body'); } catch { return ws.terminate(); }
     seen.add(message.id); if (seen.size > 2048) seen.delete(seen.values().next().value);
-    if (inflight.size >= MAX_INFLIGHT) return failure(ws,message.id,503,'Connector is busy');
+    if (atCapacity(inflight,allowed.media)) return failure(ws,message.id,503,'Connector is busy');
     const headers = {};
     if (message.authorization) headers.authorization = message.authorization;
     if (message.contentType) headers['content-type'] = message.contentType;
@@ -43,14 +43,14 @@ export function createConnector(options) {
       } catch { if (retire(message.id)) failure(ws,message.id,502,'Bridge response too large or unavailable'); res.destroy(); }
     });
     const timer = setTimeout(() => { if (inflight.has(message.id)) { cancel(message.id); failure(ws,message.id,504,'Bridge request timed out'); } },timeout);
-    inflight.set(message.id,{request:local,timer});
+    inflight.set(message.id,{request:local,timer,media:allowed.media});
     local.on('error',() => { if (retire(message.id)) failure(ws,message.id,502,'Bridge request failed'); });
     local.end(body);
   }
   function connect() {
     if (closed) return;
     notify('connecting');
-    const ws = new WebSocket(relay.href,{headers:{authorization:`Bearer ${machineKey}`,'x-voxcode-machine-id':machineId},followRedirects:false,maxPayload:FRAME_LIMIT,perMessageDeflate:false,handshakeTimeout:10000}); socket = ws;
+    const ws = new WebSocket(relay.href,{headers:{authorization:`Bearer ${machineKey}`,'x-voxcode-machine-id':machineId},ca:options.ca,rejectUnauthorized:true,minVersion:'TLSv1.2',followRedirects:false,maxPayload:FRAME_LIMIT,perMessageDeflate:false,handshakeTimeout:10000}); socket = ws;
     let heartbeatTimer,pongTimer,ping;
     const clearHeartbeat = () => { clearInterval(heartbeatTimer); clearTimeout(pongTimer); heartbeatTimer = pongTimer = ping = undefined; };
     ws.on('pong',data => { if (ping && data.equals(ping)) { clearTimeout(pongTimer); pongTimer = ping = undefined; } });
