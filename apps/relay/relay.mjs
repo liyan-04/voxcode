@@ -57,6 +57,13 @@ export function createRelay(options) {
     catch { remove(id); sendError(res,503,'Mac connection failed'); }
   };
   const server = tls ? createSecureServer(tls,handleRequest) : createServer(handleRequest);
+  const sockets = new Set();
+  // HTTP connection tracking starts after TLS, so own raw sockets from acceptance.
+  server.on('connection',socket => {
+    if (closing) { socket.destroy(); return; }
+    sockets.add(socket);
+    socket.once('close',() => sockets.delete(socket));
+  });
   server.requestTimeout = 15000; server.headersTimeout = 10000; server.maxConnections = 128;
   const wss = new WebSocketServer({noServer:true,maxPayload:FRAME_LIMIT,perMessageDeflate:false});
   server.on('upgrade',(req,socket,head) => {
@@ -95,5 +102,15 @@ export function createRelay(options) {
   });
   const heartbeat = setInterval(() => { if (!connector) return; if (!connector.alive) connector.terminate(); else { connector.alive = false; connector.ping(); } },15000);
   heartbeat.unref();
-  return {server,async close() { closing = true; clearInterval(heartbeat); connector?.terminate(); for (const [id,entry] of pending) { remove(id); sendError(entry.res,503,'Relay is stopping'); } server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await new Promise(resolve => wss.close(resolve)); }};
+  return {server,async close() {
+    closing = true;
+    clearInterval(heartbeat);
+    connector?.terminate();
+    for (const [id,entry] of pending) { remove(id); sendError(entry.res,503,'Relay is stopping'); }
+    const closed = new Promise(resolve => server.close(resolve));
+    server.closeAllConnections();
+    for (const socket of sockets) socket.destroy();
+    await closed;
+    await new Promise(resolve => wss.close(resolve));
+  }};
 }
