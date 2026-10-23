@@ -1,0 +1,2 @@
+#!/bin/sh
+exec node scripts/check-pr-policy.mjs --commit-file "$1"

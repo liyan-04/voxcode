@@ -2,6 +2,8 @@
 
 This file is coordinator-owned. Implementers propose changes before changing a shared field.
 
+Current delivery scope: docs/phone-demo-scope.zh-CN.md. The first demo uses native task/results/voice views. Preview routes, preview cookie transport, WKWebView and onPreview publication below are reserved future interfaces, not phone-demo implementation or acceptance requirements; optional preview fields may remain null. Monitoring is currently a proposed aggregate-only capability; add its exact interface here before implementing consumers.
+
 ## HTTP
 All `/api/*` except health and pair require `Authorization: Bearer <sessionToken>`.
 JSON errors: `{ "error": { "code": "string", "message": "string" } }`.
