@@ -105,9 +105,14 @@ test('core mutation errors preserve status and version conflict body',async t=>{
 });
 test('relay shutdown closes TCP connections that never finish a TLS handshake',{timeout:5000},async t=>{
   const tls=await certificates(t),f=await fixture(t,{tls});
+  const accepted=once(f.relay.server,'connection');
   const socket=createConnection({host:'127.0.0.1',port:Number(new URL(f.base).port)});socket.on('error',()=>{});await once(socket,'connect');
+  const [peer]=await accepted;
   const closing=f.relay.close();let timer,closed;
-  try{closed=await Promise.race([closing.then(()=>true),new Promise(resolve=>{timer=setTimeout(()=>resolve(false),500);})]);}
+  let peerClosed;
+  try{closed=await Promise.race([closing.then(()=>true),new Promise(resolve=>{timer=setTimeout(()=>resolve(false),500);})]);peerClosed=peer.destroyed;}
   finally{clearTimeout(timer);socket.destroy();await closing;}
   assert.equal(closed,true,'Relay shutdown must own pre-handshake TCP sockets');
+  assert.equal(peerClosed,true,'Accepted raw socket must close before client cleanup');
+  assert.equal(await new Promise((resolve,reject)=>f.relay.server.getConnections((error,count)=>error?reject(error):resolve(count))),0);
 });
