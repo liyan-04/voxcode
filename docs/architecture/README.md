@@ -30,4 +30,4 @@ The architect may edit only its explicitly assigned coordination record under `d
 
 No staging, commits, stash, branch switches, pushes, merges, deployment, credential access or edits to implementation/shared contract files. Request ownership changes through the coordinator. Deployment remains deferred. Do not discard existing red tests or unfinished files; use them as resumable work with their original owners.
 
-All agents follow [the Agent work agreement and acceptance standard](agent-work-agreement.md). Post-merge branch/worktree cleanup follows [cleanup-policy.md](cleanup-policy.md).
+All agents follow [the Agent work agreement and acceptance standard](agent-work-agreement.md) and [the development practices](development-practices.md): short-lived PR integration into master, acceptance criteria before implementation, shared contracts before parallel consumers, and model-gateway backoff/recovery. Use the practice checklist at assignment and handoff checkpoints. Post-merge branch/worktree cleanup follows [cleanup-policy.md](cleanup-policy.md).
