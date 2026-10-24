@@ -1,5 +1,11 @@
 # Progress and verification
 
+## 2026-10-24: master consolidation and branch retirement
+- User made `master` the final integration branch and authorized merging remaining content through PRs, then deleting merged remote branches. PR [#22](https://github.com/liyan-04/voxcode/pull/22) merged the phone loop into `master` at `33d0daf`; its tested head `cbcf71f` has an identical tree.
+- Local promotion validation: `npm test` 161/161; `npm run test:policy` 29/29; whitespace checks passed. Existing component reviews remain in `docs/reviews/`; this promotion does not certify native signing, live Linx or outdoor access.
+- Full remote head inventory, transitive PR integration evidence and retained local resources are in [the master consolidation audit](architecture/master-consolidation-2026-10-24.md). All 15 audited old remote refs were deleted after current-head/protection/dependency checks. PR #14 was closed as superseded by #19/#22; dirty local worktrees remain preserved. Issue #21 merged through PR #23 at `3b851f1`; its local worktree is still retained.
+- Updated the current-base instructions to `master`; retired `codex/mvp`/`codex/phone-demo` must not be targets for new development PRs. Master remains protected against deletion, force push and direct updates.
+
 ## 2026-10-24: Issue collaboration policy (Issue #21)
 - Added feature/task, bug/regression and acceptance/deployment Issue forms with required scope, owner, dependencies, checks and evidence fields. Forms reuse existing repository labels.
 - Added coordinator allocation, separate child Issues/worktrees, exclusive paths, start/blocker/handoff records and Issue-to-PR linkage. Existing tasks retain their names; unavailable GitHub access uses a local pending record until linked before ready-for-review.

@@ -6,11 +6,11 @@
 
 只有同时满足以下条件，资源才进入清理候选：
 
-1. 对应 PR 的状态为 `MERGED`，且目标是当前项目基线分支（目前为 `codex/mvp`）。不能只根据“CI 通过”、PR 关闭或 commit 看起来已经存在来判断合并。
+1. 当前唯一集成和默认分支为 `master`。对应 PR 已合并到 `master`，或者存在已合并的组件 PR → 集成 PR → `master` 的完整链路，并核对最终文件内容。仅有 CI 通过或 PR 关闭不足以证明合并；被后续 PR 替代的旧 PR 要明确标记为 superseded，不能记作 merged。
 2. PR URL、最终合并 SHA、审查报告、验证命令和剩余风险已经记录在 PR 和 `docs/progress.md`；架构决策或依赖关系记录在 `docs/architecture/`。
 3. 没有打开的 PR、stacked PR、Issue 或其他任务仍依赖该 topic 分支或 worktree。
-4. 分支没有未推送的独有 commit；worktree 没有未提交或未跟踪的文件。任何可能只存在于待删 worktree 的内容都先转移到已审查的 commit 或文档。
-5. 清理对象不属于 `main`、`master`、`codex/mvp` 或其他受保护分支，也不包含凭据、证书私钥、用户数据或未发布的验收证据。
+4. 删除远端分支前确认它的提交内容已集成且没有新的远端提交；同时独立检查本地分支和 worktree。远端引用可删除，不代表同名本地分支或 dirty worktree 可删除。任何可能只存在于待删本地资源的内容都先保留或转移。
+5. 清理对象不属于 `main`、`master` 或其他实际受保护分支，也不包含凭据、证书私钥、用户数据或未发布的验收证据。用户已授权在内容进入 `master` 后退役并删除远端 `codex/mvp` 和 `codex/phone-demo`；其 dirty 本地恢复快照仍须保留。
 
 Squash merge 后，topic 分支的 commit SHA 可能不是基线分支的祖先；此时以 GitHub PR 的 `MERGED` 状态、目标分支和合并 SHA 为准，并核对 PR diff 已出现在基线树中，不能只使用 `git branch --merged`。
 
@@ -21,13 +21,13 @@ Squash merge 后，topic 分支的 commit SHA 可能不是基线分支的祖先�
 - 由本项目创建、内容已纳入 PR 或明确属于构建缓存的干净 worktree，使用 `git worktree remove` 后执行 `git worktree prune`。
 - 已验证不再需要的 ignored 构建包、测试证书 fixture 和临时目录。私钥、用户数据和未核对的文件不能作为“缓存”清理。
 
-清理不关闭 PR、不删除 PR 评论、不删除 review 报告、不改写 Git 历史，也不删除 `docs/progress.md` 中的里程碑记录。若需要保留可恢复快照，先归档 worktree 或创建带说明的快照，再执行删除。
+清理不删除 PR 评论、review 报告或历史证据，不改写 Git 历史。被替代的旧 PR 仅在用户已授权整理时关闭，并记录替代 PR；关闭不等于合并。若需要保留可恢复快照，先归档 worktree 或创建带说明的快照，再执行删除。
 
 ## 禁止清理的对象
 
 - 当前正在使用的 worktree，或含有任何未提交/未跟踪内容的 worktree。
 - 有未合并 PR、依赖 PR 或开发者明确标记为“保留”的分支。
-- 受保护分支、远端默认分支、共享集成分支和用户未明确授权的外部服务器目录。
+- 受保护分支、远端默认分支、仍在使用的共享集成分支和用户未明确授权的外部服务器目录。
 - 不能证明归属的 PID、目录、构建产物或证书材料。发现归属不明时停止清理并报告。
 
 ## 标准流程

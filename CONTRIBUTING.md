@@ -4,7 +4,7 @@ Applies equally to humans, the coordinator and AI workers. Read [AGENTS.md](AGEN
 
 ## Branches and change boundaries
 
-- Use `codex/<issue-number>-<short-purpose>`, for example `codex/21-issue-collaboration`. Existing branches may keep their names. Verify the remote default and actual PR base; stacked work may target an integration branch.
+- Use `codex/<issue-number>-<short-purpose>`, for example `codex/21-issue-collaboration`, starting from the latest `origin/master`. Existing branches may keep their names. `master` is the sole default and integration branch; all new PRs target `master`. Retired `codex/mvp` and `codex/phone-demo` are not integration targets.
 - Direct commits and pushes to protected branches (`main`, `master`, `codex/mvp`) are prohibited. Every submitted change must be pushed to a `codex/*` topic branch and merged through a pull request. The local commit and pre-push hooks enforce this when installed; repository branch protection/rulesets remain the authoritative GitHub control. GitHub Actions workflows are disabled, so each PR must include exact local validation evidence.
 - One PR addresses one reviewable behavior or closely related set of changes. Prefer small PRs; roughly 400 changed source lines is a review prompt, not a reason to split inseparable changes or omit tests. Exclude generated files when judging size.
 - One commit is one coherent change, with its tests and essential documentation. A regression fix belongs with its regression test. Do not split a knowingly broken intermediate state into the shared branch.
@@ -70,7 +70,7 @@ The PR title follows the same subject format. Fill all five template sections wi
 
 Open a **draft** when implementation, required reviews or relevant verification is incomplete. Record pending external gates in plain language. A source PR can become reviewable after its specified code gates pass; that does not certify device/outdoor delivery. Never label a feature live-ready while its live acceptance gates remain open.
 
-Prefer squash merge after review, using the conventional PR title. Do not automatically merge, deploy or promote a draft. Stacked PRs must name their dependency and base; retarget and re-run checks after the dependency merges. Changes to requirements, security boundaries or shared contracts require coordinator integration and affected-component review.
+Prefer squash merge after review, using the conventional PR title. Do not automatically merge, deploy or promote a draft. Dependent PRs must name their dependency and target `master`; re-run checks after the dependency merges. Changes to requirements, security boundaries or shared contracts require coordinator integration and affected-component review.
 
 ## Verification and independent review
 
