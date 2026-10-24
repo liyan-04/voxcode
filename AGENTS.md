@@ -1,6 +1,7 @@
 # VoxCode engineering rules
 
 ## Scope
+- Current user-approved scope supersedes historical native/Relay requirements below: phone browser only, server VoxCode HTTPS/WSS, server-side 灵矽 voice/MCP and Codex CLI (not App Server). Read [current architecture](docs/architecture/current.md), [product workspace](docs/product/voice-code-workspace.md) and [contract](docs/architecture/voice-code-workspace-contract.md) first. Mac, Relay, Connector and native iOS are historical modules outside this delivery. Keep all collaboration, security and verification rules; first-batch draft/confirm and unverified voice-correlation gates remain mandatory.
 - Build a two-day hackathon MVP: native iPhone controller, server-hosted Codex executor and server-side Linx AI voice integration. The phone connects only to VoxCode's server. Read [the current server architecture](docs/architecture/server-execution.md) and [implementation tasks](docs/architecture/server-execution-plan.md); company Mac execution is optional future scope.
 - Read CONTRIBUTING.md and docs/agent-collaboration.md for mandatory commit/PR and multi-agent rules. Read docs/phone-demo-scope.zh-CN.md, docs/contract.md and docs/implementation-v1.md before implementation; docs/product-proposal.zh-CN.md and docs/plan.md are historical broader plans.
 - Record decisions, alternatives, evidence, limitations and optimization proposals in docs/. Do not record private internal reasoning or credentials.
