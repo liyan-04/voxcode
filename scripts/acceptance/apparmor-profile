@@ -1,0 +1,8 @@
+# Temporary compatibility profile for this disposable acceptance binary only.
+# Load with apparmor_parser -r; unload with apparmor_parser -R after stopping.
+# Codex workspace-write and network restrictions remain enabled.
+abi <abi/4.0>,
+include <tunables/global>
+profile voxcode-voice-acceptance-75 /opt/voxcode-voice-acceptance-75/bin/{codex,codex-code-mode-host} flags=(unconfined) {
+  userns,
+}
