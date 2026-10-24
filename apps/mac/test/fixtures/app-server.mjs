@@ -1,11 +1,12 @@
 import { createInterface } from "node:readline";
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, appendFileSync } from "node:fs";
 
 const send = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);
 let mode;
 createInterface({ input: process.stdin }).on("line", (line) => {
   const message = JSON.parse(line);
+  appendFileSync("protocol.jsonl", `${JSON.stringify(message)}\n`);
   if (message.method === "initialize")
     send(
       process.argv[2] === "init-error"
@@ -14,9 +15,36 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     );
   if (message.method === "thread/start")
     send({ id: message.id, result: { thread: { id: "thread" } } });
+  if (message.method === "thread/resume") {
+    if (process.argv[2] === "stale-events")
+      send({
+        method: "turn/completed",
+        params: {
+          threadId: message.params.threadId,
+          turn: { id: "previous-turn", status: "completed" },
+        },
+      });
+    send(
+      process.argv[2] === "resume-error"
+        ? { id: message.id, error: { message: "fixture thread unavailable" } }
+        : {
+            id: message.id,
+            result: { thread: { id: message.params.threadId } },
+          },
+    );
+  }
   if (message.method === "turn/start") {
+    if (process.argv[2] === "turn-timeout") return;
     mode = message.params.input[0].text;
     send({ id: message.id, result: { turn: { id: "turn" } } });
+    if (process.argv[2] === "stale-events")
+      send({
+        method: "turn/completed",
+        params: {
+          threadId: "foreign-thread",
+          turn: { id: "foreign-turn", status: "completed" },
+        },
+      });
     if (mode === "cancel") {
       process.on("SIGTERM", () => {});
       const child = spawn(
@@ -60,10 +88,28 @@ createInterface({ input: process.stdin }).on("line", (line) => {
         id: 901,
         method: "item/commandExecution/requestApproval",
         params: {
+          threadId: "thread",
+          turnId: "turn",
           command: "echo hello",
           cwd: process.cwd(),
           reason: "run command",
         },
+      });
+    } else if (mode === "command-failure") {
+      send({
+        method: "item/completed",
+        params: {
+          item: {
+            type: "commandExecution",
+            command: "npm test",
+            exitCode: 1,
+            aggregatedOutput: "assertion failed",
+          },
+        },
+      });
+      send({
+        method: "turn/completed",
+        params: { turn: { status: "completed" } },
       });
     } else if (mode === "environment") {
       writeFileSync(

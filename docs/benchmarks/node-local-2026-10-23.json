@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-23T15:44:29.343Z",
+  "revision": "b531aa1a13b96e2e0256c0bbbb38dad9e3e2a7c7",
+  "dirty": false,
+  "evidence": "local-fixture",
+  "dependencies": {
+    "executor": "controlled gated executor, no Codex",
+    "workspaces": "temporary directories, no git worktree preparation",
+    "voice": "not exercised",
+    "network": "loopback HTTP, no TLS/cellular"
+  },
+  "environment": {
+    "node": "v26.0.0",
+    "os": "darwin",
+    "release": "25.3.0",
+    "cpu": "Apple M5 Pro",
+    "cpuCount": 15
+  },
+  "configuration": {
+    "managedTasks": 24,
+    "executionLimit": 4,
+    "warmupRequests": 5,
+    "repetitions": 1
+  },
+  "invariants": {
+    "maxActive": 4,
+    "executedOnce": 24,
+    "completed": 23,
+    "cancelled": 1,
+    "fifthQueued": true,
+    "stoppingRetainedSlot": true,
+    "replayDeduplicated": true
+  },
+  "cancelSettlementMs": 2.8335419999999942,
+  "api": {
+    "create": {
+      "samples": 24,
+      "p50Ms": 0.6430420000000083,
+      "p95Ms": 1.6810419999999908,
+      "p99Ms": 3.582334000000003,
+      "errors": 0
+    },
+    "replay": {
+      "samples": 1,
+      "p50Ms": 0.3387090000000086,
+      "p95Ms": 0.3387090000000086,
+      "p99Ms": 0.3387090000000086,
+      "errors": 0
+    },
+    "expected-conflict": {
+      "samples": 1,
+      "p50Ms": 0.32766700000000526,
+      "p95Ms": 0.32766700000000526,
+      "p99Ms": 0.32766700000000526,
+      "errors": 0
+    },
+    "cancel": {
+      "samples": 1,
+      "p50Ms": 1.1928329999999931,
+      "p95Ms": 1.1928329999999931,
+      "p99Ms": 1.1928329999999931,
+      "errors": 0
+    },
+    "list": {
+      "samples": 60,
+      "p50Ms": 0.23466700000000174,
+      "p95Ms": 0.4796659999999946,
+      "p99Ms": 0.9868750000000119,
+      "errors": 0
+    },
+    "status": {
+      "samples": 60,
+      "p50Ms": 0.1450839999999971,
+      "p95Ms": 0.2553750000000008,
+      "p99Ms": 0.4004580000000004,
+      "errors": 0
+    }
+  },
+  "limitations": [
+    "Single local baseline; p99 with small samples is the observed upper tail, not a production guarantee.",
+    "Fixture durations do not measure Codex, Linx, native UI, TLS, real worktree setup or outdoor behavior. No performance thresholds established."
+  ]
+}

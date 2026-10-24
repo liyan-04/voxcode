@@ -37,7 +37,13 @@ test("evidence/events are bounded with monotonic cursors; cancellation stays ava
   assert.equal(events.events.length, 64);
   assert.ok(events.cursor > 64);
   assert.equal(s.events(t.id, events.cursor).events.length, 0);
-  for (let i = 0; i < 126; i++)
+  s.mutate(
+    "criterion",
+    { requestId: "manual", version: 0, decision: "pass" },
+    t.id,
+    task.criteria[0].id,
+  );
+  for (let i = 0; i < 125; i++)
     s.mutate("accept", { requestId: `accept-${i}`, version: 0 }, t.id);
   assert.throws(
     () =>
@@ -80,7 +86,13 @@ test("bounded pending approval decisions accept and decline at the mutation cap 
       prompt: "two",
     });
     await new Promise((resolve) => setTimeout(resolve, 20));
-    for (let i = 0; i < 126; i++)
+    s.mutate(
+      "criterion",
+      { requestId: "manual", version: 0, decision: "pass" },
+      done.id,
+      done.criteria[0].id,
+    );
+    for (let i = 0; i < 125; i++)
       s.mutate("accept", { requestId: `accept-${i}`, version: 0 }, done.id);
     const saved = [];
     for (let i = 0; i < 16; i++) {
@@ -108,7 +120,7 @@ test("bounded pending approval decisions accept and decline at the mutation cap 
             block.id,
             approvalId,
           ),
-        { status: 409, code: "conflict" },
+        { status: 409, code: "blocked" },
       );
       saved.push({ body, approvalId, result });
     }

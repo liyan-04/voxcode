@@ -24,6 +24,8 @@ GitHub Actions workflows are intentionally disabled because this repository's Ac
 
 - [Commit and PR rules](CONTRIBUTING.md)
 - [Multi-agent ownership and handoffs](docs/agent-collaboration.md)
+- [Independent worktrees](docs/worktrees.md)
+- [Milestones and separate PRs](docs/milestones.md)
 - [Active implementation plan](docs/implementation-v1.md)
 - [Design and boundaries](docs/design.md)
 - [Shared interface contract](docs/contract.md)
