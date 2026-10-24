@@ -35,9 +35,8 @@ test("pairing code expires", async () => {
   assert.throws(() => s.pair(s.pairCode), /invalid/);
   await s.close();
 });
-test("deduplicates durable mutations, rejects stale versions and isolates active tasks", async () => {
+test("deduplicates durable mutations, rejects stale versions and isolates two slots", async () => {
   const s = setup();
-  s.configure({ requestId: "two-slots", executionLimit: 2 });
   const a = s.mutate("create", { requestId: "a", title: "A", prompt: "one" });
   assert.deepEqual(
     s.mutate("create", { requestId: "a", title: "A", prompt: "one" }),
@@ -54,9 +53,9 @@ test("deduplicates durable mutations, rejects stale versions and isolates active
   s.mutate("create", { requestId: "b", title: "B", prompt: "two" });
   const c = s.mutate("create", { requestId: "c", title: "C", prompt: "three" });
   await new Promise((r) => setTimeout(r, 30));
-  assert.equal(s.active.size, 3);
-  assert.equal(s.get(c.id).status, "running");
-  assert.equal(new Set([...s.active.values()].map((x) => x.cwd)).size, 3);
+  assert.equal(s.active.size, 2);
+  assert.equal(s.get(c.id).status, "queued");
+  assert.equal(new Set([...s.active.values()].map((x) => x.cwd)).size, 2);
   assert.throws(
     () =>
       s.mutate(
@@ -152,20 +151,19 @@ test("real Git worktrees isolate files and cancellation frees a slot only after 
         );
       }),
   });
-  s.configure({ requestId: "two-slots", executionLimit: 2 });
   const a = s.mutate("create", { requestId: "a", title: "A", prompt: "one" });
   s.mutate("create", { requestId: "b", title: "B", prompt: "two" });
   const c = s.mutate("create", { requestId: "c", title: "C", prompt: "three" });
   await new Promise((r) => setTimeout(r, 100));
-  assert.equal(paths.length, 3);
+  assert.equal(paths.length, 2);
   assert.equal(readFileSync(`${project}/file.txt`, "utf8"), "original");
   assert.equal(readFileSync(`${paths[0]}/file.txt`, "utf8"), "A");
   s.mutate("cancel", { requestId: "cancel", version: 0 }, a.id);
-  assert.equal(s.get(c.id).status, "running");
+  assert.equal(s.get(c.id).status, "queued");
   await new Promise((r) => setTimeout(r, 100));
   assert.equal(paths.length, 3);
   assert.equal(s.get(a.id).status, "interrupted");
-  assert.equal(max, 3);
+  assert.equal(max, 2);
   await s.close();
 });
 test("expired approval declines operation and cannot be consumed", async () => {

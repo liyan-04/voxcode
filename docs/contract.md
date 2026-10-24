@@ -12,7 +12,7 @@ JSON errors: `{ "error": { "code": "string", "message": "string" } }`.
 - POST /api/pair `{code:string}` -> `{sessionToken:string}`. Expiring local pairing code, rate limited.
 - GET /api/settings -> `Settings` (authenticated).
 - GET /api/monitor -> `MonitorSnapshot` (authenticated, local Mac only; no relay exposure in the first demo).
-- POST /api/settings `{requestId,executionLimit}` -> `Settings`; durable replay and legacy integer 1–8 compatibility. The value is informational and does not block task dispatch; each task still has one active turn.
+- POST /api/settings `{requestId,executionLimit}` -> `Settings`; durable replay, integer 1–8. Default four. Lowering does not stop existing turns.
 - GET /api/tasks -> `{tasks:Task[]}`.
 - POST /api/tasks `{requestId,title,prompt}` -> `{task:Task}`. Selected server project only.
 - GET /api/tasks/:id -> `{task:Task}`.

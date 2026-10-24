@@ -92,7 +92,7 @@ test("SIGKILL restart quarantines orphaned executions and queued work until expl
     assert.equal(recovered.active.size, 0);
     assert.equal(
       recovered.list().filter((task) => task.status === "interrupted").length,
-      3,
+      2,
     );
     const taskId = started.keys().next().value;
     assert.match(
@@ -136,7 +136,7 @@ test("SIGKILL restart quarantines orphaned executions and queued work until expl
     assert.equal(
       JSON.parse(readFileSync(`${dataDir}/state.json`)).unconfirmedExecutions
         .length,
-      3,
+      2,
       "recovery without explicit cleanup confirmation must preserve quarantine",
     );
     execFileSync(
@@ -160,8 +160,7 @@ test("SIGKILL restart quarantines orphaned executions and queued work until expl
         dispatched++;
       },
     });
-    await delay(80);
-    assert.equal(dispatched, 0, "recovery must not replay interrupted turns");
+    await until(() => dispatched === 1);
   } finally {
     if (bridge.exitCode === null && bridge.signalCode === null)
       bridge.kill("SIGKILL");

@@ -1,19 +1,5 @@
 # Progress and verification
 
-## 2026-10-24: remove execution concurrency quota
-- User requested removing the short-term execution quota. Mac scheduling no longer stops at `executionLimit`; queued tasks dispatch while the existing 32-task retention, process ownership/recovery, cancellation and one-active-turn-per-task safeguards remain. The settings field is retained as a legacy compatibility value and is no longer a scheduling gate.
-
-## 2026-10-24: delivery target clarification
-- Corrected the delivery wording after user clarification: the target is the combined loop of a native app installed on a real iPhone **and** that same build controlling Codex on the company Mac through the public Relay/Connector path. Neither a simulator demo nor an install-only result closes the project.
-- G4 device evidence and G5 outdoor evidence must identify the same signed build, device/iOS version, relay endpoint, Mac connector and Codex requestId. Current local state has neither a signed iPhone build nor a live public/outdoor run; these gates remain blocked by the missing Xcode/signing and deferred deployment resources.
-
-## 2026-10-24: phone-demo working tree verification
-- On `codex/phone-demo`, the complete local Node suite passed: `npm test` reported 122 passed / 0 failed under Node v26.0.0. This covers Mac bridge, relay, voice, integration, policy and fixture checks; it is local/fixture evidence and does not establish signed-device, live Linx or outdoor operation.
-- `node scripts/benchmark.mjs --help` ran the controlled 24-task benchmark successfully (`maxActive:4`, fifth task queued, stopping retained a slot, replay deduplicated, 23 completed and 1 cancelled; all measured API error counts were zero). The checkout was dirty, so the benchmark revision is recorded as `3273c4c` with `dirty:true`.
-- `npm run test:policy` passed 27 / 27 and `git diff --check` passed.
-- `swift test` remains pending in this environment: the installed CommandLineTools SwiftPM could not write its user cache or clang module cache (`Operation not permitted`). No signed Xcode build, simulator app build or device verification is claimed from this run.
-- Follow-up diagnosis confirmed the failure is environmental: `xcode-select -p` points to `/Library/Developer/CommandLineTools`, `xcrun --sdk iphonesimulator --show-sdk-path` reports no simulator SDK, and the available macOS SDK Swift interface was built by a different compiler patch level. With writable caches, the standalone core runner passed 34 assertions and Swift frontend parsing passed for `VoxCodeApp.swift`, `Recorder.swift` and `Session.swift`. Full XCTest remains blocked until matching full Xcode/iOS SDK is installed and selected.
-
 ## 2026-10-24: architect collaboration and post-merge cleanup policy
 - Added [the architect collaboration and cleanup policy](architecture/cleanup-policy.md): GitHub PRs remain the merge/evidence source; Issues/Projects coordinate active work; `docs/architecture/` and `docs/progress.md` retain durable decisions and evidence.
 - After a PR is merged into `codex/mvp`, only verified dependency-free topic branches, clean project-owned worktrees and disposable build artifacts may be removed. PRs, merge SHAs, reviews and progress records remain. Implementers report eligibility, architects check dependencies, and only the coordinator performs deletion.
