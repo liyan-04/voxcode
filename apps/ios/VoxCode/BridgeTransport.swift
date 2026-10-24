@@ -3,7 +3,7 @@ import Security
 import VoxCodeCore
 
 enum BridgeTransport {
-    static let fixedIP = "121.52.250.201"
+    static let fixedIP = "100.100.81.209"
     static let session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieStorage = nil

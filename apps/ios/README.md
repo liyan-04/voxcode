@@ -1,10 +1,12 @@
 # VoxCode for iPhone
 
-SwiftUI iOS 17+ phone controller. Current scope: `docs/phone-demo-scope.zh-CN.md`; contract v1. The phone shows task activity, versioned conditions, diff/check evidence and manual acceptance. WebView/site previews and the Mac workbench are deferred.
+SwiftUI iOS 17+ native iPhone controller. Current scope: [server execution](../../docs/architecture/server-execution.md) and [implementation tasks](../../docs/architecture/server-execution-plan.md), contract v1. The phone connects only to the authenticated VoxCode server at `https://100.100.81.209:9899`; cellular access to this VPN address requires the user's VPN. The server runs Codex locally and connects to Linx AI. No Linx/Codex provider credentials or Linx SDK belong on the phone. The app shows task activity, versioned conditions, diff/check evidence and manual acceptance. WebView/site previews and a full workbench are deferred; AirPlay is not a requirement for this scope.
 
 ## Build
 
-Requires a Mac with full Xcode 16+, the iPhoneOS SDK >=17, Python 3, OpenSSL, and preinstalled **XcodeGen exactly 2.44.1**. The app targets iPhone/iOS 17+. Use the operator's existing Apple signing account, development identity/private key in Keychain and installed development provisioning profile. The script never installs tools, downloads trust assets, generates/copies private keys, changes accounts/profiles or invokes provisioning updates. It does not select Xcode globally or run `sudo`.
+For a first installation with a normal Apple ID / Personal Team, follow [the Xcode Run guide](../../docs/verification/ios-personal-team.md): use automatic signing on a separate project copy, then run on the connected iPhone. The user handles Apple account, Keychain and device prompts. Personal Team IPA export is not promised. Xcode remains a build/signing prerequisite; a company Mac is not an execution dependency.
+
+The manual archive/IPA path below is separate from that first-install workflow. It requires existing signing resources and does not prepare automatic signing. Requires a Mac with full Xcode 16+, the iPhoneOS SDK >=17, Python 3, OpenSSL, and preinstalled **XcodeGen exactly 2.44.1**. The app targets iPhone/iOS 17+. Use the operator's existing Apple signing account, development identity/private key in Keychain and installed development provisioning profile. The script never installs tools, downloads trust assets, generates/copies private keys, changes accounts/profiles or invokes provisioning updates. It does not select Xcode globally or run `sudo`.
 
 `Scripts/device-build.sh` defaults to a read-only preflight. It checks each prerequisite with a time/output bound, captures sensitive tool output internally and emits only pass/fail summaries. All signing inputs below are required, including for preflight; missing inputs return nonzero before generating a project or archive. This is an inventory/consistency check, not proof that Keychain access, archive/export or device installation will succeed.
 
@@ -24,7 +26,7 @@ bash Scripts/device-build.sh preflight
 
 `DEVELOPER_DIR` affects only the current process; if omitted the current `xcode-select -p` selection is checked. `VOXCODE_XCODEGEN` may be omitted when the exact pinned version is on PATH. The team and bundle must match an unexpired explicit App ID profile with this signing certificate and at least one registered device. Wildcard profiles and the sample bundle `io.voxcode.client` are rejected. The profile must already be installed in Xcode's normal profile store; this script only reads its explicit path and never installs it. Use Xcode's account/signing UI separately to prepare missing resources. The operator checks that the intended iPhone is included; device identifiers and full provisioning data stay local.
 
-The CA path contains **public DER only**, with a separately reviewed SHA-256. The script checks exact bytes, DER format, CA basicConstraints and validity, then stages it as `VoxCode/VoxCodeCA.der`. A public CA certificate does not itself identify the fixed IP: deployment review must confirm that this is the intended Relay's issuing CA for `121.52.250.201` and that the leaf has the matching IP SAN. Do not use a loopback test CA or treat a locally computed hash as an independent trust review.
+The CA path contains **public DER only**, with a separately reviewed SHA-256. The script checks exact bytes, DER format, CA basicConstraints and validity, then stages it as `VoxCode/VoxCodeCA.der`. A public CA certificate does not itself identify the fixed IP: deployment review must confirm that this is the intended server entry's issuing CA for `100.100.81.209` and that the leaf has the matching IP SAN. Do not use a loopback test CA or treat a locally computed hash as an independent trust review.
 
 After preflight passes, explicitly build into a **new absolute directory outside `apps/ios` whose parent already exists**:
 
@@ -37,7 +39,7 @@ This repeats preflight, exclusively creates the output directory, copies only ap
 
 The script does not install the IPA. Use Xcode Devices and Simulators (or the operator's normal authorized Apple device workflow) to install the exported **development IPA on an iPhone included in its profile**; trust the Mac and enable Developer Mode. This does not produce App Store/TestFlight distribution. Personal-team and paid-team signing have Apple's normal device/expiry limits; unsupported export fails honestly rather than changing signing mode. Record revision/build number, bundle ID, IPA checksum, device model/iOS version and actual installation result without publishing a UDID or provisioning contents.
 
-Configure the public Relay behind trusted HTTPS, then enter its root URL and expiring pairing code in Settings. Tokens stay in device-only Keychain; Linx/Codex credentials remain server-side. Complete the remote delivery check with this same installed build: turn off Wi-Fi, use cellular data, confirm the company Mac Connector is online, submit a real Codex task, and retain the returned requestId plus current-version diff/check/result evidence. Installation and that public Mac task are separate required gates. Full evidence and remaining PR35 test/coverage gates are in [iPhone delivery verification](../../docs/verification/ios-device-delivery.md).
+Prepare the server's authenticated TLS entry and reviewed CA/IP SAN, then enter `https://100.100.81.209:9899` and its expiring pairing code in Settings. Tokens stay in device-only Keychain; Linx/Codex credentials remain server-side. With this same installed build, turn off Wi-Fi, enable cellular data and the user's VPN, confirm the server runtime is online, submit a real server Codex task, and retain the requestId plus current-version diff/check/result evidence. Installation and that remote task are separate gates; neither has been verified here. See [iPhone delivery verification](../../docs/verification/ios-device-delivery.md) for the manual pipeline's evidence and limits. PR35's monitoring UI is a separate Draft and is not included in this source change.
 
 This build requires HTTPS. Ordinary hosts use system certificate trust; the configured fixed IP uses the explicit reviewed CA trust path described below. Arbitrary self-signed certificates are rejected. Path-prefixed URLs, userinfo, query and fragments are explicitly rejected. Settings edits a separate draft address: only a successful unauthenticated pairing replaces the origin/token record together in Keychain. Polling always uses that paired origin; old unbound token-only records are ignored and require re-pairing. Local network and microphone permission descriptions are included. The app does not discover hosts with Bonjour.
 
@@ -69,7 +71,7 @@ xcodebuild -project VoxCode.xcodeproj -scheme VoxCode -sdk iphonesimulator -conf
 xcodebuild -project VoxCode.xcodeproj -scheme VoxCode -destination 'platform=iOS Simulator,id=<available-iPhone-UDID>' CODE_SIGNING_ALLOWED=NO test
 ```
 
-`VoxCodeTests` exercises actual Recorder startup callbacks using controlled permission/network/capture dependencies. These are native fixture tests, not microphone/device acceptance. A simulator `.app` is not a signed iPhone IPA. Device installation uses the chosen bundle ID, a development team and normal Apple provisioning; no signing has been verified locally. This Mac currently has Command Line Tools, not the iOS SDK.
+`VoxCodeTests` exercises actual Recorder startup callbacks using controlled permission/network/capture dependencies. These are native fixture tests, not microphone/device acceptance. A simulator `.app` is not a signed iPhone IPA. Device installation uses the chosen bundle ID, a development team and normal Apple provisioning; no signing has been verified locally. At the Issue56 check on 2026-10-24, `xcode-select` still selected Command Line Tools and `xcrun` could not find `xcodebuild`; the user reported full Xcode was downloading. Source parsing and the macOS transport runner below are not iOS SDK compilation. Native simulator XCTest and true XCTest coverage remain blocked until full Xcode and an iPhone simulator are available.
 
 ## Demonstration
 
@@ -79,11 +81,11 @@ The real client polls tasks/settings while active and refreshes when returning t
 
 ## Fixed-IP TLS
 
-The fixed entry is `https://121.52.250.201:9899`. A reviewed public DER CA named `VoxCodeCA.der` must be included in the application target's resources before that address can pair. No production trust asset is committed, downloaded or generated by the phone. The relay helper emits public PEM/DER materials; private keys remain on the deployment side. The local loopback fixture CA is **not** a production trust asset and must not be bundled in the app.
+The fixed entry is `https://100.100.81.209:9899`. A reviewed public DER CA named `VoxCodeCA.der` must be included in the application target's resources before that address can pair. No production trust asset is committed, downloaded or generated by the phone. The relay helper emits public PEM/DER materials; private keys remain on the server. The reviewed CA must issue a server leaf whose IP SAN is exactly `100.100.81.209`; a leaf for only the old IP is not sufficient. The local loopback fixture CA is **not** a production trust asset and must not be bundled in the app.
 
 Only that IP has an iOS 17 ATS exception. Its insecure-load flag permits the explicit private trust evaluation; application URL validation still rejects all plaintext and URLSession requires TLS 1.2+. Fixed-IP challenges use an exact IP SSL policy, the bundled CA as the only anchor, disabled network trust fetching and `SecTrustEvaluateWithError`. The bundled anchor's DER basicConstraints and own validity period are also checked. Missing, malformed, non-CA or expired anchors fail clearly. Ordinary HTTPS uses system trust. Redirects are rejected; cookies and caching are disabled. WKWebView trust is outside current scope.
 
-The editable pairing address is independent from the existing Keychain origin/token binding. Pairing sends no prior bearer and replaces both only after Keychain save. Root origins only: no path prefixes, credentials, query or fragment. Pairing failures retain the old binding. Revoke calls authenticated `/api/unpair`; offline local forgetting explicitly leaves the Mac credential active.
+The editable pairing address is independent from the existing Keychain origin/token binding. Pairing sends no prior bearer and replaces both only after Keychain save. Root origins only: no path prefixes, credentials, query or fragment. Pairing failures retain the old binding. Revoke calls authenticated `/api/unpair`; offline local forgetting explicitly leaves the server credential active.
 
 ## Recording, drafts and playback
 
@@ -95,7 +97,7 @@ VoiceDraft events must match the frozen task/version, have valid conditions and 
 
 The first submission freezes its route, text, version, conditions and request ID. An uncertain response locks editing and Retry sends the identical payload. A small local submission journal survives closing/relaunch and is scoped by a hash of the paired origin plus credential; it does not duplicate the bearer outside Keychain. The journal contains the confirmed prompt/conditions in app-local preferences. Success or explicit pre-mutation rejection clears the matching journal. Structured `400 invalid`, `409 stale` and `409 blocked` responses restore editing while preserving the confirmed text/conditions; stale versions require explicit rereview and a new request ID. Auth/visibility failures, `409 conflict`, `429`, `5xx`, malformed responses and transport failures remain uncertain and retain the original request for reconciliation. A revoked retry cannot prove whether an earlier lost response already executed. Local forgetting also clears the journal. Pending settings follow the same rejection/uncertainty distinction within the session.
 
-Mac-decoded signed int16 little-endian mono PCM at negotiated 16 or 24 kHz is converted to Float32 and scheduled through AVAudioEngine/AVAudioPlayerNode. No native Opus dependency exists. Sequence/cursor validation rejects gaps, regressions and oversized batches. Frame sizes and queued audio (four seconds) are bounded. Audio received while recording is discarded to prevent feedback. Recording start clears output; abort, aborted TTS, discard and interruption stop queued playback immediately. `outputSupported` means the server codec supports the stream, not that a speaker was heard. Native/device audible speech and actual input conversion remain separate acceptance gates.
+Server-decoded signed int16 little-endian mono PCM at negotiated 16 or 24 kHz is converted to Float32 and scheduled through AVAudioEngine/AVAudioPlayerNode. No native Opus dependency exists. Sequence/cursor validation rejects gaps, regressions and oversized batches. Frame sizes and queued audio (four seconds) are bounded. Audio received while recording is discarded to prevent feedback. Recording start clears output; abort, aborted TTS, discard and interruption stop queued playback immediately. `outputSupported` means the server codec supports the stream, not that a speaker was heard. Native/device audible speech and actual input conversion remain separate acceptance gates.
 
 ## Local Checks
 
@@ -130,7 +132,16 @@ swiftc -module-cache-path /private/tmp/voxcode-swift -I /private/tmp -L /private
 /private/tmp/voxcode-simulation-checks
 ```
 
-Public **fixture-only** CA metadata, syntax and plist checks:
+Actual transport API/delegate checks on macOS, with no network, Keychain, trust asset or iOS SDK (reuse the core module built above):
+
+```sh
+swiftc -module-cache-path /private/tmp/voxcode-swift -I /private/tmp -L /private/tmp -lVoxCodeCore -Xlinker -rpath -Xlinker /private/tmp VoxCode/BridgeTransport.swift VoxCode/AnchorMetadata.swift Scripts/TransportChecks.swift -o /private/tmp/voxcode-transport-checks
+/private/tmp/voxcode-transport-checks
+```
+
+This exercises the literal server entry's missing-CA failure before pairing, plaintext/root-origin validation, request authentication, fixed-IP rejection without server trust, ordinary HTTPS system handling and redirect refusal. It does not evaluate a real leaf chain, iOS ATS or a live URLSession handshake. `NativeTests/TransportTests.swift` carries the corresponding simulator regressions; those still require native XCTest.
+
+Public **fixture-only** CA metadata, source syntax and plist checks (source parsing is not SDK type checking):
 
 ```sh
 swiftc -module-cache-path /private/tmp/voxcode-swift VoxCode/AnchorMetadata.swift Scripts/AnchorChecks.swift -o /private/tmp/voxcode-anchor-checks
@@ -150,4 +161,4 @@ The machine-readable report records environment, samples, p50/p95/p99, errors an
 
 ## Remaining Gates
 
-Run core XCTest/coverage and native simulator XCTest on this exact source revision, then two independent component reviews. Real gates remain: signed iPhone installation; microphone permissions, interruption and 16 kHz conversion; audible 16/24 kHz speech and immediate abort; trusted fixed-IP URLSession with reviewed CA; real Linx STT/tools/drafts/queries; real Codex task and same-thread follow-up; 20-task native navigation, lost-response replay and stale acceptance; cellular/company-Mac connectivity. Relay deployment is authorized on the designated personal host; SSH/public and signed-device verification remain incomplete. No simulator/core pass closes live, device or outdoor gates.
+Run core XCTest/coverage and native simulator XCTest on this exact source revision, then two independent component reviews. Real gates remain: signed iPhone installation; microphone permissions, interruption and 16 kHz conversion; audible 16/24 kHz speech and immediate abort; trusted fixed-IP URLSession with reviewed CA; real Linx STT/tools/drafts/queries; real Codex task and same-thread follow-up; 20-task native navigation, lost-response replay and stale acceptance; cellular/VPN server connectivity. Test the intended server leaf positively and wrong IP SAN, wrong CA, expired leaf/anchor negatively through actual iOS URLSession; metadata/parser or delegate checks do not close those gates. Server Linux runtime, live provider, SSH/entry ownership and signed-device verification remain incomplete. No simulator/core pass closes live, device or outdoor gates.

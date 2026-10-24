@@ -25,10 +25,10 @@ import Foundation
         precondition(pending.mutation.criteria == criteria)
         for value in [0, 9] { do { _ = try SettingsMutation(executionLimit: value); fatalError("Invalid execution limit accepted") } catch is APIError {} }
         let settings = try SettingsMutation(executionLimit: 4); precondition(settings.executionLimit == 4)
-        let origin = URL(string: "https://121.52.250.201:9899")!
+        let origin = URL(string: "https://100.100.81.209:9899")!
         let scope = try PreviewScope(origin: origin, path: "/preview/abc/")
         for path in ["/preview/abc/index.html", "/preview/abc/assets/app.js", "/preview/abc/#route"] { precondition(scope.allows(URL(string: path, relativeTo: origin)!.absoluteURL)) }
-        for raw in ["http://121.52.250.201:9899/preview/abc/", "https://evil.example/preview/abc/", "https://121.52.250.201:9899/api/tasks", "https://121.52.250.201:9899/preview/abc/../other/", "https://121.52.250.201:9899/preview/abc/%2e%2e/other", "https://121.52.250.201:9899/preview/abcd/", "https://121.52.250.201:9899/preview/abc/%2fapi"] { precondition(!scope.allows(URL(string: raw)!)) }
+        for raw in ["http://100.100.81.209:9899/preview/abc/", "https://evil.example/preview/abc/", "https://100.100.81.209:9899/api/tasks", "https://100.100.81.209:9899/preview/abc/../other/", "https://100.100.81.209:9899/preview/abc/%2e%2e/other", "https://100.100.81.209:9899/preview/abcd/", "https://100.100.81.209:9899/preview/abc/%2fapi"] { precondition(!scope.allows(URL(string: raw)!)) }
         let recording = FrozenRecording(taskId: "task-1", version: 2)
         var draft = VoiceDraft(id: "draft", taskId: "task-1", version: 2, title: "标题", prompt: "修改", criteria: criteria, expiresAt: "2099-01-01T00:00:00Z")
         precondition(draft.isValid(for: recording))

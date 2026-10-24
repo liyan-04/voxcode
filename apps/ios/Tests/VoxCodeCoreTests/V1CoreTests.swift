@@ -89,11 +89,11 @@ final class V1CoreTests: XCTestCase {
         XCTAssertNotNil(WireDate.parse("2026-10-23T00:00:00Z"))
     }
     func testDeferredPreviewScopeRejectsEscapesAndOtherOrigins() throws {
-        let origin = URL(string: "https://121.52.250.201:9899")!
+        let origin = URL(string: "https://100.100.81.209:9899")!
         let scope = try PreviewScope(origin: origin, path: "/preview/future-id/")
-        XCTAssertEqual(scope.url.absoluteString, "https://121.52.250.201:9899/preview/future-id/")
+        XCTAssertEqual(scope.url.absoluteString, "https://100.100.81.209:9899/preview/future-id/")
         XCTAssertTrue(scope.allows(URL(string: "assets/app.js", relativeTo: scope.url)!.absoluteURL))
-        for raw in ["http://121.52.250.201:9899/preview/future-id/", "https://121.52.250.201/preview/future-id/", "https://other.test:9899/preview/future-id/", "https://121.52.250.201:9899/api/tasks", "https://121.52.250.201:9899/preview/future-id/%2e%2e/x", "https://121.52.250.201:9899/preview/future-id/%2fx", "https://121.52.250.201:9899/preview/future-id/%25x", "https://user@121.52.250.201:9899/preview/future-id/"] { XCTAssertFalse(scope.allows(URL(string: raw)!)) }
+        for raw in ["http://100.100.81.209:9899/preview/future-id/", "https://100.100.81.209/preview/future-id/", "https://other.test:9899/preview/future-id/", "https://100.100.81.209:9899/api/tasks", "https://100.100.81.209:9899/preview/future-id/%2e%2e/x", "https://100.100.81.209:9899/preview/future-id/%2fx", "https://100.100.81.209:9899/preview/future-id/%25x", "https://user@100.100.81.209:9899/preview/future-id/"] { XCTAssertFalse(scope.allows(URL(string: raw)!)) }
         for path in ["/preview/", "/preview/a", "/preview/../", "/preview/a/b/", "https://evil.test/"] { XCTAssertThrowsError(try PreviewScope(origin: origin, path: path)) }
     }
     func testPCMDecodesSignedLittleEndianAndRejectsUnsupportedOrUnboundedFrames() throws {
@@ -136,6 +136,6 @@ final class V1CoreTests: XCTestCase {
         let invalid = BridgeAPI(base: origin, token: "", transport: { request in (Data(), URLResponse(url: request.url!, mimeType: nil, expectedContentLength: 0, textEncodingName: nil)) })
         do { _ = try await invalid.request("/api/tasks"); XCTFail("Non-HTTP response accepted") } catch is APIError {}
         XCTAssertThrowsError(try success.makeRequest("https://evil.test/api/tasks"))
-        XCTAssertThrowsError(try BridgeAPI.validateOrigin(URL(string: "http://121.52.250.201:9899")!))
+        XCTAssertThrowsError(try BridgeAPI.validateOrigin(URL(string: "http://100.100.81.209:9899")!))
     }
 }

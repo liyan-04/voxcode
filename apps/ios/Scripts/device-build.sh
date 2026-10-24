@@ -320,7 +320,7 @@ try:
     (output / 'ipa.sha256').write_text(digest + '  ' + packages[0].name + '\n')
     print('Native archive/export succeeded. IPA: ' + str(packages[0]))
     print('IPA SHA256: ' + digest)
-    print('Installation, device behavior, cellular Relay/company-Mac Codex and Linx gates remain pending.')
+    print('Installation, device behavior, cellular/VPN server connectivity, server Codex and Linx gates remain pending.')
 except (RuntimeError, ValueError, KeyError, TypeError, OSError,
         plistlib.InvalidFileException, zipfile.BadZipFile):
     sys.exit('FAIL: native delivery did not complete; preserve and inspect local output: ' + str(output))

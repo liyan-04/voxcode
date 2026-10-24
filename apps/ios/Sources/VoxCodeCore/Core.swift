@@ -29,7 +29,7 @@ public struct TaskSnapshot: Codable, Sendable, Identifiable {
         guard status == "completed", acceptance != "accepted", let criteria, !criteria.isEmpty else { return false }
         return criteria.allSatisfy { $0.version == version && (!$0.required || $0.status == "passed") }
     }
-    public var statusLabel: String { ["queued": "排队", "running": "执行中", "waiting_input": "等待输入", "waiting_approval": "等待授权", "stopping": "停止中", "interrupted": "需在 Mac 恢复", "failed": "失败", "completed": "执行完成"][status] ?? status }
+    public var statusLabel: String { ["queued": "排队", "running": "执行中", "waiting_input": "等待输入", "waiting_approval": "等待授权", "stopping": "停止中", "interrupted": "需在服务器恢复", "failed": "失败", "completed": "执行完成"][status] ?? status }
 }
 public enum TaskFilter: String, CaseIterable, Sendable {
     case all = "全部", active = "执行中", queued = "排队", attention = "待处理"

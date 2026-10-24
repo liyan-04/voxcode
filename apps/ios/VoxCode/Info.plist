@@ -10,7 +10,7 @@
 <key>UILaunchScreen</key><dict/>
 <key>NSAppTransportSecurity</key><dict>
 <key>NSExceptionDomains</key><dict>
-<key>121.52.250.201</key><dict>
+<key>100.100.81.209</key><dict>
 <key>NSIncludesSubdomains</key><false/>
 <key>NSExceptionAllowsInsecureHTTPLoads</key><true/>
 <key>NSExceptionRequiresForwardSecrecy</key><false/>
@@ -18,7 +18,7 @@
 </dict>
 </dict>
 </dict>
-<key>NSMicrophoneUsageDescription</key><string>Record instructions for your selected Mac development task.</string>
-<key>NSLocalNetworkUsageDescription</key><string>Connect to your paired Mac bridge on your local network.</string>
+<key>NSMicrophoneUsageDescription</key><string>Record instructions for your selected server development task.</string>
+<key>NSLocalNetworkUsageDescription</key><string>Connect to your paired VoxCode server on your network or VPN.</string>
 <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
 </dict></plist>

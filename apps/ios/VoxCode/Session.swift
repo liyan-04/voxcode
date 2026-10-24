@@ -39,7 +39,7 @@ struct EventsEnvelope: Decodable { var events: [TaskEvent]; var cursor: Int }
     }
     var api: BridgeAPI { get throws {
         if simulation { return BridgeAPI(base: URL(string: "https://simulation.invalid")!, token: "simulation", transport: { [fixture] in try await fixture.send($0) }) }
-        guard let paired else { throw APIError(message: "请先配对 Mac") }
+        guard let paired else { throw APIError(message: "请先配对服务器") }
         if let transport { return BridgeAPI(base: paired.origin, token: paired.token, transport: transport) }
         return try BridgeTransport.api(origin: paired.origin, token: paired.token)
     } }
@@ -87,6 +87,6 @@ struct EventsEnvelope: Decodable { var events: [TaskEvent]; var cursor: Int }
         if !outcome.retainsPending, pendingSubmission?.path == path, pendingSubmission?.mutation.requestId == mutation.requestId { retainSubmission(nil) }
         return outcome
     }
-    func unpair() async -> Bool { let binding = paired; do { _ = try await api.request("/api/unpair", method: "POST"); guard paired == binding else { return false }; forgetLocally(); return true } catch { self.error = "Could not revoke pairing: \(error.localizedDescription). Local forgetting leaves the Mac credential active."; return false } }
+    func unpair() async -> Bool { let binding = paired; do { _ = try await api.request("/api/unpair", method: "POST"); guard paired == binding else { return false }; forgetLocally(); return true } catch { self.error = "Could not revoke pairing: \(error.localizedDescription). Local forgetting leaves the server credential active."; return false } }
     func forgetLocally() { retainSubmission(nil); TokenVault.clear(); paired = nil; revision = UUID(); tasks = []; settings = BridgeSettings(); pendingSettings = nil; connected = false; health = ConnectionHealth() }
 }

@@ -24,7 +24,7 @@ struct RootView: View {
                     if let issue = session.health.issue { Text(issue).font(.caption).foregroundStyle(.red) }
                     if let date = session.health.lastSuccess { Text("最近同步 \(date.formatted())").font(.caption2).foregroundStyle(.secondary) }
                     HStack { Text("执行 \(session.settings.activeExecutions)/\(session.settings.executionLimit)"); Spacer(); Text("排队 \(TaskFilter.queued.apply(session.tasks).count)"); Spacer(); Text("待处理 \(TaskFilter.attention.apply(session.tasks).count)") }.font(.caption)
-                    if session.settings.recoveryRequired { Label("需在 Mac 核对旧执行", systemImage: "exclamationmark.triangle").foregroundStyle(.red) }
+                    if session.settings.recoveryRequired { Label("需在服务器核对旧执行", systemImage: "exclamationmark.triangle").foregroundStyle(.red) }
                     Picker("任务筛选", selection: $filter) { ForEach(TaskFilter.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
                     if session.pendingSubmission != nil { Button { recovering = true } label: { Label("提交结果待确认", systemImage: "arrow.clockwise") } }
                 }

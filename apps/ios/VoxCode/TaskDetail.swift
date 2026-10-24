@@ -23,7 +23,7 @@ struct TaskDetail: View {
                         if !task.summary.isEmpty { Text(task.summary) }
                         if let error = session.error { Text(error).font(.caption).foregroundStyle(.red) }
                         if !session.connected { Label("离线 · 当前为缓存快照", systemImage: "wifi.slash").foregroundStyle(.red) }
-                        if task.status == "queued" { Text(task.waitingReason ?? (session.settings.recoveryRequired ? "Mac 需要恢复旧执行" : "等待执行名额")).font(.caption).foregroundStyle(.secondary) }
+                        if task.status == "queued" { Text(task.waitingReason ?? (session.settings.recoveryRequired ? "服务器需要恢复旧执行" : "等待执行名额")).font(.caption).foregroundStyle(.secondary) }
                         Picker("详情", selection: $tab) { Text("动态").tag(0); Text("结果").tag(1) }.pickerStyle(.segmented)
                     }
                     if let approval = task.approval { approvalSection(approval, task: task) }
