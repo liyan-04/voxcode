@@ -1,5 +1,23 @@
 # Progress and verification
 
+## 2026-10-25: server-only documentation refresh (Issue #91)
+
+- Created `codex/91-docs-refresh` from `origin/master` and aligned the root and
+  server READMEs with the files that actually exist after the client/Relay
+  cleanup. The supported command is `node --env-file=<private env>
+  apps/server/task-cli.mjs start`; it uses a private Unix socket and does not
+  provide a composed HTTP/voice deployment.
+- Recorded the remaining migration boundary: `apps/server/cli.mjs`, the source
+  bundle allowlist and the root aggregate test still reference removed legacy
+  paths. They are documented as blocked cleanup work rather than reported as
+  working launch or release commands.
+- Validation: `npm ci --ignore-scripts --prefix apps/server --offline` passed;
+  the focused server fixture command in the READMEs passed 74/74 on macOS
+  arm64/Node.js 26. The full `npm test` was run and remains failing in the
+  legacy CLI/preflight and source-package tests because those deleted paths are
+  still imported. No live, Linux, device, TLS, Linx or deployment evidence is
+  inferred from the local fixture pass.
+
 ## 2026-10-24: phone duplex WSS design checkpoint (Issue62)
 - User requires actual simultaneous phone↔server WSS. Architect and PM recommend authenticated `/api/stream` through a fixed same-host Relay→Bridge proxy, with HTTPS retained for pairing, durable mutations and full evidence. Existing machine Connector and provider Linx WSS are separate connections.
 - Design freezes pre-upgrade authorization/revocation, JSON/binary framing, audio credits and bounded queues, ACK-before-events, real task subscriptions/replay/gaps, immutable recording targets and no old audio on reconnect. iOS must change record-only audio/session behavior as well as transport.

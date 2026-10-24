@@ -1,4 +1,25 @@
-# Architect agent
+# Architecture documentation
+
+## Current checkout
+
+As of 2026-10-25, the supported implementation in `master` is server-only. The
+executable task entry is `apps/server/task-cli.mjs`; it runs a protected Unix
+socket task service backed by the configured Codex CLI. The HTTP, MCP and WSS
+files under `apps/server/` are composable library modules with fixture coverage,
+not a deployed browser/voice launcher. The old Mac, Relay, iOS and Integration
+paths were removed from the current tree. Documents that still name those paths
+are historical evidence and must not be copied into current setup instructions.
+
+The implementation boundary and open gates are recorded in [the current
+architecture](current.md), [the server execution plan](server-execution-plan.md)
+and the repository [README](../../README.md). Keep these entry points aligned
+with actual files and commands before describing a capability as available.
+
+## Historical coordination record
+
+The sections below describe the earlier architect-agent workflow and retained
+review evidence. They do not assign current writable paths or imply that the
+historical Mac, Relay or iOS workers still exist.
 
 Current decision: [server-hosted Codex and Linx](server-execution.md), with [bounded implementation tasks](server-execution-plan.md), approved for source work after PM/architect assessment and local simple verification. The phone connects only to the server; no company Mac or AirPlay requirement remains for this delivery. Server delivery55, iOS56 and voice57 use independent worktrees; the coordinator owns shared documentation/Git and two independent review gates. Historical worker role names below do not mandate a Mac host. Linux/live/device/outdoor acceptance remains open until actually exercised.
 

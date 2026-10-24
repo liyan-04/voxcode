@@ -1,58 +1,65 @@
-# 当前架构：VoxCode 服务器语音开发工作区
+# 当前架构：VoxCode 服务器任务工作区
 
-更新：2026-10-24。Issue：#71、#78。本文是当前主链路入口；与历史原生 iPhone、Mac、Relay 文档冲突时，以本文及用户最新要求为准。
+更新：2026-10-25。本文描述当前 `master` 中已经存在的代码边界；目标产品合同和历史交付记录分别见 [语音工作区合同](voice-code-workspace-contract.md) 与 `docs/reviews/`。如果历史文档仍引用已经删除的 Mac、Relay、原生 iOS 或 Integration 目录，以本文件和实际代码树为准。
 
-## 最小链路
+## 已实现的最小链路
 
 ```text
-手机/桌面浏览器
-  ├─ HTTPS：页面、项目、任务、历史、归档和恢复
-  └─ WSS：双工录音、识别、播报事件
-          ↓
-服务器 VoxCode（Web/API、灵矽语音 SDK）
-  ├─ HTTP 操作 ───────────────┐
-  └─ 灵矽语音 → 灵矽调用 MCP   │
-          ↓                  │
-  xrobo MCP Proxy            │
-          ↕ 独立 JSON-RPC WSS │
-  服务器 MCP dispatcher ─────┤
-                             ↓
-              同一任务服务 / 项目注册表 / 持久状态
-                             ↓ 受限 Unix socket
-              独立任务账户 → Codex CLI → 授权仓库
+私有项目注册表 + 已授权 Git checkout
+                │
+                ▼
+     apps/server/task-cli.mjs
+                │ 受保护 Unix socket / JSON-RPC 白名单
+                ▼
+       project-service + task store
+                │
+                ▼
+ codex-cli-adapter → Codex CLI → 项目根目录
 ```
 
-手机只访问 VoxCode。Codex 使用服务器 CLI，不依赖 App Server、Mac、Relay、Connector 或原生客户端。音频 WSS 与 MCP 代理 WSS 分别实现，不能把录音发送到 mcpproxy/connect。
+`task-cli.mjs` 是当前唯一可直接启动的 server 入口。它要求专用非 root 用户、绝对 canonical 配置路径、私有状态目录、可信 Codex 可执行文件和项目 HEAD；它不会打开 TCP/HTTP 端口，也不会接收浏览器、MCP 或灵矽凭据。
 
-## 产品和权限
+任务创建先生成草稿，确认时校验 `revision` 和 `requestId`。任务状态、JSONL 日志、请求去重和项目元数据写入状态目录。取消只终止受管理的执行，不回滚项目文件；进程归属或清理无法确认时进入 quarantine，不自动重跑。
 
-- 左侧展开项目、任务和子任务；每个任务独立保留上下文、输入草稿与状态。关闭标签只关闭视图。
-- 文字和语音最终操作同一任务；录音开始冻结项目/任务，切换页面不能重定向正在发送的内容。
-- 首批创建草稿并确认执行。普通指令直接执行须在目标关联、授权、幂等和版本约束验证后单独启用。
-- 停止任务不回滚代码；归档只调整可见性；删除是可恢复标记，不删除仓库文件或任务历史。运行/停止中/隔离任务须先停止并对账再归档或删除。
-- CLI 执行版本 `revision` 与归档/删除版本 `metadataRevision` 分开校验；业务 `requestId` 持久去重，JSON-RPC id 不能替代它。
-- 语音调用必须可靠绑定平台会话到服务器 Context。关联未验证时拒绝语音写操作；不能采用全局当前项目或模型自报身份。
-- Web/MCP/TLS 凭据与 Codex 任务使用不同账户；任务进程由其所属账户取消。首批全局单执行槽，scope 细分写权限与独立任务 worktree 尚未交付时保持关闭。
+## 已存在但尚未组合发布的模块
 
-## 数据和接口
+- `http-server.mjs` 提供登录、项目/任务 API 和静态页面 handler，`public/index.html` 是工作区页面。
+- `mcp-server.mjs` 提供 token 保护的 MCP dispatcher，工具调用复用项目和任务授权。
+- `mcp-proxy-bridge.mjs` 提供远端 WSS 的边界、重连、大小限制和请求去重。
 
-浏览器只使用 VoxCode API，不读取 Codex 私有数据库/会话目录。VoxCode 保存项目、父子任务、初始需求、状态、CLI sessionId、请求去重、归档/删除标记和结果证据；Codex 自身会话用于后续恢复执行。当前组件采用原子 JSON 文件，不能称为完整对话历史；增量事件与不可变结果由独立文件保存的完整实现仍待交付。是否迁移 SQLite 由事务、查询和历史量需求决定，不为当前小批次额外引入数据库服务。
+这些模块有 fixture 测试，但当前没有生产 launcher 将它们与 task runtime、TLS、浏览器语音或部署服务组合起来。`apps/server/cli.mjs` 仍是旧 preflight/Relay runtime 入口，导入已移除的模块；在修复前不要使用它。
 
-实时执行由 CLI JSONL 事件更新任务状态；持久历史不能仅依赖内存。停止/重启后仍未确认的执行进入隔离状态，不自动重跑。尚未采集的 Diff、检查或完整上下文明确标记 unavailable。
+## 安全和隔离边界
 
-## 证据与分步交付
+- RPC 只允许固定方法和 JSON 参数；不能执行任意 shell、任意路径或任意 Codex 参数。
+- 项目根必须是已登记的 Git checkout；状态目录必须在项目外并由运行用户私有拥有。
+- 当前只有一个全局活动 Codex execution slot。多个项目可以登记，但尚未提供每任务独立 worktree 或多租户文件隔离。
+- `getDiff` 和 `getChecks` 没有采集证据时返回 `collected: false`；配置存在、CLI `--version` 或 fixture 通过都不等于真实模型执行成功。
 
-已入 master 的真实证据仅证明 vm6 出站 MCP 代理及 `codex_status` 返回安装版本；不证明常驻服务、模型开发或手机录音成功。详见 [实测](../verification/server-linx-mcp-proxy-2026-10-24.md)。
+## 未完成的产品关口
 
-| 批次 | 交付 | 独立关口 |
-| --- | --- | --- |
-| #72 | CLI 草稿、确认、取消、状态恢复 | Linux 进程组和真实模型执行 |
-| #73 | MCP dispatcher、代理重连、工具列表 | 真实常驻与语音会话关联 |
-| #74 | 项目任务树、管理 API、文字/语音入口 | 手机交互和实际后端接入 |
-| #80 | 多项目任务、持久元数据、独立账户 RPC | 实际账户权限与取消 |
-| #81 | 浏览器双工语音及 provider 注入 | 灵矽关联、真实音频及手机权限 |
-| #79 | 打包、上传、部署、健康检查和回滚 | 最终入口集成与 vm6 部署 |
+以下能力仍需独立实现和验收，不能从当前 fixture 推导：
 
-每个可验证批次先提交 Draft PR，完成两份独立代码审阅后合并。GitHub Actions 仍关闭；PR 记录实际本地检查。真实语音验收继续由 #75 跟踪。
+- HTTP 页面与 task runtime 的生产组合、TLS/HTTPS、登录会话部署和健康检查；
+- 常驻 MCP/WSS 代理与可信灵矽会话关联；
+- 真实 Codex 模型的修改、续接、Diff、检查和手机浏览器闭环；
+- 每任务 worktree、并发隔离、多租户授权、部署脚本和回滚；
+- Linux、真实 Linx、手机/蜂窝网络、签名设备和公网环境验收。
 
-详细产品方案见 [工作区](../product/voice-code-workspace.md)，接口目标见 [合同](voice-code-workspace-contract.md)。后者包含尚未实现的扩展，不能作为已交付清单。
+## 验证证据
+
+当前 server 核心 fixture 可从仓库根目录运行：
+
+```sh
+npm ci --ignore-scripts --prefix apps/server
+node --test \
+  apps/server/test/codex-cli-adapter.test.mjs \
+  apps/server/test/http-server.test.mjs \
+  apps/server/test/mcp-proxy-bridge.test.mjs \
+  apps/server/test/mcp-server.test.mjs \
+  apps/server/test/project-service.test.mjs \
+  apps/server/test/task-cli.test.mjs \
+  apps/server/test/task-rpc.test.mjs
+```
+
+2026-10-25 在 macOS arm64、Node.js 26 上通过 74/74。根 `npm test`、source bundle allowlist 和旧 preflight 测试仍含删除目录的迁移遗留，修复这些引用前不把它们当作总回归或发布验证入口。真实 Linux、TLS、Codex、Linx、设备和部署证据继续记录在 `docs/verification/`，且必须标明环境类型。
