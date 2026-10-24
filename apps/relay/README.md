@@ -29,9 +29,9 @@ The key must be 32-256 base64url characters; use a generated random value. This
 key belongs only to the relay and connector, never to the phone. Keep the env
 file private and outside commits.
 
-Deployment remains deferred. Do not start a public listener or access the remote
-server until the user resumes deployment; immediately recheck `bili-xs8:9899`
-and stop if occupied. The intended endpoint is `https://121.52.250.201:9899`,
+Relay deployment is authorized on the designated personal vm6 host via the
+liyan-server skill; the earlier bili-xs8 route is superseded. Verify the target
+and public mapping, check9899 on that host, and stop if occupied. The intended endpoint is `https://121.52.250.201:9899`,
 with WSS upgrades on the same port. No domain or additional public port is needed.
 
 ### Local trust material
@@ -232,7 +232,7 @@ outside `test/*.test.mjs`, remains RED, and can be run explicitly when preview
 scope resumes. It is not counted as passing first-demo coverage.
 
 Fixtures do not prove deployed TLS, company outbound access, signed-device trust,
-live Codex/Linx or an outdoor iPhone round trip. Deployment remains deferred.
+live Codex/Linx or an outdoor iPhone round trip. SSH/public deployment verification remains incomplete.
 The relay preserves audio bytes; codec negotiation/decoding/playback belong to
 the voice integration and native client.
 

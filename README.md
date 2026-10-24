@@ -22,6 +22,8 @@ GitHub Actions workflows are intentionally disabled because this repository's Ac
 
 ## Project records
 
+- [Product positioning and phone scenarios](docs/product/positioning-and-scenarios.md)
+- [PM and architect workflow](docs/product/pm-architect-workflow.md)
 - [Commit and PR rules](CONTRIBUTING.md)
 - [Multi-agent ownership and handoffs](docs/agent-collaboration.md)
 - [Independent worktrees](docs/worktrees.md)
