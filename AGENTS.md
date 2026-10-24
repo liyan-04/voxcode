@@ -32,7 +32,7 @@
 - Use codex/ branches and verify the target base (currently codex/mvp). Direct commits or pushes to `main`, `master` or `codex/mvp` are forbidden; submit every change through a PR from a `codex/*` topic branch. Never force-push, commit secrets or merge unreviewed implementation.
 - Commit one coherent change with relevant tests/docs and validation evidence. Coordinator stages explicit paths and inspects the staged diff; never git add . in a shared checkout.
 - Follow the PR template: Summary, Validation, Risks, Review. Keep incomplete work/reviews in draft; prefer reviewed squash merges. Do not merge or deploy automatically.
-- Install npm run hooks:install in each active checkout. Run npm run test:policy when changing repository policy. CI checks metadata/subjects; required merge enforcement still depends on GitHub branch protection.
+- Install npm run hooks:install in each active checkout. Run npm run test:policy when changing repository policy. GitHub Actions checks are disabled; local hooks, exact validation records and human PR reviews are the enforcement path.
 
 ## Quality
 - Write focused regression tests for task isolation, authorization, replay, cancellation and approval expiry before implementing them.

@@ -15,6 +15,8 @@ Local fixture: node --test apps/preview/test/*.test.mjs; 4 passed. Device: not r
 Native WebView cookie propagation remains unverified.
 ## Review
 Independent review reports are pending; keep this PR in draft.
+## Milestone tag
+Tag: VoxCode1.2.3
 `;
 const pr = { title: 'fix(preview): reject expired preview sessions', body, headRef: 'codex/preview-expiry' };
 
@@ -36,6 +38,13 @@ test('limits title to 100 Unicode characters rather than bytes', () => {
 });
 
 test('accepts complete PR metadata without demanding invented device evidence', () => {
+  assert.deepEqual(validatePullRequest(pr), []);
+});
+
+test('requires a three-level VoxCode milestone tag in every PR', () => {
+  assert.ok(validatePullRequest({ ...pr, body: body.replace('## Milestone tag\nTag: VoxCode1.2.3\n', '') }).some(error => error.includes('Milestone tag')));
+  assert.ok(validatePullRequest({ ...pr, body: body.replace('VoxCode1.2.3', 'VoxCode1.2') }).some(error => error.includes('must name a tag')));
+  assert.ok(validatePullRequest({ ...pr, body: body.replace('VoxCode1.2.3', 'milestone/1.2.3') }).some(error => error.includes('must name a tag')));
   assert.deepEqual(validatePullRequest(pr), []);
 });
 
