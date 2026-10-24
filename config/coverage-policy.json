@@ -4,7 +4,7 @@
   "allowOverallDecrease": false,
   "languages": {
     "node": {
-      "include": ["apps/mac/", "apps/relay/", "apps/integration/", "packages/voice/src/"],
+      "include": ["apps/mac/", "apps/relay/", "apps/integration/", "apps/server/", "packages/voice/src/"],
       "extensions": [".mjs", ".js"],
       "exclude": ["/test/", "/node_modules/"]
     },
