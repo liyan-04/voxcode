@@ -34,5 +34,8 @@ voice, TLS, native UI or outdoor latency.
 `node scripts/smoke-real-codex.mjs` separately creates a temporary Git project,
 runs two real model turns, verifies both file contents and the persisted owned
 thread, and cleans up. It requires an available authenticated local Codex runtime.
-Real Linx, signing and outdoor acceptance remain separate gates; deployment is
-deferred.
+Real Linx, signing and outdoor acceptance remain separate gates. Relay deployment is authorized on the designated personal server but no public/device success is inferred from these local checks.
+
+## Configuration loading
+
+The CLI reads its process environment; it does not implicitly load `.env` files. With Node22+, keep voice settings in an ignored private `.env.linx` file (mode0600) and run `VOXCODE_PROJECT=/absolute/git/project node --env-file=.env.linx apps/integration/cli.mjs` from the repository root. Never put provider tokens in command arguments or the iPhone bundle. All three Linx credential fields are required together; configured means present, not live verified.

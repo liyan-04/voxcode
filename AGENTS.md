@@ -11,6 +11,7 @@
 - Start new development, bugfix, architecture, deployment and acceptance work from a GitHub Issue. Record the primary owner/agent role, exclusive writable paths, dependencies and observable acceptance criteria. Follow [Issue collaboration](docs/issue-collaboration.md) and use `.github/ISSUE_TEMPLATE/`.
 - The coordinator allocates Issues and paths before agents edit. Each parallel worker uses a child Issue and an independent worktree; post start/blocker/handoff evidence on the Issue through an authorized coordinator. Shared contracts and integration are serialized.
 - Workers edit only their assigned paths. The coordinator owns shared contracts and integration.
+- The architect also owns project documentation and delivery consistency: root/module READMEs, runnable build/install/deployment entry points and rollback instructions. Developers update their module documentation with behavior changes; the coordinator allocates paths and checks code/docs/scripts together at every milestone. Missing tools, signing, live or deployment evidence stay explicit. Script maintenance does not add deployment authority.
 - A dedicated architect agent coordinates the iOS, Mac and Relay developers: technical task briefs, interfaces, dependency order, blockers and cross-component checks. Read docs/architecture/README.md. The coordinator retains Git/PR, integration and shared-file mutation ownership; architect checks do not replace the two independent component reviews.
 - Before dispatch, record goal, writable paths, contract/dependencies and verification criteria. Each developer uses an independent worktree and component branch; preserve the original checkout during migration. Workers must not stage, commit, stash, switch branches or push.
 - Do not commit another worker's changes. Coordinator makes scoped commits after verification.
@@ -24,7 +25,7 @@
 - Freeze task target at recording start. Deduplicate mutations using requestId.
 - Default four execution slots, configurable 1–8; each task has at most one active turn. Separate worktrees, data directories and immutable result artifacts. Stopping/waiting-approval turns retain their slots; lowering the limit only affects future dispatch.
 - Native remote transport uses TLS on the fixed IP with explicit certificate trust; no domain or existing HTTPS is required from the user. Do not accept arbitrary certificates or send remote control credentials over plaintext.
-- Deployment remains deferred until the user explicitly resumes it. Recheck bili-xs8:9899 first; if occupied, stop and notify without touching the existing service.
+- Relay deployment is authorized on the designated personal vm6 host using the liyan-server skill. The prior bili-xs8 path is superseded. Confirm the target and public mapping, then check9899 on that host first; if occupied, stop and notify without touching the existing service. SSH/public/device validation remains incomplete.
 - Cancellation is asynchronous and never implies rollback.
 - Execution completion, operation approval and user acceptance are distinct.
 - Do not expose preview files, ports or the Mac filesystem without authorization.

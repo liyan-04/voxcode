@@ -1,5 +1,9 @@
 # Progress and verification
 
+## 2026-10-24: architect documentation and delivery ownership (Issue #33)
+- User assigned root/module README and build/deployment script consistency to the architect. Added role/PR checkpoints and corrected conflicting iOS TTS/TLS statements and runtime environment-file instructions.
+- Package module closure is audited with server monitoring Issue #29; its new runtime module must be included and imported from the extracted installation package. No remote deployment, signed build or live Linx pass is claimed by these documentation changes.
+
 ## 2026-10-24: phone monitoring contract (Issue #25)
 - User accepts native phone monitoring instead of a required Grafana deployment. Frozen [contract/design](architecture/phone-monitor.md) forwards the existing paired aggregate monitor, adds bounded Relay transport metrics only after Mac authorization, and separates configuration from live voice success.
 - Server #29 and iOS #30 use independent worktrees/owned paths. Phone monitoring refresh does not control task execution or alter task connection state; failed/old samples remain visibly stale.
