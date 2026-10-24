@@ -14,6 +14,7 @@
 - Do not commit another worker's changes. Coordinator makes scoped commits after verification.
 - Each implementation component requires two reviews independent of its implementer; save reviewed revision, findings and resolutions under docs/reviews/. AI reports are not human GitHub approvals or user acceptance.
 - Record real verification commands and outcomes in docs/progress.md. Pending verification stays pending.
+- After a PR is merged into the current base, follow [docs/architecture/cleanup-policy.md](docs/architecture/cleanup-policy.md): preserve PR/review/progress evidence, then let the coordinator remove only verified, dependency-free topic branches, clean worktrees and disposable build artifacts. Never delete protected branches, unmerged work or a dirty worktree.
 
 ## Safety and correctness
 - Codex is local to the Mac. Do not automate IDE keystrokes or expose an unauthenticated App Server.

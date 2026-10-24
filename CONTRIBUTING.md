@@ -10,6 +10,7 @@ Applies equally to humans, the coordinator and AI workers. Read [AGENTS.md](AGEN
 - One commit is one coherent change, with its tests and essential documentation. A regression fix belongs with its regression test. Do not split a knowingly broken intermediate state into the shared branch.
 - Independent work should use separate worktrees. In the existing shared-checkout session, workers have exclusive paths and the coordinator alone stages, commits, pushes and switches branches. Do not switch while workers are editing.
 - Preserve unrelated user/worker changes. Stage explicit paths and inspect `git diff --cached`; never use `git add .` in shared work. Never rewrite published history or force-push without explicit user instruction.
+- After a PR is merged, cleanup is allowed only after the checks in [docs/architecture/cleanup-policy.md](docs/architecture/cleanup-policy.md) pass. Keep the PR, merge SHA, reviews and progress records; use `git branch -d` for a verified local topic branch and never delete protected, unmerged or dirty work.
 
 ## Commit messages
 
