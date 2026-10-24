@@ -1,0 +1,47 @@
+name: Acceptance or deployment gate
+description: Track real-device, live-service, public-network or release evidence
+title: "test(acceptance): "
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: target
+    attributes:
+      label: Gate and target
+      description: Name the G0–G5 gate, build/revision and service/device.
+    validations:
+      required: true
+  - type: textarea
+    id: prerequisites
+    attributes:
+      label: Prerequisites and owners
+      description: List resources by name only, owners and dependencies. Never paste secrets.
+    validations:
+      required: true
+  - type: textarea
+    id: procedure
+    attributes:
+      label: Procedure and expected result
+      description: Give repeatable steps and concrete expected/actual results.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and limitations
+      description: Record commands, environment and evidence class; keep pending gates explicit.
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Primary owner and agent role
+      description: Name the GitHub owner and agent role; coordinator confirms assignment.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and writable paths
+      description: Name authorized paths, deployment targets and excluded services.
+    validations:
+      required: true

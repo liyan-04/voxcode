@@ -36,7 +36,7 @@ These exact remote heads were audited before deletion. Delete only if the remote
 
 - Original checkout on local `codex/phone-demo`: dirty, with local commit `3710cef` and concurrent uncommitted files. It is a recovery snapshot, not the integration branch. Do not reset, switch, clean or stage it wholesale.
 - Architecture, iOS, Mac and Relay worktrees retain untracked review reports. Preserve them.
-- `codex/issue-collaboration-policy` is active work for Issue #21; preserve its worktree and commit/PR independently against `master`.
+- Issue #21 merged through PR #23 at `3b851f10938ed1332f72051ff4d419f06ced4582`; preserve the local `issue-collaboration-policy` worktree and its retained files. Its remote head is eligible for retirement only after exact SHA/merge verification.
 - The clean mainline-integration worktree contains an ignored Relay installation package; retain that package and its checkout.
 - `/private/tmp/voxcode-pr13` contains an untracked dependency symlink; `/private/tmp/voxpr` has detached commits needing separate audit. Preserve both.
 - TLS private keys and unarchived benchmark/review outputs are outside branch-ref cleanup. Do not remove them as caches.
@@ -48,10 +48,14 @@ Completed: 15 audited remote `codex/*` refs deleted after reading each current h
 
 Two unoccupied local topics (`codex/collaboration-policy`, `codex/phone-demo-contracts`) were removed with ordinary `git branch -d`. Git refused to delete local `codex/relay-package` because squash integration does not establish ancestry; it remains preserved, with no force deletion.
 
-The final cleanup documentation uses a separate PR to `master`; its temporary remote branch is deleted only after its own merge. Local dirty worktrees, active Issue #21, installation package and private keys remain untouched.
+The final cleanup documentation uses a separate PR to `master`; its temporary remote branch is deleted only after its own merge. Local dirty worktrees, the retained Issue #21 worktree, installation package and private keys remain untouched.
 
 Independent local reviews: `/root/master_ancestry_audit` found no actionable defect; `/root/remote_branch_inventory` requested distinguishing master-only UI tests/coverage additions from superseded metadata, which is corrected above. `/root/worktree_cleanup_audit` confirmed runtime source integration and listed retained worktrees. Reviews are AI evidence, not human GitHub approvals.
 
 ## Product acceptance remains separate
 
 Branch consolidation does not prove a signed iPhone install, live Linx speech, deployed Relay, or cellular access to the company Mac. G3–G5 remain subject to their recorded acceptance gates.
+
+## Concurrent policy integration (Issue #26)
+
+PR #23 merged Issue #21 governance while this documentation PR was pending. Retained its Issue-first allocation, branch naming and PR linkage alongside the master-only rule. PR #24 initially failed to merge; its remote head was inadvertently removed by a dependent cleanup command, auto-closing the PR. The exact local head was immediately restored without losing commits. Reopen #24 only after reconciling master, revalidation and review. Future deletion is a separate action after an explicit MERGED readback.

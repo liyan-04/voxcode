@@ -9,6 +9,7 @@ import { validateTitle, validatePullRequest, validateCommits } from '../check-pr
 
 const body = `## Summary
 Reject expired preview sessions before serving the artifact.
+Refs #42
 ## Validation
 Local fixture: node --test apps/preview/test/*.test.mjs; 4 passed. Device: not run.
 ## Risks
@@ -39,6 +40,21 @@ test('limits title to 100 Unicode characters rather than bytes', () => {
 
 test('accepts complete PR metadata without demanding invented device evidence', () => {
   assert.deepEqual(validatePullRequest(pr), []);
+});
+
+test('requires a primary Issue reference in the PR body', () => {
+  assert.ok(validatePullRequest({ ...pr, body: body.replace('Refs #42\n', '') }).some(error => /Issue/u.test(error)));
+  assert.deepEqual(validatePullRequest({ ...pr, body: body.replace('Refs #42', 'Fixes #42') }), []);
+});
+
+test('Issue examples, comments, placeholders and zero are not actual linkage', () => {
+  const unlinked = body.replace('Refs #42\n', '');
+  for (const example of ['<!-- Refs #42 -->', '`Refs #42`', '```text\nRefs #42\n```', 'Issue: Refs #<number>', 'Refs #0', 'Example: Refs #42', '> ```text\n> Refs #42\n> ```']) {
+    assert.ok(validatePullRequest({ ...pr, body: `${unlinked}\n${example}` }).some(error => /Issue/u.test(error)), example);
+  }
+  for (const reference of ['Issue: Refs #21', 'fixes #21', '- Refs #21']) {
+    assert.deepEqual(validatePullRequest({ ...pr, body: `${unlinked}\n${reference}` }), []);
+  }
 });
 
 test('requires a three-level VoxCode milestone tag in every PR', () => {

@@ -8,6 +8,8 @@
 - The first demo is the native VoxCode app with real task progress/diff/checks/acceptance. Interactive generated-site preview, full Mac workbench and custom AirPlay control are deferred. Preserve benchmark scripts and lightweight authenticated monitoring; do not build a monitoring platform before the core loop. Original competition AirPlay compliance remains unconfirmed.
 
 ## Collaboration
+- Start new development, bugfix, architecture, deployment and acceptance work from a GitHub Issue. Record the primary owner/agent role, exclusive writable paths, dependencies and observable acceptance criteria. Follow [Issue collaboration](docs/issue-collaboration.md) and use `.github/ISSUE_TEMPLATE/`.
+- The coordinator allocates Issues and paths before agents edit. Each parallel worker uses a child Issue and an independent worktree; post start/blocker/handoff evidence on the Issue through an authorized coordinator. Shared contracts and integration are serialized.
 - Workers edit only their assigned paths. The coordinator owns shared contracts and integration.
 - A dedicated architect agent coordinates the iOS, Mac and Relay developers: technical task briefs, interfaces, dependency order, blockers and cross-component checks. Read docs/architecture/README.md. The coordinator retains Git/PR, integration and shared-file mutation ownership; architect checks do not replace the two independent component reviews.
 - Before dispatch, record goal, writable paths, contract/dependencies and verification criteria. Each developer uses an independent worktree and component branch; preserve the original checkout during migration. Workers must not stage, commit, stash, switch branches or push.
@@ -29,9 +31,10 @@
 
 ## Git
 - Required subject: type(scope): summary, lowercase type/scope, at most 100 Unicode characters. Types: feat, fix, docs, test, refactor, chore, ci, perf, build, revert. Example: feat(mac): add durable task snapshots.
-- `master` is the sole integration and default branch. Create `codex/*` topic branches from current `origin/master` and target every new PR at `master`; retired `codex/mvp` and `codex/phone-demo` are not integration targets. Direct commits or pushes to `main`, `master` or the retired `codex/mvp` name are forbidden. Never force-push, commit secrets or merge unreviewed implementation.
+- `master` is the sole integration and default branch. Create `codex/<issue-number>-<purpose>` topic branches from current `origin/master` and target every new PR at `master`; existing topic names are grandfathered. Retired `codex/mvp` and `codex/phone-demo` are not integration targets. Direct commits or pushes to `main`, `master` or the retired `codex/mvp` name are forbidden. Never force-push, commit secrets or merge unreviewed implementation.
 - Commit one coherent change with relevant tests/docs and validation evidence. Coordinator stages explicit paths and inspects the staged diff; never git add . in a shared checkout.
 - Follow the PR template: Summary, Validation, Risks, Review. Keep incomplete work/reviews in draft; prefer reviewed squash merges. Do not merge or deploy automatically.
+- Every new PR links its primary Issue with a visible `Refs #N` or `Fixes #N` line. Use `codex/<issue-number>-<purpose>` for new topic branches. `Fixes` means all criteria for that Issue are met; keep separate live/device/outdoor gates open. The local PR checker validates linkage syntax; the coordinator verifies the target Issue and evidence.
 - Install npm run hooks:install in each active checkout. Run npm run test:policy when changing repository policy. GitHub Actions checks are disabled; local hooks, exact validation records and human PR reviews are the enforcement path.
 
 ## Quality

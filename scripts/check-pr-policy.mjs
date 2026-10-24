@@ -49,6 +49,18 @@ function hasContent(tokens) {
   });
 }
 
+function hasIssueReference(tokens) {
+  const inlineText = items => items.map(token => {
+    if (['html', 'code', 'codespan'].includes(token.type)) return '';
+    return token.tokens ? inlineText(token.tokens) : (token.text ?? '');
+  }).join('');
+  return tokens.some(token => {
+    if (token.type === 'list') return token.items.some(item => hasIssueReference(item.tokens));
+    if (!['paragraph', 'text'].includes(token.type)) return false;
+    return /^(?:Issue:\s*)?(?:Refs|Fixes)\s+#[1-9]\d*(?=$|[\s,.;])/imu.test(inlineText(token.tokens ?? [token]));
+  });
+}
+
 export function validatePullRequest(pr) {
   if (!pr || typeof pr !== 'object') return ['PR metadata is required.'];
   const errors = validateTitle(pr.title);
@@ -57,7 +69,11 @@ export function validatePullRequest(pr) {
   } else if (protectedBranches().includes(pr.headRef)) {
     errors.push(`PR head branch ${pr.headRef} is protected; create the change on a separate codex/* branch.`);
   }
-  const { sections, duplicates } = sectionsIn(typeof pr.body === 'string' ? pr.body : '');
+  const body = typeof pr.body === 'string' ? pr.body : '';
+  if (!hasIssueReference(marked.lexer(body))) {
+    errors.push('PR body must link a primary GitHub Issue with Refs #N or Fixes #N.');
+  }
+  const { sections, duplicates } = sectionsIn(body);
   for (const section of requiredSections) {
     if (!sections.has(section) || !hasContent(sections.get(section))) errors.push(`PR requires substantive ## ${section} content.`);
     if (duplicates.has(section)) errors.push(`PR must contain only one ## ${section} section.`);
