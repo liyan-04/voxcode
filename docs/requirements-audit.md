@@ -9,6 +9,8 @@ Carry only an iPhone outdoors, control Codex executing on a company Mac, use Lin
 
 ## Coverage
 
+The delivery claim has two required halves that must be recorded together: **G4 installs the signed native app on a real iPhone**, and **G5 uses that installed build over a public relay and cellular network to control Codex on the company Mac**. A simulator artifact, a signed install without a remote task, or a relay health check alone is partial evidence and cannot be called the final delivery.
+
 | Requirement | Current evidence | Remaining gap |
 | --- | --- | --- |
 | Native iPhone app | SwiftUI source; GitHub Actions 39966128017 passed Swift tests and unsigned iOS simulator SDK build at 4c59925 | Signing, specified iPhone installation and real microphone test remain unverified |
