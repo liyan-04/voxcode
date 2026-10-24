@@ -11,6 +11,7 @@
     "test:coverage:node": "node scripts/coverage.mjs collect-node --output coverage/node",
     "test:coverage:swift": "node scripts/coverage.mjs collect-swift --output coverage/swift",
     "hooks:install": "git config --local core.hooksPath .githooks",
+    "check:branch": "node scripts/branch-policy.mjs --commit",
     "start": "node apps/integration/cli.mjs",
     "relay": "node apps/relay/relay-cli.mjs",
     "connector": "node apps/relay/connector-cli.mjs",
