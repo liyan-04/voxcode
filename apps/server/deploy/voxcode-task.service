@@ -1,0 +1,34 @@
+[Unit]
+Description=VoxCode isolated Codex CLI task service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=voxcode-task
+Group=voxcode-rpc
+WorkingDirectory=@ROOT@/current
+Environment=HOME=/var/lib/voxcode-task
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=@ROOT@/shared/task-config/task.env
+EnvironmentFile=@ROOT@/current/release.env
+ExecStart=/usr/bin/node @ROOT@/current/task-cli.mjs start
+Restart=on-failure
+RestartSec=3
+RuntimeDirectory=voxcode-task
+RuntimeDirectoryMode=0750
+TimeoutStopSec=25
+KillMode=control-group
+UMask=0007
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=@ROOT@/shared/task-state /srv/voxcode/project /var/lib/voxcode-task
+ReadOnlyPaths=@ROOT@/shared/task-config
+InaccessiblePaths=@ROOT@/shared/config @ROOT@/shared/state /var/lib/voxcode
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

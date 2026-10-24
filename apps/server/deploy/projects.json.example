@@ -1,0 +1,5 @@
+{
+  "projects": [
+    { "id": "demo", "name": "Demo", "root": "/srv/voxcode/project", "enabled": true }
+  ]
+}

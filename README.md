@@ -1,6 +1,6 @@
 # VoxCode
 
-VoxCode 当前是一个运行在服务器上的 Codex CLI 任务工作区。服务器保存项目注册表、任务状态和请求去重记录，通过受保护的 Unix socket 调度 Codex CLI；浏览器 HTTP、MCP 和语音能力仍在组合接入与真实验收阶段。
+VoxCode 当前是一个运行在服务器上的语音 Code Agent。服务器保存项目注册表、任务状态和请求去重记录，通过受保护的 Unix socket 调度 Codex CLI；手机浏览器访问 VoxCode HTTPS 管理端，灵矽通过服务器出站 MCP 代理调用只读工具，写操作仍受可信语音上下文门禁保护。
 
 ## 当前实现（2026-10-25）
 
@@ -10,12 +10,12 @@ VoxCode 当前是一个运行在服务器上的 Codex CLI 任务工作区。服�
 - `project-service.mjs` 管理已配置的 Git 项目、任务元数据、归档/恢复和软删除。
 - `codex-cli-adapter.mjs` 在受控项目根目录启动 Codex CLI，保存 JSONL 事件、状态、日志和取消结果。
 - `task-rpc.mjs` 在私有 Unix socket 上提供有限的 JSON-RPC 方法，不能执行任意 shell 或任意路径。
-- `http-server.mjs`、`mcp-server.mjs` 和 `mcp-proxy-bridge.mjs` 是已测试的库模块，目前没有组合它们的生产启动器。
+- `runtime.mjs`、`server-cli.mjs` 和 `scripts/server/cli.mjs` 提供组合启动、打包、上传、部署、生命周期和回滚入口。
 - `public/index.html` 是 HTTP 工作区页面；页面和服务端组合部署、服务器语音接入、TLS/WSS 入口仍未形成可发布闭环。
 
 旧的 `apps/mac`、`apps/relay`、`apps/integration`、`apps/ios` 和 `packages/voice` 已从当前主线移除。相关设计、验收和评审文档保留在 `docs/` 作为历史证据；它们不能当作当前目录、启动命令或已交付功能清单。
 
-当前不应宣称已经具备：真实模型开发验收、浏览器生产 HTTPS、灵矽实时语音、MCP 常驻代理、手机/蜂窝网络验收、独立任务 worktree、多租户隔离或自动部署回滚。
+当前不应宣称已经具备：真实模型开发验收、灵矽实时语音、手机/蜂窝网络验收、独立任务 worktree、多租户隔离或 vm6 线上部署成功。部署脚本和回滚路径已通过本地 fixture，不能替代 Linux/live/device 验收。
 
 ## 本地运行任务服务
 
@@ -76,7 +76,7 @@ node --test \
 
 在本次文档刷新中，该命令在 macOS arm64、Node.js 26 上通过 74/74。测试使用本地 fixture，不证明真实 Codex 模型、灵矽账号、TLS、手机设备或公网部署成功。
 
-仓库根目录的 `npm test` 和 source bundle 测试仍含有已删除客户端/Relay/Integration 路径的遗留引用；在这些引用清理前，不把它们写成通过的总回归入口。`apps/server/cli.mjs preflight|start` 同样仍依赖已移除的旧 runtime，当前不是受支持的启动命令。
+服务器组合入口为 `node --env-file=<private-env> apps/server/server-cli.mjs preflight|start`；任务服务由 `task-cli.mjs` 以独立账户运行。部署包使用 `scripts/server/cli.mjs` 的显式 server allowlist，不再依赖已删除的 Relay/Integration source builder。
 
 ## 目录和文档入口
 
@@ -86,5 +86,19 @@ node --test \
 - `docs/contract.md`、`docs/architecture/voice-code-workspace-contract.md`：接口目标；未实现的条目会明确标注。
 - `docs/verification/`、`docs/reviews/`：实际命令、环境和评审证据。
 - `AGENTS.md`、`CONTRIBUTING.md`：分支、Issue、审阅和验证要求。
+
+服务器部署命令（先完成主机身份、配置和 TLS 预检）：
+
+```sh
+node scripts/server/cli.mjs package --revision <commit> --output /private/tmp/voxcode-server.tar.gz
+node scripts/server/cli.mjs upload --host 100.100.81.209 --archive /private/tmp/voxcode-server.tar.gz
+node scripts/server/cli.mjs deploy --host 100.100.81.209 --archive /private/tmp/voxcode-server.tar.gz
+node scripts/server/cli.mjs start --host 100.100.81.209
+node scripts/server/cli.mjs restart --host 100.100.81.209
+node scripts/server/cli.mjs stop --host 100.100.81.209
+node scripts/server/cli.mjs rollback --host 100.100.81.209
+```
+
+本次运行时提交的本地证据为：`npm test` 146/146、`npm run test:policy` 62/62、服务器运行时与部署专项 62/62；环境为 macOS arm64、Node.js 26、fixture/local。真实 vm6 写入、Codex 模型、灵矽语音和手机验收仍待执行。
 
 修改运行时入口、环境变量、协议或部署方式时，同时更新本文件和 `apps/server/README.md`，并在 `docs/progress.md` 记录实际命令、结果和未完成关口。

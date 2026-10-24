@@ -43,11 +43,13 @@ test('project discovery returns only safe fields and list filters project owners
  const tasks=JSON.parse((await post(f.base,call('codex_list_tasks',{projectId:'p1'}))).body.result.content[0].text);
  assert.deepEqual(tasks,[{id:'t1',projectId:'p1'}]);assert.ok(f.calls.some(x=>x[0]==='list'&&x[1].projectId==='p1'));
 });
-test('draft requires explicit authorized project and durable mutation identity',async t=>{
+test('draft requires explicit project, durable identity and write authorization',async t=>{
  const f=await fixture(t);
  for(const args of [{prompt:'x'},{projectId:'p1',prompt:'x'},{projectId:'p1',prompt:'x',requestId:'r',path:'/tmp'},{projectId:'p1',prompt:'x',requestId:3}])assert.equal((await post(f.base,call('codex_start_task',args))).body.error.code,-32602);
  for(const projectId of ['missing','p2'])assert.equal((await post(f.base,call('codex_start_task',{projectId,prompt:'x',requestId:'r'}))).body.error.code,-32004);
- const args={projectId:'p1',prompt:'x',requestId:'r',title:'Title'};assert.equal((await post(f.base,call('codex_start_task',args))).body.result.isError,false);assert.deepEqual(f.calls,[['start',args]]);
+ const args={projectId:'p1',prompt:'x',requestId:'r',title:'Title'};assert.equal((await post(f.base,call('codex_start_task',args))).body.error.code,-32003);assert.deepEqual(f.calls,[]);
+ let authorizationCalls=0;const allowed=await fixture(t,{authorizeWrite:async()=>{authorizationCalls++;return true;}});
+ assert.equal((await post(allowed.base,call('codex_start_task',args))).body.result.isError,false);assert.equal(authorizationCalls,1);assert.deepEqual(allowed.calls,[['start',args]]);
 });
 test('cancel is default deny and uses task-owned project for authorization',async t=>{
  const denied=await fixture(t);assert.equal((await post(denied.base,call('codex_cancel_task',{taskId:'t1',requestId:'cancel-1'}))).body.error.code,-32003);assert.ok(!denied.calls.some(x=>x[0]==='cancel'));
