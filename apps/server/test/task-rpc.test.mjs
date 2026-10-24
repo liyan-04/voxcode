@@ -1,0 +1,82 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,chmod,lstat,rm,symlink,mkdir,realpath} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createConnection} from 'node:net';
+import {createTaskRpcServer,createTaskRpcClient} from '../task-rpc.mjs';
+
+async function fixture(t,options={}){
+  const dir=await realpath(await mkdtemp(join(tmpdir(),'vxrpc-')));await chmod(dir,0o700);
+  t.after(()=>rm(dir,{recursive:true,force:true}));
+  const socketPath=join(dir,'task.sock');let calls=0;
+  const adapter={status:async()=>({available:true}),listProjects:async()=>[{id:'alpha',name:'Alpha',enabled:true,scopes:[{id:'all',name:'全项目'}]}],
+    getProject:async id=>id==='alpha'?{id,name:'Alpha',enabled:true}:null,
+    startTask:async args=>{calls++;return {taskId:'one',projectId:args.projectId};},
+    getTask:async id=>({id,projectId:'alpha'}),confirmTask:async(id,opts)=>({id,revision:opts.revision+1}),
+    cancelTask:async id=>({id,status:'cancelled'}),listTasks:async()=>[],getLogs:async()=>({logs:[]}),getDiff:async()=>({collected:false}),getChecks:async()=>({collected:false}),...options.adapter};
+  const {adapter:ignored,...serverOptions}=options;
+  const server=await createTaskRpcServer({socketPath,adapter,timeoutMs:250,...serverOptions});t.after(()=>server.close());
+  return {dir,socketPath,server,client:createTaskRpcClient({socketPath,timeoutMs:1000}),get calls(){return calls;}};
+}
+function raw(path,data){return new Promise((resolve,reject)=>{const s=createConnection(path);let out='';s.on('connect',()=>s.write(data));s.on('data',x=>out+=x);s.on('end',()=>{try{resolve(JSON.parse(out));}catch{reject(Error('bad response'));}});s.on('error',reject);});}
+
+test('real Unix socket roundtrip uses bounded allowlisted adapter operations',async t=>{
+  const f=await fixture(t);assert.equal((await lstat(f.socketPath)).mode&0o777,0o660);
+  assert.equal((await f.client.status()).available,true);
+  assert.equal((await f.client.startTask({projectId:'alpha',prompt:'test',requestId:'one'})).taskId,'one');
+  assert.equal((await f.client.confirmTask('one',{revision:1,requestId:'confirm'})).revision,2);
+  assert.equal((await f.client.cancelTask('one',{requestId:'stop'})).status,'cancelled');
+  assert.equal(f.calls,1);assert.equal((await f.client.listProjects())[0].id,'alpha');
+});
+
+test('RPC metadata and subtasks forward strict CAS fields and reject arbitrary metadata injection',async t=>{
+  const f=await fixture(t,{adapter:{archiveTask:async(id,opts)=>({id,archived:opts.archived,metadataRevision:opts.metadataRevision+1}),deleteTask:async id=>({id,deletedAt:'fixture-time'}),restoreTask:async id=>({id,deletedAt:null})}});
+  assert.equal((await f.client.startTask({projectId:'alpha',parentTaskId:'parent',prompt:'child'})).taskId,'one');
+  assert.equal((await f.client.archiveTask('one',{metadataRevision:1,archived:true,requestId:'archive'})).metadataRevision,2);
+  assert.equal((await f.client.deleteTask('one',{metadataRevision:2})).deletedAt,'fixture-time');
+  assert.equal((await f.client.restoreTask('one',{metadataRevision:3})).deletedAt,null);
+  await assert.rejects(()=>f.client.deleteTask('one',{revision:1}),e=>e.code==='invalid_argument');
+  await assert.rejects(()=>f.client.archiveTask('one',{metadataRevision:1,archived:true,projectRoot:'/tmp'}),e=>e.code==='invalid_argument');
+});
+
+test('RPC rejects arbitrary methods, arbitrary paths, malformed and oversize requests before mutation',async t=>{
+  const f=await fixture(t);
+  for(const data of [JSON.stringify({id:'x',method:'exec',args:['rm']}),JSON.stringify({id:'x',method:'startTask',args:[{projectId:'alpha',prompt:'test',command:'/bin/sh'}]}),'not-json']) {
+    const response=await raw(f.socketPath,data+'\n');assert.equal(response.ok,false);
+  }
+  const response=await raw(f.socketPath,'x'.repeat(65537));assert.equal(response.error.code,'request_too_large');assert.equal(f.calls,0);
+});
+
+test('slow RPC has explicit unknown-result timeout and never retries a mutation',async t=>{
+  let calls=0;
+  const f=await fixture(t,{adapter:{startTask:async()=>{calls++;await new Promise(r=>setTimeout(r,100));return {taskId:'late'};}},timeoutMs:30});
+  await assert.rejects(()=>f.client.startTask({projectId:'alpha',prompt:'test'}),e=>e.code==='deadline_exceeded');
+  await new Promise(r=>setTimeout(r,120));assert.equal(calls,1);
+});
+
+test('timed-out in-flight operations retain capacity until completion',async t=>{
+  let release;
+  const f=await fixture(t,{maxConnections:1,timeoutMs:30,adapter:{startTask:()=>new Promise(r=>{release=r;})}});
+  await assert.rejects(()=>f.client.startTask({projectId:'alpha',prompt:'slow'}),e=>e.code==='deadline_exceeded');
+  await assert.rejects(()=>f.client.status(),e=>e.code==='busy');
+  release({taskId:'done'});await new Promise(r=>setTimeout(r,10));
+  assert.equal((await f.client.status()).available,true);
+});
+
+test('oversize response is redacted and connection count is bounded',async t=>{
+  const f=await fixture(t,{maxConnections:1,adapter:{getLogs:async()=>({logs:['secret'.repeat(200000)]})}});
+  await assert.rejects(()=>f.client.getLogs('one'),e=>e.code==='response_too_large');
+  const first=createConnection(f.socketPath);await new Promise(r=>first.once('connect',r));
+  t.after(()=>first.destroy());
+  const response=await raw(f.socketPath,JSON.stringify({id:'two',method:'status',args:[]})+'\n');assert.equal(response.error.code,'busy');
+});
+
+test('socket startup refuses existing endpoints, world-accessible or symlink parents',async t=>{
+  const f=await fixture(t);
+  await assert.rejects(()=>createTaskRpcServer({socketPath:f.socketPath,adapter:{status(){}}}),/socket/i);
+  const world=join(f.dir,'world');await mkdir(world,{mode:0o777});await chmod(world,0o777);
+  await assert.rejects(()=>createTaskRpcServer({socketPath:join(world,'task.sock'),adapter:{}}),/parent/i);
+  const link=join(f.dir,'link');await symlink(f.dir,link);
+  await assert.rejects(()=>createTaskRpcServer({socketPath:join(link,'other.sock'),adapter:{}}),/parent/i);
+});
