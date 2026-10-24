@@ -3,6 +3,7 @@ import {createServer as createSecureServer} from 'node:https';
 import {randomUUID, timingSafeEqual} from 'node:crypto';
 import {WebSocketServer, WebSocket} from 'ws';
 import {credentials,bounded,route,bearer,requestType,decodeBody,responseType,readBody,atCapacity,DEFAULT_BODY_LIMIT,DEFAULT_RESPONSE_LIMIT,FRAME_LIMIT} from './protocol.mjs';
+import {createMonitorMetrics,monitorSnapshot} from './monitor.mjs';
 
 export function createRelay(options) {
   const {machineId,machineKey} = options; credentials(machineId,machineKey);
@@ -20,6 +21,7 @@ export function createRelay(options) {
   let connector, closing = false;
   const pending = new Map(), expired = new Set();
   const rates = new Map();
+  const metrics = createMonitorMetrics();
   function rate(key,limit) {
     const now = Date.now(); let entry = rates.get(key);
     if (!entry || now - entry.start >= 60000) { entry = {start:now,count:0}; rates.set(key,entry); }
@@ -34,6 +36,7 @@ export function createRelay(options) {
   function remove(id) { const entry = pending.get(id); if (entry) { pending.delete(id); clearTimeout(entry.timer); retire(id); } return entry; }
   function cancel(id,target) { if (target?.readyState === WebSocket.OPEN) target.send(JSON.stringify({type:'cancel',id})); }
   const handleRequest = async (req,res) => {
+    metrics.track(res);
     const allowed = route(req.method,req.url);
     if (!allowed) { req.resume(); return sendError(res,404,'Unknown relay route'); }
     if (allowed.error) { req.resume(); return sendError(res,400,'Invalid query'); }
@@ -46,7 +49,7 @@ export function createRelay(options) {
     if (Number(req.headers['content-length']) > maxBody) { req.resume(); return sendError(res,413,'Request body too large'); }
     const target = connector, id = randomUUID();
     const timer = setTimeout(() => { if (remove(id)) { sendError(res,504,'Mac request timed out'); req.resume(); cancel(id,target); } },timeout);
-    pending.set(id,{res,timer,target,media:allowed.media});
+    pending.set(id,{res,timer,target,media:allowed.media,monitor:allowed.kind==='monitor'});
     res.on('close', () => { if (remove(id)) cancel(id,target); });
     let body;
     try { body = await readBody(req,maxBody); } catch { remove(id); return sendError(res,413,'Request body invalid or too large'); }
@@ -90,6 +93,14 @@ export function createRelay(options) {
           if (!Number.isInteger(response.status) || response.status < 200 || response.status > 599 || !responseType(response.contentType)) throw new Error('Invalid response');
           body = decodeBody(response.body,maxResponse);
         } catch { ws.terminate(); return; }
+        if (entry.monitor) {
+          if (response.status>=400) { remove(response.id); return sendError(entry.res,response.status,'Monitor request rejected'); }
+          try {
+            if (response.status!==200) throw new Error('Invalid monitor status');
+            body=Buffer.from(JSON.stringify({...monitorSnapshot(body,response.contentType),relay:metrics.snapshot(true,pending.size)}));
+            if (body.length>maxResponse) throw new Error('Monitor response too large');
+          } catch { remove(response.id); return sendError(entry.res,502,'Monitor response unavailable'); }
+        }
         remove(response.id);
         if (entry.res.destroyed || entry.res.writableEnded) return;
         entry.res.writeHead(response.status,{'content-type':response.contentType,'content-length':body.length,'cache-control':'no-store','x-content-type-options':'nosniff'}); entry.res.end(body);

@@ -1,8 +1,13 @@
 import { createServer as httpServer } from "node:http";
 import { ApiError, createService } from "./service.mjs";
-import { codexAvailable } from "./codex.mjs";
+import { execFile } from "node:child_process";
 export function createServer(options) {
   const service = options.service ?? createService(options);
+  // One bounded asynchronous startup sample; polling never shells out or blocks controls.
+  const codexReadiness = new Promise((resolve) => {
+    execFile("codex", ["--version"], { timeout: 2000, killSignal: "SIGKILL", maxBuffer: 4096 },
+      (error, stdout) => resolve(!error && /codex-cli/.test(stdout)));
+  });
   const send = (res, status, value) => {
     res.writeHead(status, {
       "content-type": "application/json",
@@ -18,7 +23,7 @@ export function createServer(options) {
         return send(res, 200, {
           name: "VoxCode",
           version: "0.1.0",
-          codexAvailable: codexAvailable(),
+          codexAvailable: await codexReadiness,
           voiceConfigured: !!options.voiceHandler,
         });
       let body;
@@ -59,7 +64,15 @@ export function createServer(options) {
         const peer = req.socket.remoteAddress;
         if (peer !== "::1" && !/^(::ffff:)?127\./.test(peer ?? ""))
           throw new ApiError(403, "denied");
-        return send(res, 200, service.monitor());
+        const available = await codexReadiness;
+        service.authorize(req.headers.authorization);
+        return send(res, 200, {
+          ...service.monitor(),
+          readiness: {
+            codexAvailable: available,
+            voiceConfigured: !!options.voiceHandler,
+          },
+        });
       }
       if (url.pathname.startsWith("/api/voice")) {
         if (options.voiceHandler)
