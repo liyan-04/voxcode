@@ -18,7 +18,7 @@ npm test
 Start the loopback Mac bridge with `VOXCODE_PROJECT=/absolute/git/project npm start`.
 See apps/ios/README.md for native building/signing, apps/relay/README.md for the remote relay, and packages/voice/README.md for Linx credentials and protocol boundaries. Public plaintext transport is not supported by the native app.
 
-GitHub Actions tests Node components and builds an unsigned iOS simulator app with full Xcode. A successful simulator build is not an installable signed iPhone package or a device test.
+Run the local Node and Swift checks described below. Full Xcode builds, signing and device tests remain separate verification steps.
 
 ## Project records
 

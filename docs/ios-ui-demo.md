@@ -1,6 +1,6 @@
 # iOS 模拟器界面演示
 
-每次 iOS 前端改动都会在 GitHub Actions 的 `macos-15` runner 上执行一套可重复的界面演示。它使用 Apple 官方 iPhone Simulator，不依赖本地 Xcode。
+每次 iOS 前端改动都应在本地或具备完整 Xcode 的 macOS 环境执行可重复的界面演示。它使用 Apple 官方 iPhone Simulator。
 
 ## 流程
 
@@ -24,4 +24,4 @@
 
 ## 手动触发
 
-在 GitHub Actions 选择 `Verify VoxCode` → `Run workflow`。`push` 和 `pull_request` 也会自动运行同一套 UI 演示。
+请在具备完整 Xcode 的 macOS 环境手动执行上述构建、测试和录制步骤。

@@ -82,10 +82,6 @@ swiftc -frontend -parse VoxCode/*.swift NativeTests/*.swift Tests/VoxCodeCoreTes
 plutil -lint VoxCode/Info.plist
 ```
 
-## Remote simulator UI demo
-
-The standard visual verification runs in GitHub Actions on `macos-15`. It generates the Xcode project, builds the unsigned simulator app, runs `VoxCodeUITests` through the simulation flow, captures the home/task/new-task screens, records an MP4 with `simctl`, and uploads the `ios-ui-demo` artifact. See [the UI demo runbook](../../docs/ios-ui-demo.md). The local machine does not need Xcode for this check.
-
 ## Core Benchmark
 
 ```sh

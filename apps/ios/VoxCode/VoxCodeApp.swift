@@ -45,7 +45,7 @@ struct RootView: View {
         .sheet(isPresented: $settings) { SettingsView() }
         .sheet(isPresented: $creating) { ComposeView(target: nil) }
         .sheet(isPresented: $recovering) { if let pending = session.pendingSubmission { ComposeView(target: (pending.target?.taskId).flatMap { id in session.tasks.first { $0.id == id } }, recovery: pending) } }
-        .task { if session.token.isEmpty && !session.simulation { settings = true }; while !Task.isCancelled { if scenePhase == .active && (!session.token.isEmpty || session.simulation) { await session.refresh() }; try? await Task.sleep(for: .seconds(2)) } }
+        .task { if session.token.isEmpty { settings = true }; while !Task.isCancelled { if scenePhase == .active && (!session.token.isEmpty || session.simulation) { await session.refresh() }; try? await Task.sleep(for: .seconds(2)) } }
         .onChange(of: scenePhase) { _, phase in if phase == .active && (!session.token.isEmpty || session.simulation) { Task { await session.refresh() } } }
         .alert("操作未完成", isPresented: Binding(get: { session.error != nil }, set: { if !$0 { session.error = nil } })) { Button("确定") { session.error = nil } } message: { Text(session.error ?? "") }
     }
