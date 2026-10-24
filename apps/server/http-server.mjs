@@ -5,6 +5,7 @@ import {join} from 'node:path';
 
 function cookieValue(header,name){const m=String(header||'').match(new RegExp('(?:^|;\\s*)'+name+'=([^;]+)'));return m?.[1];}
 function sign(value,secret){return createHmac('sha256',secret).update(value).digest('base64url');}
+const validRequestId=value=>typeof value==='string'&&value.length>=1&&value.length<=128&&!/[\s\x00-\x1f\x7f]/u.test(value);
 function json(res,status,body){const data=Buffer.from(JSON.stringify(body));res.writeHead(status,{'content-type':'application/json; charset=utf-8','content-length':data.length,'cache-control':'no-store'});res.end(data);}
 async function body(req,limit=64*1024){const chunks=[];let n=0;for await(const c of req){n+=c.length;if(n>limit)throw Error('body too large');chunks.push(c);}if(!chunks.length)return {};return JSON.parse(Buffer.concat(chunks));}
 export function createHttpServer({adapter,mcp,projectRegistry,legacyProjectId,revision=process.env.VOXCODE_REVISION??null,sessionSecret= randomBytes(32).toString('hex'),loginSecret,publicOrigin,secureCookies=true,sessionTtlMs=3600000,maxSessions=64,now=Date.now,serverInfo={name:'VoxCode',version:'0.1.0'},publicDir=new URL('./public/',import.meta.url)}){
@@ -31,7 +32,7 @@ export function createHttpServer({adapter,mcp,projectRegistry,legacyProjectId,re
      const tasks=await adapter.listTasks({projectId:id,...flags});return json(res,200,{tasks:tasks.filter(t=>taskProject(t)===id&&(flags.includeArchived||!t.archived)&&(flags.includeDeleted||!t.deletedAt))});
    }
    if(url.pathname==='/api/tasks'&&req.method==='POST'){
-     const b=await body(req);if(!await project(b.projectId))return json(res,404,{error:'project unavailable'});if(typeof b.prompt!=='string'||!b.prompt.trim())return json(res,400,{error:'prompt required'});
+     const b=await body(req);if(!await project(b.projectId))return json(res,404,{error:'project unavailable'});if(!validRequestId(b.requestId))return json(res,400,{error:'invalid requestId'});if(typeof b.prompt!=='string'||!b.prompt.trim())return json(res,400,{error:'prompt required'});
      if(b.parentTaskId!==undefined&&b.parentTaskId!==null){if(typeof b.parentTaskId!=='string'||!b.parentTaskId||b.parentTaskId.length>128)return json(res,400,{error:'invalid parent task'});let parent;try{parent=await adapter.getTask(b.parentTaskId);}catch{}if(!parent||taskProject(parent)!==b.projectId||parent.deletedAt)return json(res,400,{error:'parent task unavailable'});}
      return json(res,201,await adapter.startTask({projectId:b.projectId,prompt:b.prompt,title:b.title,requestId:b.requestId,...(b.parentTaskId!==undefined?{parentTaskId:b.parentTaskId}:{})}));
    }
@@ -40,10 +41,10 @@ export function createHttpServer({adapter,mcp,projectRegistry,legacyProjectId,re
      if(req.method==='GET'&&!m[2])return json(res,200,{...task,projectId:taskProject(task),parentTaskId:task.parentTaskId??null,metadataRevision:task.metadataRevision??1,archived:task.archived===true,deletedAt:task.deletedAt??null});
      if(req.method==='POST'&&m[2]){
        const b=await body(req);if(b.projectId&&b.projectId!==taskProject(task))return json(res,404,{error:'task unavailable'});
-       if(m[2]==='confirm'){if(typeof adapter.confirmTask!=='function')return json(res,501,{error:'confirmation unavailable'});return json(res,200,await adapter.confirmTask(id,{revision:b.revision,requestId:b.requestId}));}
-       if(m[2]==='cancel'){if(typeof adapter.cancelTask!=='function')return json(res,501,{error:'cancellation unavailable'});return json(res,200,await adapter.cancelTask(id,{requestId:b.requestId}));}
+       if(m[2]==='confirm'){if(!validRequestId(b.requestId)||!Number.isSafeInteger(b.revision)||b.revision<1)return json(res,400,{error:'invalid execution mutation'});if(typeof adapter.confirmTask!=='function')return json(res,501,{error:'confirmation unavailable'});return json(res,200,await adapter.confirmTask(id,{revision:b.revision,requestId:b.requestId}));}
+       if(m[2]==='cancel'){if(!validRequestId(b.requestId))return json(res,400,{error:'invalid requestId'});if(typeof adapter.cancelTask!=='function')return json(res,501,{error:'cancellation unavailable'});return json(res,200,await adapter.cancelTask(id,{requestId:b.requestId}));}
        if(typeof adapter[m[2]+'Task']!=='function')return json(res,501,{error:'task visibility unavailable'});
-       if(typeof b.requestId!=='string'||!b.requestId||b.requestId.length>128||!Number.isSafeInteger(b.metadataRevision)||b.metadataRevision<1||m[2]==='archive'&&typeof b.archived!=='boolean')return json(res,400,{error:'invalid metadata mutation'});
+       if(!validRequestId(b.requestId)||!Number.isSafeInteger(b.metadataRevision)||b.metadataRevision<1||m[2]==='archive'&&typeof b.archived!=='boolean')return json(res,400,{error:'invalid metadata mutation'});
        if(m[2]!=='restore'&&(['queued','running','cancelling','waiting_approval','approval_required'].includes(task.status)||task.quarantined))return json(res,409,{error:'stop and reconcile task first'});
        return json(res,200,await adapter[m[2]+'Task'](id,{requestId:b.requestId,metadataRevision:b.metadataRevision,...(m[2]==='archive'?{archived:b.archived}:{})}));
      }
