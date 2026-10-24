@@ -27,7 +27,11 @@ actor SimulationBridge {
             return response(url, previous.1)
         }
         let data: Data
-        if path == "/api/settings" {
+        if path == "/api/monitor", method == "GET" {
+            let statuses = ["queued", "running", "waiting_approval", "waiting_input", "stopping", "interrupted", "failed", "completed", "accepted"]
+            let counts = Dictionary(uniqueKeysWithValues: statuses.map { status in (status, tasks.filter { ($0.status == "completed" && $0.acceptance == "accepted" ? "accepted" : $0.status) == status }.count) })
+            data = try JSONSerialization.data(withJSONObject: ["generatedAt": ISO8601DateFormatter().string(from: Date()), "uptimeSeconds": 0, "executionLimit": limit, "maxTasks": 32, "activeExecutions": TaskFilter.active.apply(tasks).count, "recoveryRequired": false, "counts": counts, "memory": ["rssBytes": 0, "heapUsedBytes": 0], "readiness": ["codexAvailable": false, "voiceConfigured": false]])
+        } else if path == "/api/settings" {
             if method == "POST" { guard let value = body["executionLimit"] as? Int, (1...8).contains(value) else { return try failure(url, "invalid", "[模拟] 执行名额无效", 400) }; limit = value }
             var settings = BridgeSettings(); settings.executionLimit = limit; settings.activeExecutions = TaskFilter.active.apply(tasks).count; settings.queuedTasks = TaskFilter.queued.apply(tasks).count
             data = try JSONEncoder().encode(settings)

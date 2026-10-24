@@ -24,6 +24,8 @@ struct SettingsView: View {
                     LabeledContent("排队", value: "\(session.settings.queuedTasks)")
                 }
                 Section("状态") {
+                    NavigationLink { MonitorView() } label: { Label("运行监控", systemImage: "chart.bar.xaxis") }
+                        .disabled(!session.simulation && session.token.isEmpty)
                     LabeledContent("连接", value: session.connected ? "已连接" : "未连接")
                     if let error = session.error { Text(error).font(.caption).foregroundStyle(.red) }
                     if !session.token.isEmpty && !session.simulation {
