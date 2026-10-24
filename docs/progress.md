@@ -1,5 +1,11 @@
 # Progress and verification
 
+## 2026-10-24: latest official Linx server protocol (Issue #57)
+- Pinned current official docs revision `20ce1b29a1bdff575a4c3317689bae30a7e08535` (2026-10-22); server integrates outbound WSS software-device voice plus device MCP. Cloud SSE callbacks and third-app SSE are alternative routes, not required services for this path. Phone holds no Linx credentials.
+- Validates supplied session IDs before STT/TTS/MCP, binds all MCP replies, accepts documented optional hello metadata and never invents an output codec/rate. Voice tools return drafts; explicit phone confirmation remains the execution boundary.
+- Frozen implementation `a5ed5ec1259a33ca5035cc51415d456846978525`: full local Node211/211; two independent reviewers each reran voice/integration50/50; coordinator17/17. Exact-source coverage passed100% changed lines/95.65% branches, no overall decrease. [Review and limitations](reviews/linx-current-protocol-2026-10-24.md) retain the earlier EPERM failure and unchanged passing retry.
+- Real Relay/Connector/Bridge transport, Opus and temporary Git worktrees use controlled Linx/Codex peers in the composition test. This does not close Linux/Node22, real Linx binding/ASR/tools/audio, authenticated real model, remote TLS, signed iPhone or cellular+VPN acceptance.
+
 ## 2026-10-24: bounded voice HTTP smoke tooling (Issue #43)
 - Added actual authenticated loopback voice-route client, explicit synthetic PCM input, paced/bounded uploads and polling, redacted stage/event report, independent abort/delete cleanup and identical-ID uncertain-create reconciliation only for cleanup. No task dispatch, approval, result acceptance or playback.
 - Root and independent linx_onboarding review found event-type array coercion could fake observed stages; now requires string types. Also bounded decoded frames to negotiated16/24kHz120ms. Regression RED/GREEN and final focused14/14 passed; source review/evidence in reviews/linx-smoke-2026-10-24.md.
