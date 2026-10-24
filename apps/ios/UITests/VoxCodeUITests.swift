@@ -11,16 +11,6 @@ final class VoxCodeUITests: XCTestCase {
     }
 
     func testDemoScreenshots() throws {
-        let simulationSwitch = app.switches["模拟演练"]
-        XCTAssertTrue(simulationSwitch.waitForExistence(timeout: 10), "模拟演练开关未出现")
-        if !simulationSwitch.isSelected {
-            simulationSwitch.tap()
-        }
-
-        let finishButton = app.buttons["完成"]
-        XCTAssertTrue(finishButton.waitForExistence(timeout: 10), "设置页完成按钮未出现")
-        finishButton.tap()
-
         let homeNavigationBar = app.navigationBars["VoxCode"]
         XCTAssertTrue(homeNavigationBar.waitForExistence(timeout: 10), "任务首页未出现")
         attachScreenshot(named: "01-home")

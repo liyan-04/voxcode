@@ -25,7 +25,15 @@ struct EventsEnvelope: Decodable { var events: [TaskEvent]; var cursor: Int }
     private let fixture = SimulationBridge()
     private var revision = UUID()
     private var snapshots = SnapshotOwnership()
-    init(binding: PairedBridge? = TokenVault.read(), transport: BridgeAPI.Transport? = nil, preferences: UserDefaults = .standard) { paired = binding; self.transport = transport; self.preferences = preferences; restoreSubmission() }
+    init(binding: PairedBridge? = TokenVault.read(), transport: BridgeAPI.Transport? = nil, preferences: UserDefaults = .standard) {
+        paired = binding
+        self.transport = transport
+        self.preferences = preferences
+        restoreSubmission()
+        if ProcessInfo.processInfo.arguments.contains("--ui-demo") {
+            simulation = true
+        }
+    }
     private var submissionKey: String? {
         guard !simulation, let paired else { return nil }
         let digest = SHA256.hash(data: Data((paired.origin.absoluteString + "\n" + paired.token).utf8)).map { String(format: "%02x", $0) }.joined()
