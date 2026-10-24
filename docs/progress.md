@@ -1,5 +1,10 @@
 # Progress and verification
 
+## 2026-10-24: server Linx onboarding and phone duplex correction (Issues61/62)
+- User confirmed test-agent resources are not ready; [the server onboarding guide](verification/linx-readiness-2026-10-24.md) now covers official console/model/intent/voice/save steps, private software-device activation, terminal-only code, durable identity, exact helper commands, prompt placeholders and staged live/device acceptance. No account or activation was performed.
+- User requires phone↔server WSS duplex. Current HTTP audio blocks/voice and task event polling do not satisfy it. Architect and PM evaluated fixed-loopback Relay→Bridge WebSocket forwarding, simultaneous audio/events, explicit confirmation, frozen recording target, bounded queues, voice abort vs task cancel, and reconnect without old audio replay. Issue62 tracks the protocol/implementation; official Linx WSS is a distinct existing server connection.
+- Two independent guide reviews have no P0/P1/P2;39 local links and policy45/45 passed. [Review](reviews/linx-server-guide-2026-10-24.md) distinguishes source from live/device gates. Architecture PR58 merged as9236039 and current Linx PR59 as5fc427f; no direct master commit.
+
 ## 2026-10-24: latest official Linx server protocol (Issue #57)
 - Pinned current official docs revision `20ce1b29a1bdff575a4c3317689bae30a7e08535` (2026-10-22); server integrates outbound WSS software-device voice plus device MCP. Cloud SSE callbacks and third-app SSE are alternative routes, not required services for this path. Phone holds no Linx credentials.
 - Validates supplied session IDs before STT/TTS/MCP, binds all MCP replies, accepts documented optional hello metadata and never invents an output codec/rate. Voice tools return drafts; explicit phone confirmation remains the execution boundary.
