@@ -46,7 +46,7 @@ test('v1 exact settings, criteria and voice abort routes require phone bearer',a
     assert.equal((await fetch(f.base+path,{...request,method,headers:{'content-type':'application/json',authorization:`Bearer ${machineKey}`}})).status,401);
   }
   assert.equal(f.received.length,4);assert(f.received.every(request=>request.headers.authorization===authorization));
-  for(const path of ['/api/monitor','/preview/artifact/','/api/tasks/task-1/preview-session','/api/settings/other','/api/tasks/task-1/criteria/c-1/other'])assert.equal(route('GET',path),null);
+  for(const path of ['/preview/artifact/','/api/tasks/task-1/preview-session','/api/settings/other','/api/tasks/task-1/criteria/c-1/other'])assert.equal(route('GET',path),null);
   assert.equal(route('POST','/api/tasks/task-1/preview-session'),null);
 });
 test('matching private CA/IP permits HTTPS and WSS while unknown CA is rejected',{timeout:15000},async t=>{

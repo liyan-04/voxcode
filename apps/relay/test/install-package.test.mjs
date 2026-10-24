@@ -5,6 +5,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
+import {pathToFileURL} from 'node:url';
 
 const run = promisify(execFile);
 const root = new URL('../../..', import.meta.url).pathname;
@@ -57,6 +58,22 @@ test('installs a role into a new private prefix and refuses overwrite', async t 
     run('bash', [join(packageDir, 'install.sh'), '--role', 'relay', '--prefix', prefix, '--skip-deps'], {cwd: packageDir}),
     error => error.code === 1 && /Refusing to overwrite existing prefix/i.test(error.stderr ?? ''),
   );
+});
+
+test('extracted package imports and starts the relay with every runtime module bundled', async t => {
+  const {packageDir} = await buildFixture(t);
+  const source = `
+    const {createRelay} = await import(${JSON.stringify(pathToFileURL(join(packageDir, 'app', 'relay.mjs')).href)});
+    const relay = createRelay({machineId:'package-fixture',machineKey:'fixture-machine-key-with-at-least-32-characters'});
+    try {
+      await new Promise(resolve => relay.server.listen(0, '127.0.0.1', resolve));
+      const response = await fetch('http://127.0.0.1:' + relay.server.address().port + '/api/monitor');
+      if (response.status !== 401) throw new Error('Packaged monitor route lost authorization');
+      console.log('packaged relay started');
+    } finally { await relay.close(); }
+  `;
+  const result = await run(process.execPath, ['--input-type=module', '--eval', source], {cwd: packageDir});
+  assert.match(result.stdout, /packaged relay started/);
 });
 
 test('installs connector role without creating relay config', async t => {

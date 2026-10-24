@@ -19,6 +19,7 @@ export function route(method, path) {
   const id = '[A-Za-z0-9_-]{1,128}';
   let kind;
   if (method === 'GET' && pathname === '/api/health') kind = 'health';
+  if (method === 'GET' && pathname === '/api/monitor') kind = 'monitor';
   if (method === 'POST' && pathname === '/api/pair') kind = 'pair';
   if (method === 'POST' && pathname === '/api/unpair') kind = 'json';
   if (['GET','POST'].includes(method) && pathname === '/api/settings') kind = 'json';

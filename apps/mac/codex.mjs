@@ -4,19 +4,6 @@ import { setTimeout as delay } from "node:timers/promises";
 import { gitEnv } from "./service.mjs";
 import { collectRepositoryEvidence } from "./evidence.mjs";
 
-export function codexAvailable() {
-  try {
-    return /codex-cli/.test(
-      execFileSync("codex", ["--version"], {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }),
-    );
-  } catch {
-    return false;
-  }
-}
-
 // Each App Server starts a new, owned process group. Group signals never target
 // the bridge's process group or another desktop Codex session.
 export async function runCodex({
