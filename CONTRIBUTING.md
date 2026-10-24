@@ -5,6 +5,7 @@ Applies equally to humans, the coordinator and AI workers. Read [AGENTS.md](AGEN
 ## Branches and change boundaries
 
 - Use `codex/<short-purpose>`, for example `codex/ios-task-filter`. The current remote default branch is `codex/mvp`; verify the PR base instead of assuming `main`.
+- Direct commits and pushes to protected branches (`main`, `master`, `codex/mvp`) are prohibited. Every submitted change must be pushed to a `codex/*` topic branch and merged through a pull request. The local commit and pre-push hooks enforce this when installed; the PR workflow fails if a protected branch receives a direct push, while repository branch protection/rulesets remain the authoritative GitHub control.
 - One PR addresses one reviewable behavior or closely related set of changes. Prefer small PRs; roughly 400 changed source lines is a review prompt, not a reason to split inseparable changes or omit tests. Exclude generated files when judging size.
 - One commit is one coherent change, with its tests and essential documentation. A regression fix belongs with its regression test. Do not split a knowingly broken intermediate state into the shared branch.
 - Independent work should use separate worktrees. In the existing shared-checkout session, workers have exclusive paths and the coordinator alone stages, commits, pushes and switches branches. Do not switch while workers are editing.

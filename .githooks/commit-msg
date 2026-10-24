@@ -1,2 +1,5 @@
 #!/bin/sh
+set -eu
+branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+GIT_BRANCH="$branch" node scripts/branch-policy.mjs --commit
 exec node scripts/check-pr-policy.mjs --commit-file "$1"
