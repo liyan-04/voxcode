@@ -1,5 +1,9 @@
 # Progress and verification
 
+## 2026-10-24: architect documentation and delivery ownership (Issue #33)
+- User assigned root/module README and build/deployment script consistency to the architect. Added role/PR checkpoints and corrected conflicting iOS TTS/TLS statements and runtime environment-file instructions.
+- Package module closure is audited with server monitoring Issue #29; its new runtime module must be included and imported from the extracted installation package. No remote deployment, signed build or live Linx pass is claimed by these documentation changes.
+
 ## 2026-10-24: master consolidation and branch retirement
 - User made `master` the final integration branch and authorized merging remaining content through PRs, then deleting merged remote branches. PR [#22](https://github.com/liyan-04/voxcode/pull/22) merged the phone loop into `master` at `33d0daf`; its tested head `cbcf71f` has an identical tree.
 - Local promotion validation: `npm test` 161/161; `npm run test:policy` 29/29; whitespace checks passed. Existing component reviews remain in `docs/reviews/`; this promotion does not certify native signing, live Linx or outdoor access.
