@@ -13,6 +13,7 @@
     "hooks:install": "git config --local core.hooksPath .githooks",
     "start": "node apps/integration/cli.mjs",
     "relay": "node apps/relay/relay-cli.mjs",
-    "connector": "node apps/relay/connector-cli.mjs"
+    "connector": "node apps/relay/connector-cli.mjs",
+    "package:relay": "node scripts/build-relay-package.mjs --output dist/voxcode-relay-0.1.0.tar.gz"
   }
 }
