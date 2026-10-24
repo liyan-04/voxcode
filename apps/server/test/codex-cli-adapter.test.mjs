@@ -17,3 +17,55 @@ test('quarantined task cannot be confirmed after restart',async t=>{const f=awai
 test('continuation is disabled until resume sandbox is verified',async t=>{const f=await fixture(t);await assert.rejects(f.a.continueTask('missing'),/disabled/);});
 test('confirmation persistence failure reserves slot and does not spawn',async t=>{let writes=0;const tasks=new Map();const f=await fixture(t,{storeFactory:()=>({list:async()=>[...tasks.values()],put:async x=>{if(++writes===2)throw new Error('disk full');tasks.set(x.id,structuredClone(x));}})});const {taskId}=await f.a.startTask({prompt:'x'});await assert.rejects(f.a.confirmTask(taskId),/disk full/);assert.equal(f.calls,0);assert.equal((await f.a.status()).activeTasks,1);});
 test('concurrent confirmations spawn only once',async t=>{const f=await fixture(t);const a=await f.a.startTask({prompt:'a'}),b=await f.a.startTask({prompt:'b'});const results=await Promise.allSettled([f.a.confirmTask(a.taskId),f.a.confirmTask(b.taskId)]);assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(f.calls,1);f.p.emit('close',0);await f.a.getTask(a.taskId);});
+
+const waitFor=async(predicate,timeout=1000)=>{const until=Date.now()+timeout;while(!predicate()){if(Date.now()>until)throw Error('fixture condition timed out');await new Promise(r=>setTimeout(r,2));}};
+const bounded=async promise=>Promise.race([promise,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('operation remained pending')),1000);timer.unref();})]);
+test('cancel accepted during confirmation persistence prevents launch',async t=>{
+  const tasks=new Map();let release,entered=false;
+  const f=await fixture(t,{storeFactory:()=>({list:async()=>[...tasks.values()],put:async task=>{const snapshot=structuredClone(task);if(snapshot.status==='running'&&!entered){entered=true;await new Promise(r=>release=r);}tasks.set(snapshot.id,snapshot);}})});
+  const {taskId}=await f.a.startTask({prompt:'x'}),confirm=f.a.confirmTask(taskId);
+  await waitFor(()=>entered);const cancel=f.a.cancelTask(taskId);await new Promise(r=>setTimeout(r,5));release();
+  const outcome=await Promise.all([confirm,bounded(cancel)]);assert.equal(f.calls,0);assert.equal(outcome[1].status,'cancelled');
+});
+test('confirmation persistence failure leaves a complete cancellable entry without launching',async t=>{
+  const tasks=new Map();let failed=false;
+  const f=await fixture(t,{storeFactory:()=>({list:async()=>[...tasks.values()],put:async task=>{if(task.status==='running'&&!failed){failed=true;throw Error('fixture disk full');}tasks.set(task.id,structuredClone(task));}})});
+  const {taskId}=await f.a.startTask({prompt:'x'});await assert.rejects(f.a.confirmTask(taskId),/fixture disk full/);
+  const result=await bounded(f.a.cancelTask(taskId));assert.equal(f.calls,0);assert.equal(result.quarantined,true);
+});
+test('cancel persists failure conservatively but sends TERM and KILL and retry completes',async t=>{
+  const tasks=new Map(),signals=[];let failed=false;
+  const f=await fixture(t,{killGraceMs:5,groupExists:()=>false,signalGroup:(_pid,s)=>{signals.push(s);if(s==='SIGKILL')f.p.emit('close',null);},storeFactory:()=>({list:async()=>[...tasks.values()],put:async task=>{if(task.status==='cancelling'&&!failed){failed=true;throw Error('fixture disk full');}tasks.set(task.id,structuredClone(task));}})});
+  const {taskId}=await f.a.startTask({prompt:'x'});await f.a.confirmTask(taskId);f.p.pid=123;
+  const first=f.a.cancelTask(taskId);await new Promise(r=>setTimeout(r,2));const second=f.a.cancelTask(taskId);
+  const result=await bounded(Promise.all([first,second]));assert.deepEqual(signals,['SIGTERM','SIGKILL']);assert.equal(result[0].quarantined,true);assert.equal(result[1].status,'cancelled');
+});
+test('timeout stopping observes persistence rejection and still terminates the process',async t=>{
+  const tasks=new Map(),signals=[];let failed=false;
+  const f=await fixture(t,{timeoutMs:5,killGraceMs:5,groupExists:()=>false,signalGroup:(_pid,s)=>{signals.push(s);if(s==='SIGKILL')f.p.emit('close',null);},storeFactory:()=>({list:async()=>[...tasks.values()],put:async task=>{if(task.status==='cancelling'&&!failed){failed=true;throw Error('fixture disk full');}tasks.set(task.id,structuredClone(task));}})});
+  const {taskId}=await f.a.startTask({prompt:'x'});await f.a.confirmTask(taskId);f.p.pid=123;
+  await waitFor(()=>signals.includes('SIGKILL'));assert.equal((await bounded(f.a.cancelTask(taskId))).quarantined,true);
+});
+test('slow event persistence coalesces snapshots and terminal state is explicitly awaited',async t=>{
+  const tasks=new Map();let release,blocked=false,writes=0;
+  const f=await fixture(t,{storeFactory:()=>({list:async()=>[...tasks.values()],put:async task=>{writes++;if(task.logs.length&&!blocked){blocked=true;await new Promise(r=>release=r);}tasks.set(task.id,structuredClone(task));}})});
+  const {taskId}=await f.a.startTask({prompt:'x'});await f.a.confirmTask(taskId);
+  f.p.stdout.emit('data',Buffer.from('{"type":"first"}\n'));await waitFor(()=>blocked);
+  for(let i=0;i<2000;i++)f.p.stdout.emit('data',Buffer.from('{"type":"item.completed","item":{"type":"agent_message","text":"latest"}}\n'));
+  assert.ok(writes<=3);f.p.emit('close',0);release();await waitFor(()=>tasks.get(taskId)?.status==='completed');
+  assert.ok(writes<=5,`writes=${writes}`);assert.equal(tasks.get(taskId).output,'latest');
+});
+test('event persistence rejection triggers observed cleanup and keeps a quarantined slot',async t=>{
+  const tasks=new Map();let failed=false;
+  const f=await fixture(t,{killGraceMs:5,storeFactory:()=>({list:async()=>[...tasks.values()],put:async task=>{if(task.logs.length&&!failed){failed=true;throw Error('event disk failure');}tasks.set(task.id,structuredClone(task));}})});
+  const {taskId}=await f.a.startTask({prompt:'x'});await f.a.confirmTask(taskId);
+  f.p.stdout.emit('data',Buffer.from('{"type":"event"}\n'));await waitFor(()=>failed);
+  const result=await bounded(f.a.cancelTask(taskId));assert.equal(result.status,'cancelled');assert.equal(result.quarantined,true);assert.equal((await f.a.status()).activeTasks,1);
+});
+test('terminal receipt failure keeps execution slot quarantined even after process cleanup',async t=>{
+  const tasks=new Map(),signals=[];let failed=false;
+  const f=await fixture(t,{groupExists:()=>false,signalGroup:(_pid,s)=>signals.push(s),storeFactory:()=>({list:async()=>[...tasks.values()],put:async task=>{if(task.status==='completed'&&!failed){failed=true;throw Error('terminal disk failure');}tasks.set(task.id,structuredClone(task));}})});
+  const {taskId}=await f.a.startTask({prompt:'x'});await f.a.confirmTask(taskId);f.p.emit('close',0);
+  const result=await f.a.getTask(taskId);assert.equal(result.quarantined,true);assert.equal((await f.a.status()).activeTasks,1);
+  f.p.pid=123;assert.equal((await bounded(f.a.cancelTask(taskId))).quarantined,true);assert.deepEqual(signals,[]);
+});
