@@ -70,7 +70,7 @@ The PR title follows the same subject format. Fill all five template sections wi
 
 Open a **draft** when implementation, required reviews or relevant verification is incomplete. Record pending external gates in plain language. A source PR can become reviewable after its specified code gates pass; that does not certify device/outdoor delivery. Never label a feature live-ready while its live acceptance gates remain open.
 
-Prefer squash merge after review, using the conventional PR title. Do not automatically merge, deploy or promote a draft. Dependent PRs must name their dependency and target `master`; re-run checks after the dependency merges. Changes to requirements, security boundaries or shared contracts require coordinator integration and affected-component review.
+Prefer squash merge after review, using the conventional PR title. The user authorizes the coordinator to mark ready and squash-merge PRs after all relevant code checks and two independent reviews; never promote an incomplete draft or treat source merge as live/device acceptance. Deployment remains separately authorized for the designated host and owned services. Dependent PRs must name their dependency and target `master`; re-run checks after the dependency merges. Changes to requirements, security boundaries or shared contracts require coordinator integration and affected-component review.
 
 ## Verification and independent review
 

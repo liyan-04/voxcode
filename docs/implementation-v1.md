@@ -1,5 +1,7 @@
 # Approved MVP Implementation Plan
 
+> 2026-10-24 scope update: [server architecture](architecture/server-execution.md) and [the server implementation plan](architecture/server-execution-plan.md) govern current work. Native iPhone connects only to vm6; server-hosted Linx and Codex replace the mandatory company-Mac execution path. AirPlay is not a user constraint. Tasks55–57 own server delivery, iOS adaptation and current Linx protocol; historical Mac/deferred-deployment/base-branch wording below is retained for prior implementation evidence, not current instructions. All new PRs target master. Actual Linux/live/signed-device/outdoor acceptance is still required.
+
 > For agentic workers: use subagent-driven-development. A dedicated architect coordinates the iOS, Mac and Relay developers; see docs/architecture/README.md. Coordinator owns shared contract application, integration and commits. User approved continuation on 2026-10-23; deployment remains deferred.
 
 **Goal:** Complete the native phone-to-Mac voice development and evidence loop under the approved scope.

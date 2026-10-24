@@ -1,4 +1,6 @@
-# Mac runtime and voice integration
+# Execution runtime and voice integration
+
+The current product runs this existing runtime on the same server as Relay: iPhone → authenticated HTTPS Relay → co-located Connector → loopback Bridge → local Codex stdio / Linx WSS. See [server architecture](../../docs/architecture/server-execution.md). Historical Mac labels below identify the retained module, not an additional required machine. Use a dedicated non-root execution account and keep Relay keys under a separate identity; environment filtering is not a file-read sandbox. Server delivery/preflight/source packaging is tracked in Issue55 and is not yet included in the existing Relay-only package.
 
 Run from the repository root after installing locked root, `packages/voice` and
 `apps/relay` dependencies. `VOXCODE_PROJECT` selects an authorized Git checkout;
@@ -12,7 +14,7 @@ runtime closes both bridge and connector together. See `apps/relay/README.md`.
 
 Real voice additionally requires all three supported device onboarding values:
 `LINX_TOKEN`, `LINX_DEVICE_ID`, `LINX_CLIENT_ID`. `LINX_WS_URL` optionally overrides
-the documented WSS endpoint. Keep credentials on the Mac; never include them in
+the documented WSS endpoint. Keep credentials on the execution server; never include them in
 the phone, repository or logs. Without voice configuration the task bridge still
 works and voice endpoints explicitly report unavailable.
 

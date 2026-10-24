@@ -1,5 +1,7 @@
 # Architect agent
 
+Current decision: [server-hosted Codex and Linx](server-execution.md), with [bounded implementation tasks](server-execution-plan.md), approved for source work after PM/architect assessment and local simple verification. The phone connects only to the server; no company Mac or AirPlay requirement remains for this delivery. Server delivery55, iOS56 and voice57 use independent worktrees; the coordinator owns shared documentation/Git and two independent review gates. Historical worker role names below do not mandate a Mac host. Linux/live/device/outdoor acceptance remains open until actually exercised.
+
 The user requested a dedicated architect on 2026-10-23 to coordinate the existing three development agents. This is an active engineering role, governed by AGENTS.md, CONTRIBUTING.md and docs/agent-collaboration.md.
 
 ## Team and authority

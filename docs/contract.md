@@ -4,6 +4,8 @@ This file is coordinator-owned. Implementers propose changes before changing a s
 
 Current delivery scope: docs/phone-demo-scope.zh-CN.md. The first demo uses native task/results/voice views. Preview routes, preview cookie transport, WKWebView and onPreview publication below are reserved future interfaces, not phone-demo implementation or acceptance requirements; optional preview fields may remain null.
 
+Current deployment: [server execution](architecture/server-execution.md). Native iPhone connects only to the server; the same server hosts Relay, the existing loopback Bridge/Connector/voice runtime and local stdio Codex. Historical “Mac” module/metric wording below identifies this retained execution runtime, not a required separate company Mac. HTTP shapes and authentication are unchanged. Linx uses the current documented WebSocket plus device-MCP protocol with a server-hosted software device; it is distinct from cloud HTTP/SSE MCP and third-party business SSE callbacks. No callback identity header is user authorization.
+
 ## HTTP
 All `/api/*` except health and pair require `Authorization: Bearer <sessionToken>`.
 JSON errors: `{ "error": { "code": "string", "message": "string" } }`.
