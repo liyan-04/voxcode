@@ -10,7 +10,7 @@ Policy: `config/coverage-policy.json`. Local enforcement: `scripts/coverage.mjs`
 - Missing, malformed or incomplete reports, missing coverage for a changed source file, failed tests and missing baseline/comparison revisions cannot pass the gate. A zero denominator is explicitly N/A, never 100%.
 - Test the actual PR head against the exact PR base SHA, using the same coverage tool/runtime for both checkouts. The coordinator produces the baseline locally for each review; a contributor cannot supply a more favorable saved baseline file.
 
-Node uses pinned `c8`/V8 with `--all`, including unimported files under `apps/mac`, `apps/relay`, `apps/integration` and `packages/voice/src`. Test/fixture and dependency directories are excluded. Scripts/CI tooling are outside the runtime percentage but have their own checker regression tests.
+Node uses pinned `c8`/V8 with `--all`, including unimported files under `apps/mac`, `apps/relay`, `apps/integration`, `apps/server` and `packages/voice/src`. Root `npm test` discovers the server tests alongside the existing suites. Test/fixture and dependency directories are excluded. Scripts/CI tooling are outside the runtime percentage but have their own checker regression tests; the server source-package builder additionally has a focused coverage report.
 
 Swift uses `swift test --enable-code-coverage` and `llvm-cov` on `VoxCodeCore`. Generated files and test sources are excluded by the source scope. SwiftUI, microphone hardware, signing and real-device interaction remain separate acceptance gates. If the Swift toolchain emits no branch records, the local report records branches as N/A; it cannot claim a measured 70% Swift branch score. Swift core line coverage remains enforced.
 

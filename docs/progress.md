@@ -1,5 +1,10 @@
 # Progress and verification
 
+## 2026-10-24: dedicated server entry and source bundle (Issue55)
+- Added non-root, redacted preflight/start entry that reuses the existing runtime, canonical verified project/data, explicit TTY-only pairing code and owned shutdown. Relay remains separate; no service/account/dependency automation or unrelated listener mutation.
+- Explicit Git-blob allowlist/source manifest excludes private configuration and honors the requested commit even with local replacement refs. Two independent reviews fixed Git-replace, writable-ancestor and path-alias findings; [report](reviews/server-source-delivery-2026-10-24.md) records hashes and regressions.
+- Coordinator full230/230, exactbase211/211; changed runtime99.33%lines/95.57%branches, no overall decrease. Source archive built from97e7f8f and extracted install/start verified with fixtures. Root test discovery and runtime coverage include apps/server; thresholds unchanged. Linux/live/device and new phone-WSS Issue62 remain open.
+
 ## 2026-10-24: server Linx onboarding and phone duplex correction (Issues61/62)
 - User confirmed test-agent resources are not ready; [the server onboarding guide](verification/linx-readiness-2026-10-24.md) now covers official console/model/intent/voice/save steps, private software-device activation, terminal-only code, durable identity, exact helper commands, prompt placeholders and staged live/device acceptance. No account or activation was performed.
 - User requires phone↔server WSS duplex. Current HTTP audio blocks/voice and task event polling do not satisfy it. Architect and PM evaluated fixed-loopback Relay→Bridge WebSocket forwarding, simultaneous audio/events, explicit confirmation, frozen recording target, bounded queues, voice abort vs task cancel, and reconnect without old audio replay. Issue62 tracks the protocol/implementation; official Linx WSS is a distinct existing server connection.
