@@ -1,5 +1,11 @@
 # Progress and verification
 
+## 2026-10-24: master consolidation and branch retirement
+- User made `master` the final integration branch and authorized merging remaining content through PRs, then deleting merged remote branches. PR [#22](https://github.com/liyan-04/voxcode/pull/22) merged the phone loop into `master` at `33d0daf`; its tested head `cbcf71f` has an identical tree.
+- Local promotion validation: `npm test` 161/161; `npm run test:policy` 29/29; whitespace checks passed. Existing component reviews remain in `docs/reviews/`; this promotion does not certify native signing, live Linx or outdoor access.
+- Full remote head inventory, transitive PR integration evidence and retained local resources are in [the master consolidation audit](architecture/master-consolidation-2026-10-24.md). All 15 audited old remote refs were deleted after current-head/protection/dependency checks. PR #14 was closed as superseded by #19/#22; dirty local worktrees and active Issue #21 remain preserved.
+- Updated the current-base instructions to `master`; retired `codex/mvp`/`codex/phone-demo` must not be targets for new development PRs. Master remains protected against deletion, force push and direct updates.
+
 ## 2026-10-24: GitHub Actions checks disabled
 - Removed `.github/workflows/pr-policy.yml` and `.github/workflows/verify.yml` after GitHub reported the repository account could not start jobs because of billing or spending-limit restrictions. This removes the external Actions check path only; local hooks, `npm run test:policy`, component tests, coverage commands and human PR reviews remain required evidence.
 - Existing failed Actions runs are historical evidence of the account restriction. They are not treated as application test failures. Future PRs must state exact local commands, environment, unavailable native/live/device gates and the two independent review records.

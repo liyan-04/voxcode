@@ -2,7 +2,11 @@
 
 ## Start with a bounded task
 
-Read `AGENTS.md`, `CONTRIBUTING.md`, the active implementation plan and relevant contract before editing. Use concise task/decision records, not private chains of thought. A task must identify:
+Read `AGENTS.md`, `CONTRIBUTING.md`, the active implementation plan and relevant contract before editing. Use concise task/decision records, not private chains of thought.
+
+The final integration branch is `master`. Start new isolated topic work from current `origin/master` and target PRs at `master`. A retained dirty worktree on a retired branch is a recovery snapshot, not a base for new work; preserve its files and port only reviewed differences into a fresh topic branch.
+
+A task must identify:
 
 ```text
 Task ID / goal:

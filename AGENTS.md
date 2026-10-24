@@ -29,7 +29,7 @@
 
 ## Git
 - Required subject: type(scope): summary, lowercase type/scope, at most 100 Unicode characters. Types: feat, fix, docs, test, refactor, chore, ci, perf, build, revert. Example: feat(mac): add durable task snapshots.
-- Use codex/ branches and verify the target base (currently codex/mvp). Direct commits or pushes to `main`, `master` or `codex/mvp` are forbidden; submit every change through a PR from a `codex/*` topic branch. Never force-push, commit secrets or merge unreviewed implementation.
+- `master` is the sole integration and default branch. Create `codex/*` topic branches from current `origin/master` and target every new PR at `master`; retired `codex/mvp` and `codex/phone-demo` are not integration targets. Direct commits or pushes to `main`, `master` or the retired `codex/mvp` name are forbidden. Never force-push, commit secrets or merge unreviewed implementation.
 - Commit one coherent change with relevant tests/docs and validation evidence. Coordinator stages explicit paths and inspects the staged diff; never git add . in a shared checkout.
 - Follow the PR template: Summary, Validation, Risks, Review. Keep incomplete work/reviews in draft; prefer reviewed squash merges. Do not merge or deploy automatically.
 - Install npm run hooks:install in each active checkout. Run npm run test:policy when changing repository policy. GitHub Actions checks are disabled; local hooks, exact validation records and human PR reviews are the enforcement path.
