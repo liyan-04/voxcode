@@ -13,7 +13,7 @@ WorkingDirectory=@ROOT@/current
 Environment=HOME=/var/lib/voxcode
 EnvironmentFile=@ROOT@/shared/config/server.env
 EnvironmentFile=@ROOT@/current/release.env
-ExecStart=/usr/bin/node @ROOT@/current/server-cli.mjs start
+ExecStart=/usr/local/bin/node @ROOT@/current/server-cli.mjs start
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=25

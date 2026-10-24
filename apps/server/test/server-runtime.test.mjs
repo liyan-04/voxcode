@@ -33,9 +33,9 @@ test('configuration rejects root, same task identity and missing config without 
 
 test('configuration enforces strict HTTPS, cert identity and private secret permissions',async t=>{
  const f=await fixture(t),testUid=process.getuid()+1; // web UID differs; files remain owned by the synthetic task UID, so reject before use.
- await assert.rejects(loadServerConfiguration({env:{...f.env,VOXCODE_PUBLIC_ORIGIN:'http://127.0.0.1:9899'},uid:testUid}),/HTTPS/);
- await assert.rejects(loadServerConfiguration({env:{...f.env,VOXCODE_PUBLIC_ORIGIN:'https://wrong.invalid:9899'},uid:testUid}));
- await chmod(f.env.VOXCODE_LOGIN_SECRET_FILE,0o644);await assert.rejects(loadServerConfiguration({env:f.env,uid:testUid}));
+ await assert.rejects(loadServerConfiguration({env:{...f.env,VOXCODE_PUBLIC_ORIGIN:'http://127.0.0.1:9899'},uid:testUid,nodeVersion:'22.23.4'}),/HTTPS/);
+ await assert.rejects(loadServerConfiguration({env:{...f.env,VOXCODE_PUBLIC_ORIGIN:'https://wrong.invalid:9899'},uid:testUid,nodeVersion:'22.23.4'}));
+ await chmod(f.env.VOXCODE_LOGIN_SECRET_FILE,0o644);await assert.rejects(loadServerConfiguration({env:f.env,uid:testUid,nodeVersion:'22.23.4'}));
 });
 test('valid configuration remains private behind a nonforgeable redacted preflight report',async t=>{
  const f=await fixture(t),config=await loadServerConfiguration(f.options);assert.equal(config.taskUid,process.getuid()+1);assert.equal(config.loginSecret,'synthetic-login-long-enough');assert.equal(config.publicOrigin,'https://127.0.0.1:9899');

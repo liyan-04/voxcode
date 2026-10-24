@@ -56,7 +56,7 @@ replace unknown services or kill foreign processes. Inspect the 9899 listener
 and both service definitions first; unrelated ownership is a hard stop. Preserve
 the separate #75 acceptance account/resources and other existing services.
 
-Use Linux Node 22 at `/usr/bin/node`, npm, Git, systemd, `ss`, `getent`, SSH and
+Use Linux Node 22 at `/usr/local/bin/node`, npm, Git, systemd, `ss`, `getent`, SSH and
 Codex at `/usr/local/bin/codex`. Inspect existing names before creating accounts:
 
 ```sh
@@ -128,8 +128,8 @@ cannot bypass those checks. Keep the default blocked until these checks can pass
 
 Packaging uses an explicit dependency-complete allowlist: standalone server
 runtime, task service, MCP/HTTP modules, pinned manifest/lock and reviewed templates.
-Old `cli.mjs`, `preflight.mjs`, other apps, tests, secrets, state and node_modules
-are excluded. Undeclared relative imports are rejected. Archives include per-file
+Other apps, tests, secrets, state and node_modules are excluded. Undeclared
+relative imports are rejected. Archives include per-file
 SHA256 and an archive sidecar; extraction accepts regular ustar entries only,
 32 MiB compressed/64 MiB expanded, no traversal/links/duplicates/extensions.
 

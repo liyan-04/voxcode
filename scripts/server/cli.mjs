@@ -70,7 +70,7 @@ export async function runCli(options, exec = run) {
   // change users, firewall, existing services, config, state or host keys.
   const uid = (await connection.ssh('id -u')).trim();
   if (uid !== '0') throw Error('SSH management identity must be root; runtime identity is voxcode');
-  await connection.ssh(`/usr/bin/node -e ${quote(prepareRootScript)} ${quote(root)}`);
+  await connection.ssh(`/usr/local/bin/node -e ${quote(prepareRootScript)} ${quote(root)}`);
   if (options.archive) {
     const archive = await realpath(options.archive), stat = await lstat(options.archive);
     if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 32 * 1024 * 1024) throw Error('Invalid local archive');
@@ -94,7 +94,7 @@ export async function runCli(options, exec = run) {
   for(const name of ['voxcode.service','voxcode-task.service'])await connection.copy(join(checkout,'apps/server/deploy',name),join(management,'apps/server/deploy',name));
   const payload = Buffer.from(JSON.stringify({ command: options.command, root, revision: options.revision, sha256: options.sha256, offline: options.offline === true,
     ...(options.command === 'deploy' ? { archive: join(root, 'incoming', `${options.revision}.tar.gz`) } : {}) })).toString('base64url');
-  const output = await connection.ssh(`/usr/bin/node ${quote(join(management, 'scripts/server/remote.mjs'))} ${quote(payload)}`);
+  const output = await connection.ssh(`/usr/local/bin/node ${quote(join(management, 'scripts/server/remote.mjs'))} ${quote(payload)}`);
   return JSON.parse(output.trim().split('\n').at(-1));
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

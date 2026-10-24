@@ -12,7 +12,7 @@ Environment=HOME=/var/lib/voxcode-task
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=@ROOT@/shared/task-config/task.env
 EnvironmentFile=@ROOT@/current/release.env
-ExecStart=/usr/bin/node @ROOT@/current/task-cli.mjs start
+ExecStart=/usr/local/bin/node @ROOT@/current/task-cli.mjs start
 Restart=on-failure
 RestartSec=3
 RuntimeDirectory=voxcode-task
