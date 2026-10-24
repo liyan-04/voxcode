@@ -1,0 +1,33 @@
+[Unit]
+Description=VoxCode HTTPS voice Code Agent
+After=network-online.target voxcode-task.service
+Wants=network-online.target
+Requires=voxcode-task.service
+
+[Service]
+Type=simple
+User=voxcode
+Group=voxcode
+SupplementaryGroups=voxcode-rpc
+WorkingDirectory=@ROOT@/current
+Environment=HOME=/var/lib/voxcode
+EnvironmentFile=@ROOT@/shared/config/server.env
+EnvironmentFile=@ROOT@/current/release.env
+ExecStart=/usr/local/bin/node @ROOT@/current/server-cli.mjs start
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=25
+KillMode=control-group
+UMask=0077
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=@ROOT@/shared/state /var/lib/voxcode
+ReadOnlyPaths=@ROOT@/shared/config
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+InaccessiblePaths=@ROOT@/shared/task-state /var/lib/voxcode-task /srv/voxcode/project
+
+[Install]
+WantedBy=multi-user.target

@@ -1,6 +1,6 @@
 # Server task runtime
 
-`apps/server` 是当前 VoxCode 主线中的服务器任务层。它把已登记的 Git 项目映射到任务服务，由专用非 root 用户通过 Codex CLI 执行任务。当前可直接启动的入口是 `task-cli.mjs`；HTTP 页面、MCP dispatcher 和出站 WSS bridge 是库模块，尚未由一个生产 launcher 组合起来。
+`apps/server` 是当前 VoxCode 主线中的服务器运行时。它把已登记的 Git 项目映射到任务服务，由专用非 root 用户通过 Codex CLI 执行任务；`server-cli.mjs` 负责 HTTPS 页面、MCP dispatcher 和出站 WSS bridge 的组合启动，`task-cli.mjs` 负责独立任务账户和 Unix RPC。
 
 ## 支持的入口
 
@@ -12,10 +12,11 @@
 | `task-rpc.mjs` | Unix socket JSON-RPC 白名单 | 被 task runtime 使用 |
 | `http-server.mjs` | 登录、项目/任务 HTTP API 和静态页面 handler | 库/fixture |
 | `mcp-server.mjs` | 受 token 保护的 MCP dispatcher | 库/fixture |
-| `mcp-proxy-bridge.mjs` | 服务器到远端 MCP WSS 的重连与请求去重 | 库/fixture |
-| `cli.mjs` | 旧 preflight/Relay runtime 入口 | 遗留；依赖已移除的旧模块，不要启动 |
+| `mcp-proxy-bridge.mjs` | 服务器到远端 MCP WSS 的重连与请求去重 | 被 server runtime 使用 |
+| `runtime-config.mjs` | HTTPS、账户、TLS、socket 和灵矽 endpoint 预检 | server runtime 使用 |
+| `runtime.mjs` / `server-cli.mjs` | HTTPS 管理端、只读 MCP 代理和安全关闭 | 支持；语音写入仍受门禁 |
 
-`task-cli.mjs` 不打开 TCP/HTTP 端口，也不接收浏览器或语音凭据。它只创建一个受保护的 Unix socket。HTTP/MCP/语音产品链路必须先完成组合 launcher、认证边界和真实验收，才能从“库模块”升级为部署入口。
+`task-cli.mjs` 不打开 TCP/HTTP 端口，也不接收浏览器或语音凭据；它只创建一个受保护的 Unix socket。`server-cli.mjs` 读取脱敏预检报告后启动 HTTPS 管理端，MCP 写操作在可信语音上下文关联完成前保持拒绝。
 
 ## 配置和启动
 
@@ -93,4 +94,4 @@ node --test \
 
 本次刷新实际结果为 74/74（macOS arm64、Node.js 26，fixture/local）。这覆盖任务状态、请求去重、取消、Unix socket 边界、HTTP/MCP 认证和 WSS bridge 行为；不覆盖真实 Codex 模型、灵矽服务、Linux、TLS 证书、手机或公网网络。
 
-根 `npm test`、`scripts/build-server-package.mjs` 及其测试仍引用已经从主线删除的旧目录。它们属于待清理的迁移遗留，不能作为当前 server runtime 的安装或发布步骤。任何部署前 source bundle 都必须先更新 allowlist、锁文件和解包测试，并重新验证。
+服务器部署包使用 `scripts/server/bundle.mjs` 和 `scripts/server/package.mjs` 的显式文件清单，排除 Relay、Integration、Mac、测试、凭据和 node_modules；部署前必须通过 server runtime 与 deployment fixture 回归。

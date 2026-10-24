@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "service": "voxcode.service",
+  "user": "voxcode",
+  "port": 9899,
+  "executionMode": "blocked-pending-supervisor",
+  "taskService": "voxcode-task.service",
+  "taskUser": "voxcode-task",
+  "taskGroup": "voxcode-rpc",
+  "taskSocket": "/run/voxcode-task/rpc.sock",
+  "identityVerified": false,
+  "healthOrigin": "https://100.100.81.209:9899",
+  "healthCaFile": "/opt/voxcode/shared/config/health-ca.pem"
+}

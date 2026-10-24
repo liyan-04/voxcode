@@ -6,7 +6,7 @@ const definitions=[
  {name:'codex_status',method:'status',description:'Return actual Codex CLI availability',properties:{},required:[]},
  {name:'codex_list_projects',method:'listProjects',description:'List configured projects without server paths',properties:{},required:[],project:true},
  {name:'codex_list_tasks',method:'listTasks',description:'List tasks for one enabled project',properties:{projectId:idSchema},required:['projectId'],project:true},
- {name:'codex_start_task',method:'startTask',description:'Create a draft for an enabled project; execution requires webpage confirmation',properties:{projectId:idSchema,prompt:{type:'string',minLength:1,maxLength:20000},title:{type:'string',maxLength:200},requestId:idSchema},required:['projectId','prompt','requestId'],project:true},
+ {name:'codex_start_task',method:'startTask',description:'Create a draft for an enabled project; execution requires webpage confirmation',properties:{projectId:idSchema,prompt:{type:'string',minLength:1,maxLength:20000},title:{type:'string',maxLength:200},requestId:idSchema},required:['projectId','prompt','requestId'],project:true,write:true},
  ...[['status','getTask'],['logs','getLogs'],['diff','getDiff'],['checks','getChecks']].map(([label,method])=>({name:`codex_task_${label}`,method,description:`Get task ${label}`,properties:{taskId:idSchema},required:['taskId'],task:true,project:true})),
  {name:'codex_cancel_task',method:'cancelTask',description:'Request cancellation of a task; does not undo file changes',properties:{taskId:idSchema,requestId:idSchema},required:['taskId','requestId'],task:true,project:true,write:true},
 ];

@@ -16,7 +16,7 @@ async function request(ws,msg){return new Promise((resolve,reject)=>{
  function finish(error,value){clearTimeout(timer);ws.off('message',message);ws.off('close',close);if(error)reject(error);else resolve(value);}ws.on('message',message);ws.on('close',close);ws.send(JSON.stringify(msg));
 });}
 test('real WS initialize, tools, status and same-connection draft retry are deduplicated',async t=>{
- let drafts=0;const registry={listProjects:async()=>[{id:'p1',name:'One',enabled:true}],getProject:async id=>id==='p1'?{id,enabled:true}:null};const mcp=createMcpDispatcher({adapter:{...registry,status:()=>({cli:true}),startTask:()=>({taskId:`draft-${++drafts}`})}});const {ws}=await fixture(t,{dispatch:mcp.dispatch});
+ let drafts=0;const registry={listProjects:async()=>[{id:'p1',name:'One',enabled:true}],getProject:async id=>id==='p1'?{id,enabled:true}:null};const mcp=createMcpDispatcher({adapter:{...registry,status:()=>({cli:true}),startTask:()=>({taskId:`draft-${++drafts}`})},authorizeWrite:async()=>true});const {ws}=await fixture(t,{dispatch:mcp.dispatch});
  assert.ok((await request(ws,rpc(1,'initialize'))).result.serverInfo);assert.ok((await request(ws,rpc(2,'tools/list'))).result.tools.some(x=>x.name==='codex_start_task'));assert.ok((await request(ws,rpc(3,'tools/call',{name:'codex_status'}))).result);
  const draft=rpc(4,'tools/call',{name:'codex_start_task',arguments:{projectId:'p1',prompt:'draft only',requestId:'draft-1'}});assert.ok((await request(ws,draft)).result);await request(ws,draft);assert.equal(drafts,1);
 });
