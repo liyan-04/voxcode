@@ -71,6 +71,7 @@ export function evaluateCoverage({ head, baseline, changed, language, policy }) 
   const overall = summarize(head, scope);
   const previous = baseline ? summarize(baseline, scope) : null;
   const delta = summarize(head, scope, changed);
+  const hasEligibleChanges = [...changed.keys()].some(path => eligible(path, scope));
   const errors = [];
   if (!overall.lines.total) errors.push('No executable source coverage for the selected language.');
   if (baseline && !previous.lines.total) errors.push('No executable baseline coverage for the selected language.');
@@ -82,7 +83,7 @@ export function evaluateCoverage({ head, baseline, changed, language, policy }) 
     if (delta[name].total && delta[name].covered * 100 < threshold * delta[name].total) {
       errors.push(`${language} changed ${name} below ${threshold}%.`);
     }
-    if (previous && policy.allowOverallDecrease === false && previous[name].total
+    if (previous && hasEligibleChanges && policy.allowOverallDecrease === false && previous[name].total
       && (!overall[name].total || overall[name].covered * previous[name].total < previous[name].covered * overall[name].total)) {
       errors.push(`${language} overall ${name} decreased from the PR baseline.`);
     }
