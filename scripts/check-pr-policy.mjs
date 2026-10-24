@@ -64,7 +64,7 @@ export function validatePullRequest(pr) {
   }
   if (sections.has('Milestone tag') && hasContent(sections.get('Milestone tag'))) {
     const tagText = textIn(sections.get('Milestone tag')).join(' ');
-    if (!/\bmilestone\/[a-z0-9][a-z0-9._-]*\b/u.test(tagText)) errors.push('PR Milestone tag section must name a tag matching milestone/<name>.');
+    if (!/\bVoxCode\d+\.\d+\.\d+\b/u.test(tagText)) errors.push('PR Milestone tag section must name a tag matching VoxCode<major>.<minor>.<patch>.');
   }
   return errors;
 }

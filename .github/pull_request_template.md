@@ -16,6 +16,7 @@ AI reports are evidence, not human GitHub approvals or acceptance. -->
 
 ## Milestone tag
 <!-- Every verifiable milestone must have an annotated Git tag on the milestone commit.
-Name it as `milestone/<short-name>` and include the exact tag here. The coordinator creates
-and pushes the tag only after the milestone checks pass; this section is required for every PR. -->
-Tag: milestone/<short-name>
+Name it as `VoxCode<major>.<minor>.<patch>` and include the exact tag here. Small PRs
+increment patch; larger progress increments minor or major. The coordinator creates and
+pushes the tag only after checks pass; this section is required for every PR. -->
+Tag: VoxCode<major>.<minor>.<patch>

@@ -16,7 +16,7 @@ Native WebView cookie propagation remains unverified.
 ## Review
 Independent review reports are pending; keep this PR in draft.
 ## Milestone tag
-Tag: milestone/preview-expiry
+Tag: VoxCode1.2.3
 `;
 const pr = { title: 'fix(preview): reject expired preview sessions', body, headRef: 'codex/preview-expiry' };
 
@@ -41,9 +41,10 @@ test('accepts complete PR metadata without demanding invented device evidence', 
   assert.deepEqual(validatePullRequest(pr), []);
 });
 
-test('requires a milestone tag in every PR and validates its format', () => {
-  assert.ok(validatePullRequest({ ...pr, body: body.replace('## Milestone tag\nTag: milestone/preview-expiry\n', '') }).some(error => error.includes('Milestone tag')));
-  assert.ok(validatePullRequest({ ...pr, body: body.replace('milestone/preview-expiry', 'release-1') }).some(error => error.includes('must name a tag')));
+test('requires a three-level VoxCode milestone tag in every PR', () => {
+  assert.ok(validatePullRequest({ ...pr, body: body.replace('## Milestone tag\nTag: VoxCode1.2.3\n', '') }).some(error => error.includes('Milestone tag')));
+  assert.ok(validatePullRequest({ ...pr, body: body.replace('VoxCode1.2.3', 'VoxCode1.2') }).some(error => error.includes('must name a tag')));
+  assert.ok(validatePullRequest({ ...pr, body: body.replace('VoxCode1.2.3', 'milestone/1.2.3') }).some(error => error.includes('must name a tag')));
   assert.deepEqual(validatePullRequest(pr), []);
 });
 

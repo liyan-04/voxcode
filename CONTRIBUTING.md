@@ -8,7 +8,7 @@ Applies equally to humans, the coordinator and AI workers. Read [AGENTS.md](AGEN
 - Direct commits and pushes to protected branches (`main`, `master`, `codex/mvp`) are prohibited. Every submitted change must be pushed to a `codex/*` topic branch and merged through a pull request. The local commit and pre-push hooks enforce this when installed; the PR workflow fails if a protected branch receives a direct push, while repository branch protection/rulesets remain the authoritative GitHub control.
 - One PR addresses one reviewable behavior or closely related set of changes. Prefer small PRs; roughly 400 changed source lines is a review prompt, not a reason to split inseparable changes or omit tests. Exclude generated files when judging size.
 - One commit is one coherent change, with its tests and essential documentation. A regression fix belongs with its regression test. Do not split a knowingly broken intermediate state into the shared branch.
-- Every verifiable milestone gets an annotated Git tag on the exact commit published by its PR. Use `milestone/<short-name>`. The PR must name that tag in its `## Milestone tag` section; the coordinator creates and pushes it only after milestone checks pass. A tag never replaces review, CI, device or acceptance evidence.
+- Every PR gets an annotated Git tag on its exact published commit, using `VoxCode<major>.<minor>.<patch>` (for example, `VoxCode1.2.3`). Small PRs increment patch; larger progress increments minor or major. The PR must name that tag in `## Milestone tag`; the coordinator creates and pushes it only after checks pass. A tag never replaces review, CI, device or acceptance evidence.
 - Independent work should use separate worktrees. In the existing shared-checkout session, workers have exclusive paths and the coordinator alone stages, commits, pushes and switches branches. Do not switch while workers are editing.
 - Preserve unrelated user/worker changes. Stage explicit paths and inspect `git diff --cached`; never use `git add .` in shared work. Never rewrite published history or force-push without explicit user instruction.
 - After a PR is merged, cleanup is allowed only after the checks in [docs/architecture/cleanup-policy.md](docs/architecture/cleanup-policy.md) pass. Keep the PR, merge SHA, reviews and progress records; use `git branch -d` for a verified local topic branch and never delete protected, unmerged or dirty work.
@@ -55,7 +55,7 @@ The hook checks the subject only. It is bypassable and is not a substitute for C
 
 ## Pull requests
 
-The PR title follows the same subject format. Fill all five template sections with concrete content; English headings are stable for automation, content may be Chinese.
+The PR title follows the same subject format. Fill all five template sections with concrete content; English headings are stable for automation, content may be Chinese. Every PR must include its three-level `VoxCode` tag.
 
 | Section | Required content |
 | --- | --- |
