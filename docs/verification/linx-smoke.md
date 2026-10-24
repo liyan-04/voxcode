@@ -1,12 +1,14 @@
 # Linx HTTP smoke client (Issue #43)
 
-This client fills the engineering smoke-client gap in [the Linx onboarding guide](linx-readiness-2026-10-24.md). It uses the existing authenticated Mac voice HTTP routes. It does not onboard a device, capture a microphone, play audio, submit Codex tasks, approve operations, accept results, or prove the complete phone demonstration.
+Current transport boundary: this is a server-local diagnostic client. It does not verify the required native phone↔server duplex WSS channel (Issue62); the currently merged phone still uses HTTP audio/events pending that implementation.
+
+This client fills the engineering smoke-client gap in [the Linx onboarding guide](linx-readiness-2026-10-24.md). It uses the existing authenticated server Bridge voice HTTP routes. It does not onboard a device, capture a microphone, play audio, submit Codex tasks, approve operations, accept results, or prove the complete phone demonstration.
 
 ## Operator prerequisites
 
-- Node >=22 and an already running Mac integration bridge with authorized Linx configuration. Use a dedicated synthetic test agent/project; voice tools can read the paired project's existing task state. The operator must authorize this session before invoking the command.
+- Node >=22 and an already running server integration bridge with authorized Linx configuration. Use a dedicated synthetic test agent/project; voice tools can read the paired project's existing task state. The operator must authorize this session before invoking the command.
 - Obtain the bridge's existing pairing bearer through the authorized local pairing flow. Store it as `VOXCODE_SESSION_TOKEN` in the process environment or a private environment file with mode 600. Do not paste a bearer into chat, an Issue, a shell argument or a report. The client never reads the Linx device credentials and does not create pairing sessions itself.
-- Set `VOXCODE_BRIDGE_URL=http://127.0.0.1:8787` if needed (this is the default). Only literal `127.0.0.1` or `[::1]` HTTP origins are accepted. DNS names, redirects, credentials in URLs, query strings and remote origins are rejected. This client is for the Mac loopback bridge; Relay/TLS and phone testing are separate gates.
+- Set `VOXCODE_BRIDGE_URL=http://127.0.0.1:8787` if needed (this is the default). Only literal `127.0.0.1` or `[::1]` HTTP origins are accepted. DNS names, redirects, credentials in URLs, query strings and remote origins are rejected. This client is for the server loopback bridge; Relay/TLS and phone duplex WSS (Issue62) testing are separate gates.
 - Supply an existing **synthetic** raw PCM file: signed 16-bit little-endian, 16 kHz, mono, no WAV header, nonempty, even byte length, at most 1,920,000 bytes (60 seconds). A non-secret synthetic spoken request for a new task draft is useful; silence cannot establish STT/draft readiness. The file must be regular and must not be a symlink or FIFO. `--synthetic` attests both content and format: raw bytes do not self-describe the actual sample rate, channels or synthetic provenance.
 
 For example, place only the bridge origin and existing paired bearer in a private operator-created environment file outside version control, then run:
@@ -40,7 +42,7 @@ The command emits one fixed-schema JSON report and exits 0 only after ready, non
 | `stages.tools:manual_required` | No full L3 claim is made | MCP negotiation, tool selection, actual-state comparison and A-to-B frozen-target behavior |
 | `observed.draft` / `observed.focus` | Visible draft/focus event counts | Complete read-tool execution traces; the HTTP API does not expose those traces |
 
-`evidence:local_http` and `provider:not_independently_verified` are intentional. A controlled server can emit the same response schema, so a successful report alone cannot certify real Linx. A future authorized live record must name the actual bridge/provider environment and revision separately, while retaining only the redacted report. Full L3, device playback, signed installation and outdoor/company-Mac transport remain distinct manual/live/device/outdoor acceptance gates.
+`evidence:local_http` and `provider:not_independently_verified` are intentional. A controlled server can emit the same response schema, so a successful report alone cannot certify real Linx. A future authorized live record must name the actual bridge/provider environment and revision separately, while retaining only the redacted report. Full L3, device playback, signed installation and outdoor server/VPN transport remain distinct manual/live/device/outdoor acceptance gates.
 
 ## Verification evidence
 
