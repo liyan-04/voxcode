@@ -2,16 +2,18 @@
 
 Each implementation component needs two reviewers independent of its implementer. Review reports state revision/snapshot, scope, severity, evidence, fixes and residual risk. Do not label a component approved before resolving P0/P1 findings. AI reports are not human GitHub approvals or user acceptance.
 
-## Current implementation-v1 gates
+## Current phone-demo gates
 
-Historical initial reviews below are evidence for their original snapshots only. In-progress v1 changes need fresh reviews; the pending rows do not imply the historical reports are missing.
+Reports retain their original findings and targeted resolutions. Source review, CI,
+signed-device tests and outdoor acceptance are separate gates. The historical
+initial reviews below apply only to their original snapshots.
 
 | Component | Reviewer 1 | Reviewer 2 | Resolution |
 | --- | --- | --- | --- |
-| Phone client v1 | pending | pending | incomplete native integration |
-| Mac executor v1 | pending | pending | incomplete scheduling/session changes |
-| Relay v1 | pending | pending | TLS/core transport work pending |
-| Linx voice/integration v1 | pending | pending | tools/audio work pending |
+| Phone client | [Platform](phone-demo-ios-platform.md), `/root/architecture_review` | [Execution/client](phone-demo-ios-execution.md), `/root/mac_v1` | Original findings and equal-time replay follow-up resolved in source5c2b9a7; exact-source native CI39988267625 passed |
+| Mac executor | [Independent fixes](phone-demo-mac-independent.md), `/root/architecture_review` | [Client/recovery](phone-demo-mac-client.md), `/root/ios_v1` | Sourcef4114f2, both independent full74/74; original authorization/approval and UTF-8 findings resolved |
+| Relay | [Security](phone-demo-relay-security.md), `/root/mac_v1` | [Client](phone-demo-relay-client.md), `/root/ios_v1` | Sourcede8fc2d; both targeted follow-ups and LinuxNode22 CI passed |
+| Linx voice/integration | [Execution](phone-demo-voice-execution.md) / [follow-up](phone-demo-voice-followup.md), `/root/mac_v1` | [Independent tools/runtime](phone-demo-voice-independent.md), `/root/architecture_review` | Sourcebdd7f29; authorization/close/TTL/criteria findings resolved; independent26/26 |
 | Preview (deferred) | not scheduled | not scheduled | Outside the first phone-demo scope; review required if resumed |
 
 ## Repository policy
@@ -22,7 +24,7 @@ Historical initial reviews below are evidence for their original snapshots only.
 
 ## Phone-demo scope and architect role
 
-Two independent document-only [reviews](phone-demo-scope.md) cover the scope reduction and architect coordination rules. Three findings were fixed; both targeted rereviews reported no residual findings or conflicts. These checks do not approve the unfinished iOS, Mac, Relay or voice implementations. The architect's own coordination record is not an independent component review.
+Two independent document-only [reviews](phone-demo-scope.md) cover the scope reduction and architect coordination rules. Three findings were fixed; both targeted rereviews reported no residual findings or conflicts. These checks do not approve the implementations above. The architect's [ARCH-003 checkpoint](../architecture/checkpoint-2026-10-24.md) is additional to component reviews. The original Relay security reviewer was unavailable for final Mac follow-up; an independent platform/security reviewer completed it. The iOS reviewer reported the voice criteria defect, then final second voice review was reassigned to that independent reviewer while iOS closed its own fixes. Implementers did not approve their own components.
 
 ## Historical initial reports
 

@@ -22,6 +22,7 @@ const service = createService({
       },
     }),
 });
+service.configure({ requestId: "two-slots", executionLimit: 2 });
 for (let i = 0; i < 3; i++)
   service.mutate("create", {
     requestId: `task-${i}`,

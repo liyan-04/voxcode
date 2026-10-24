@@ -46,10 +46,12 @@ Events: `ready` (with additive `audioParams` from server hello), `stt` (`text`),
 and `error` (`message`). The returned audio is the original encoded binary frame.
 Upstream documentation explicitly describes server TTS as Opus, normally mono
 16/24 kHz and 20/40/60 ms frames. A PCM input hello does **not** establish PCM
-output. Native iOS raw Opus decoding/playback is unimplemented and unverified;
-these packets must not be passed to a PCM player or treated as a WAV/Ogg file.
-No undocumented output-format switch is used. The ready metadata is available
-for a future tested decoder.
+output. The integration bridge decodes negotiated Opus with exact-pinned
+`opusscript` and returns bounded signed PCM frames at the negotiated 16/24 kHz
+rate. The adapter's raw frames must never be passed directly to a PCM player or
+treated as a WAV/Ogg file. No undocumented output-format switch is used. Local
+codec tests encode and decode actual Opus packets; live provider audio and
+audible iPhone playback still require verification.
 
 MCP initialize and tools/list are supported, with an empty tool list by default.
 MCP is ignored until the server hello has validated readiness. Closing from an
@@ -63,6 +65,14 @@ filesystem or general executor tools. Tool request IDs are deduplicated for the
 session (limit 256); this does not replace bridge requestId deduplication across
 reconnects. Exceptions return generic RPC errors. Calls are not automatically
 cancelled or rolled back when transport closes.
+
+The bridge registers six scoped tools: `list_tasks`, `get_task_status`,
+`get_task_evidence`, `propose_task`, `propose_followup` and `propose_focus`.
+They read actual service state or emit expiring drafts/focus suggestions. Drafts
+never dispatch work, approve operations or accept results. Creation freezes the
+task/version, supplied through documented hello prompt placeholders. Closing or
+revoking expires tools, drafts and audio; slow request bodies recheck authorization
+before provider creation. Phone confirmation remains the only execution path.
 
 ## Real integration gate
 

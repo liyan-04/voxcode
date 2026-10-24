@@ -5,6 +5,25 @@ options:
 packages:
   VoxCodeCore:
     path: .
+schemes:
+  VoxCode:
+    build:
+      targets:
+        VoxCode: all
+        VoxCodeTests: [test]
+    test:
+      gatherCoverageData: true
+      targets:
+        - name: VoxCodeTests
+  VoxCodeUI:
+    build:
+      targets:
+        VoxCode: all
+        VoxCodeUITests: [test]
+    test:
+      gatherCoverageData: false
+      targets:
+        - name: VoxCodeUITests
 targets:
   VoxCode:
     type: application
@@ -21,3 +40,26 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
     dependencies:
       - package: VoxCodeCore
+  VoxCodeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: NativeTests
+    settings:
+      base:
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: VoxCode
+      - package: VoxCodeCore
+  VoxCodeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    settings:
+      base:
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: VoxCode

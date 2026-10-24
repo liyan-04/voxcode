@@ -23,14 +23,15 @@ export function createServer(options) {
         });
       let body;
       const read = async () => {
-        let data = "";
+        const chunks = [];
+        let bytes = 0;
         for await (const chunk of req) {
-          data += chunk;
-          if (Buffer.byteLength(data) > 65536)
-            throw new ApiError(400, "invalid");
+          bytes += chunk.length;
+          if (bytes > 65536) throw new ApiError(400, "invalid");
+          chunks.push(chunk);
         }
         try {
-          return JSON.parse(data);
+          return JSON.parse(Buffer.concat(chunks, bytes).toString("utf8"));
         } catch {
           throw new ApiError(400, "invalid");
         }
@@ -46,6 +47,20 @@ export function createServer(options) {
         service.revoke(token);
         return send(res, 200, { ok: true });
       }
+      if (url.pathname === "/api/settings") {
+        if (req.method === "GET") return send(res, 200, service.settings());
+        if (req.method === "POST") {
+          body = await read();
+          service.authorize(req.headers.authorization);
+          return send(res, 200, service.configure(body));
+        }
+      }
+      if (req.method === "GET" && url.pathname === "/api/monitor") {
+        const peer = req.socket.remoteAddress;
+        if (peer !== "::1" && !/^(::ffff:)?127\./.test(peer ?? ""))
+          throw new ApiError(403, "denied");
+        return send(res, 200, service.monitor());
+      }
       if (url.pathname.startsWith("/api/voice")) {
         if (options.voiceHandler)
           return await options.voiceHandler(req, res, token, service);
@@ -54,16 +69,20 @@ export function createServer(options) {
       if (url.pathname === "/api/tasks") {
         if (req.method === "GET")
           return send(res, 200, { tasks: service.list() });
-        if (req.method === "POST")
+        if (req.method === "POST") {
+          body = await read();
+          service.authorize(req.headers.authorization);
           return send(res, 200, {
-            task: service.mutate("create", await read()),
+            task: service.mutate("create", body),
           });
+        }
       }
       const match = url.pathname.match(
-        /^\/api\/tasks\/([^/]+)(?:\/(events|messages|cancel|accept|approvals)(?:\/([^/]+))?)?$/,
+        /^\/api\/tasks\/([^/]+)(?:\/(events|messages|cancel|accept)|\/(approvals|criteria)\/([^/]+))?$/,
       );
       if (!match) throw new ApiError(404, "unknown");
-      const [, id, action, approvalId] = match;
+      const [, id, directAction, scopedAction, resourceId] = match;
+      const action = directAction ?? scopedAction;
       if (req.method === "GET" && !action)
         return send(res, 200, { task: service.get(id) });
       if (req.method === "GET" && action === "events") {
@@ -74,16 +93,25 @@ export function createServer(options) {
       }
       if (
         req.method === "POST" &&
-        ["messages", "cancel", "accept", "approvals"].includes(action)
-      )
+        ["messages", "cancel", "accept", "approvals", "criteria"].includes(
+          action,
+        )
+      ) {
+        body = await read();
+        service.authorize(req.headers.authorization);
         return send(res, 200, {
           task: service.mutate(
-            action === "approvals" ? "approval" : action,
-            await read(),
+            action === "approvals"
+              ? "approval"
+              : action === "criteria"
+                ? "criterion"
+                : action,
+            body,
             id,
-            approvalId,
+            resourceId,
           ),
         });
+      }
       throw new ApiError(404, "unknown");
     } catch (e) {
       send(res, e.status ?? 500, {
