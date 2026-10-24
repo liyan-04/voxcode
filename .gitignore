@@ -10,5 +10,8 @@ DerivedData/
 *.xcarchive
 apps/ios/VoxCode.xcodeproj/
 coverage/
+dist/
 .DS_Store
 *.log
+.voxcode-tls/
+.worktrees/

@@ -27,7 +27,7 @@ Interfaces: settings/configure routes, criteria mutations, onSession/onEvidence 
 - [ ] Add criterion snapshots, explicit manual pass/fail and acceptance gating; inherit criteria unverified on follow-up.
 - [ ] Preserve owned process teardown, secret environment stripping and version-bound evidence. Return actual diff/files/check commands, exit codes and bounded output.
 - [ ] Coordinate a minimal aggregate monitoring snapshot with the coordinator: authenticated, bounded state/counters/durations, no prompts/tokens/private paths or task labels. A status page is optional polish.
-- [ ] Run Mac tests, then obtain two independent scoped reviews before committing this feature.
+- [ ] Run Mac tests and publish the scoped milestone Draft PR, then obtain two independent scoped reviews before promoting it. Follow docs/milestones.md.
 
 ## Task 2: Native task management and identity
 
@@ -73,6 +73,7 @@ Owner: coordinator, with architect/Mac developer for monitoring interfaces. File
 ## Task 6: Verification and delivery
 
 - [ ] Publish verified source/documents through focused codex/ commits and PRs targeting the verified base; run GitHub Actions native SDK build and repair actual failures.
+- [ ] Publish each verifiable component milestone promptly as its own Draft PR with implementation-agent attribution, actual checks and pending reviews; maintain docs/milestones.md rather than hiding progress in a final combined PR.
 - [ ] Verify real Codex creates a file and follows up using the same thread; retry prior failed live smoke only after meaningful diagnostic changes.
 - [ ] Run full Node tests, Swift core and native SDK build; two reviews for final shared behavior.
 - [ ] On specified iPhone, verify signing/install, microphone/interruption, 20-task navigation, four real parallel tasks, ten mixed-target instructions, uncertain-response retry, real diff/check inspection and versioned acceptance.
