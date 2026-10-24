@@ -44,3 +44,100 @@ test('conflicting MCP retries never invoke a second tool or return the old resul
   assert.equal(calls, 1); assert(replies.some(value => value.id === 42 && value.error));
   session.close();
 });
+
+test('bound sessions accept matching or omitted IDs and bind controls and every MCP reply', async t => {
+  let calls = 0;
+  const { session, events } = await ready({ tools: [{ name: 'read', inputSchema: { type: 'object' }, invoke: () => ++calls }] });
+  t.after(() => session.close());
+  const socket = Socket.last;
+  session.startListening(); session.stopListening(); session.abort();
+  socket.message({ type: 'stt', session_id: 's', text: 'matching' });
+  socket.message({ type: 'stt', text: 'omitted' });
+  socket.message({ type: 'tts', session_id: 's', state: 'stop', is_aborted: true });
+  const rpc = (id, method, params, extra = {}) => socket.message({ type: 'mcp', ...extra, payload: { jsonrpc: '2.0', id, method, ...(params === undefined ? {} : { params }) } });
+  rpc(1, 'initialize', { protocolVersion: '2024-11-05' }, { session_id: 's' });
+  rpc(2, 'tools/list');
+  rpc(3, 'tools/call', { name: 'read' });
+  rpc(3, 'tools/call', { name: 'read' });
+  rpc(3, 'tools/call', { name: 'read', arguments: { changed: true } });
+  rpc(4, 'tools/call', { name: 'read', arguments: { text: 'x'.repeat(32768) } });
+  rpc(5, 'tools/call', { name: 'unknown' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls, 1);
+  assert.deepEqual(events.filter(event => event.type === 'stt').map(event => event.text), ['matching', 'omitted']);
+  const sent = socket.sent.slice(1).map(JSON.parse);
+  assert(sent.every(message => message.session_id === 's'));
+  const replies = sent.filter(message => message.type === 'mcp').map(message => message.payload);
+  assert.equal(replies.find(reply => reply.id === 1).result.protocolVersion, '2024-11-05');
+  assert.equal(replies.find(reply => reply.id === 2).result.tools[0].name, 'read');
+  assert.equal(replies.filter(reply => reply.id === 3 && reply.result?.isError === false).length, 2);
+  assert(replies.some(reply => reply.id === 3 && reply.error?.code === -32602));
+  assert(replies.some(reply => reply.id === 4 && reply.error?.code === -32602));
+  assert(replies.some(reply => reply.id === 5 && reply.error?.code === -32601));
+});
+
+test('conflicting or malformed incoming session IDs close before STT, TTS or tool dispatch', async t => {
+  for (const type of ['stt', 'tts', 'mcp']) for (const id of ['foreign-private-session', '', null, 7, 'bad\nvalue', 'x'.repeat(257)]) {
+    let calls = 0;
+    const { session, events } = await ready({ tools: [{ name: 'read', inputSchema: { type: 'object' }, invoke: () => ++calls }] });
+    t.after(() => session.close());
+    const socket = Socket.last;
+    socket.message({ type, session_id: id, text: 'private transcript', state: 'start', payload: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'read' } } });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(socket.closed, true, `${type} with ${typeof id} ID`);
+    assert.equal(calls, 0);
+    assert.deepEqual(events.map(event => event.type), ['ready', 'error']);
+    assert(!JSON.stringify(events).includes('foreign-private-session'));
+    assert(!JSON.stringify(events).includes('private transcript'));
+    assert.equal(socket.sent.length, 1);
+    assert.throws(() => session.startListening(), /not ready/);
+  }
+});
+
+test('hello accepts an omitted session ID but rejects malformed supplied IDs', async t => {
+  for (const id of ['', null, 7, 'bad value', 'x'.repeat(257)]) {
+    const { session, events } = setup(); t.after(() => session.close());
+    const pending = session.connect(); pending.catch(() => {});
+    Socket.last.emit('open'); Socket.last.message({ ...hello, session_id: id });
+    await assert.rejects(pending, /Invalid Linx hello/);
+    assert.equal(Socket.last.closed, true);
+    assert(!JSON.stringify(events).includes('private-token'));
+  }
+  const { session } = setup(); t.after(() => session.close());
+  const pending = session.connect(); const socket = Socket.last;
+  socket.emit('open'); const { session_id, ...unboundHello } = hello;
+  socket.message(unboundHello); await pending;
+  session.startListening(); session.stopListening(); session.abort();
+  socket.message({ type: 'mcp', payload: { jsonrpc: '2.0', id: 1, method: 'tools/list' } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert(socket.sent.slice(1).map(JSON.parse).every(message => !Object.hasOwn(message, 'session_id')));
+});
+
+test('documented optional hello audio metadata never invents an output sample rate', async t => {
+  for (const audio of [undefined, { format: 'opus', sample_rate: 16000, play_buffer_duration: 1000 }]) {
+    const { session, events } = setup(); t.after(() => session.close());
+    const pending = session.connect(); const socket = Socket.last;
+    socket.emit('open'); const { audio_params, ...metadata } = hello;
+    socket.message({ ...metadata, ...(audio ? { audio_params: audio } : {}) }); await pending;
+    session.startListening(); session.sendAudio(Buffer.alloc(640));
+    assert.deepEqual(events[0].audioParams, audio ? { ...audio, channels: 1 } : undefined);
+  }
+  for (const audio of [null, {}, { format: 'opus', channels: 1 }, { format: 'opus', sample_rate: 48000 }, { format: 'opus', sample_rate: 16000, channels: 2 }]) {
+    const { session } = setup(); t.after(() => session.close());
+    const pending = session.connect(); pending.catch(() => {});
+    Socket.last.emit('open'); Socket.last.message({ ...hello, audio_params: audio });
+    await assert.rejects(pending, /Invalid Linx hello/);
+  }
+});
+
+test('a conflicting session during an in-flight tool prevents its late MCP reply', async t => {
+  let resolve, calls = 0;
+  const { session, events } = await ready({ tools: [{ name: 'read', inputSchema: { type: 'object' }, invoke: () => { calls++; return new Promise(done => { resolve = done; }); } }] });
+  t.after(() => session.close()); const socket = Socket.last;
+  socket.message({ type: 'mcp', session_id: 's', payload: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'read' } } });
+  assert.equal(calls, 1);
+  socket.message({ type: 'stt', session_id: 'foreign', text: 'wrong target' });
+  resolve('late result'); await new Promise(done => setImmediate(done));
+  assert.equal(socket.sent.length, 1);
+  assert.equal(events.at(-1).type, 'error');
+});

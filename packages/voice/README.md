@@ -5,6 +5,16 @@ The production transport is exact-pinned `ws`: Node's built-in WebSocket does
 not provide the custom handshake headers required by the documented device API.
 Injected transports must implement the `ws` constructor and EventEmitter API.
 
+The server runs as a software Linx device: it opens the outbound authenticated
+WSS connection and advertises **端侧 MCP** on that same connection. The phone
+uses only the authenticated VoxCode voice API and keeps no Linx credentials.
+This route needs no ALSA, physical audio device or C++ SDK. The separate
+**云端 MCP** SSE route (`GET /mcp`, `POST /mcp/message`) is not implemented here
+and requires its own reachable HTTP service. Its `X-Linx-Device-Id`,
+`X-Linx-Agent-Id` and `X-Linx-Session-Id` headers correlate requests; they are
+not authentication. Third-app business SSE is another optional integration
+route, not an additional transport required by this WSS device adapter.
+
 ```js
 import { createLinxSession } from '@voxcode/voice';
 const session = createLinxSession({
@@ -34,6 +44,15 @@ be configured with `config.handshakeTimeoutMs` (1-60000). Transport and provider
 errors have generic messages; the module never logs. Callers must keep configuration,
 STT text and raw MCP payload events out of logs that may contain sensitive content.
 
+The optional hello `session_id` binds the connection. When supplied it must be
+a nonempty string of at most 256 characters without whitespace/control characters.
+All later controls and MCP success/error replies carry that binding. An incoming
+JSON message with an invalid or conflicting ID closes the session before any
+transcript, TTS or tool event is dispatched. Omitted IDs remain accepted because
+the official device MCP examples omit them. An absent hello ID leaves replies
+unbound; later messages do not silently change that binding. Binary audio has no
+session field and belongs to its authenticated connection.
+
 Send PCM only between start and stop. Each chunk must contain complete 16-bit
 samples, 1-32000 bytes (at most one second); 640-byte/20 ms chunks are recommended.
 The adapter cannot infer whether bytes actually represent the promised sample
@@ -52,6 +71,13 @@ rate. The adapter's raw frames must never be passed directly to a PCM player or
 treated as a WAV/Ogg file. No undocumented output-format switch is used. Local
 codec tests encode and decode actual Opus packets; live provider audio and
 audible iPhone playback still require verification.
+
+The documented abbreviated server hello may omit `channels`; the adapter uses
+the documented mono value when format and sample rate are present. A hello may
+also omit `audio_params` entirely: input and MCP remain usable, but the bridge
+reports `outputSupported:false` and drops binary output until a new connection
+negotiates an output format. No output codec or sample rate is inferred from the
+PCM input hello. Supplied malformed or unsupported audio metadata is rejected.
 
 MCP initialize and tools/list are supported, with an empty tool list by default.
 MCP is ignored until the server hello has validated readiness. Closing from an
@@ -159,8 +185,43 @@ Sources retrieved from upstream main on 2026-10-24:
 - https://github.com/qiniu/Xrobot-docs/blob/main/docs/xrobot/platform/websocket.md
 - https://github.com/qiniu/Xrobot-docs/blob/main/docs/xrobot/mcp/hardware-mcp.md
 
+The protocol audit for this adapter is pinned to upstream commit
+`20ce1b29a1bdff575a4c3317689bae30a7e08535` (2026-10-22):
+
+- [WebSocket device protocol](https://github.com/qiniu/Xrobot-docs/blob/20ce1b29a1bdff575a4c3317689bae30a7e08535/docs/xrobot/platform/websocket.md)
+- [Device MCP](https://github.com/qiniu/Xrobot-docs/blob/20ce1b29a1bdff575a4c3317689bae30a7e08535/docs/xrobot/mcp/hardware-mcp.md)
+- [Cloud MCP](https://github.com/qiniu/Xrobot-docs/blob/20ce1b29a1bdff575a4c3317689bae30a7e08535/docs/xrobot/mcp/software-mcp.md)
+- [Third-app integration](https://github.com/qiniu/Xrobot-docs/blob/20ce1b29a1bdff575a4c3317689bae30a7e08535/docs/xrobot/guide/third-app.md)
+- [Agent configuration](https://github.com/qiniu/Xrobot-docs/blob/20ce1b29a1bdff575a4c3317689bae30a7e08535/docs/xrobot/guide/agent-config.md)
+
+The MCP discovery response uses protocol `2024-11-05` and standard tools/list
+without requiring optional tool `type` metadata. Configure a tool-capable model,
+language/voice, intent and prompt in the Linx agent, then save and reconnect.
+Selecting a cloud MCP endpoint in the console does not configure this device
+transport or demonstrate successful tool invocation.
+
 Adapter tests use an injected protocol transport. Onboarding tests inject controlled
 request/response transports with a process-wide default-deny HTTPS mock; they
 verify persistent identity, permissions, no clobber, endpoint restrictions,
 pending/bound and error states, deadlines/body limits and redacted output. These
 checks do not prove cloud enrollment, STT quality, MCP behavior or phone playback.
+
+From the repository root, the reusable headless composition check is:
+
+```sh
+npm ci --ignore-scripts
+npm ci --ignore-scripts --prefix packages/voice
+npm ci --ignore-scripts --prefix apps/relay
+node --test apps/integration/test/headless-server.test.mjs
+```
+
+It uses actual loopback HTTP/WebSocket Relay → Connector → Bridge transport,
+the real Linx adapter with an injected protocol peer, actual Opus decoding,
+temporary Git worktrees and a controlled Node stdio subprocess. It verifies
+unauthenticated denial, MCP discovery/session binding, one draft per duplicate
+tool request, no automatic execution, explicit confirmation/diff, replay,
+same-thread follow-up, abort and conflicting-session cleanup. It owns temporary
+directories, ephemeral ports and process cleanup and requires no audio hardware.
+This is local fixture evidence on the host running the test. It does not prove
+remote TLS, Linux deployment, real Linx/model execution or audible phone output;
+the existing TLS tests and the live/device gates remain separate.

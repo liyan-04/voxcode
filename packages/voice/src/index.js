@@ -24,6 +24,7 @@ export function createLinxSession({ config, onEvent = () => {}, WebSocketImpl = 
   const emit = event => { try { onEvent(event); } catch { /* Consumer errors cannot crash transport callbacks. */ } };
   const send = value => socket.send(JSON.stringify(value));
   const control = value => send({ ...(sessionId ? { session_id: sessionId } : {}), ...value });
+  const validSessionId = value => typeof value === 'string' && value.length <= 256 && /^[^\s\x00-\x1f\x7f]+$/u.test(value);
   const requireReady = () => { if (state !== 'ready') throw new Error('Linx session is not ready'); };
   function finish(message, report = true) {
     if (state === 'closed') return;
@@ -40,7 +41,7 @@ export function createLinxSession({ config, onEvent = () => {}, WebSocketImpl = 
     const key = `${typeof payload.id}:${payload.id}`;
     const fingerprint = JSON.stringify([payload.method, payload.params ?? null]);
     if (Buffer.byteLength(fingerprint) > 32768 || (requests.has(key) && requests.get(key).fingerprint !== fingerprint)) {
-      try { send({ type: 'mcp', payload: { jsonrpc: '2.0', id: payload.id, error: { code: -32602, message: 'Conflicting or oversized tool request' } } }); }
+      try { control({ type: 'mcp', payload: { jsonrpc: '2.0', id: payload.id, error: { code: -32602, message: 'Conflicting or oversized tool request' } } }); }
       catch { finish('Linx send failed'); }
       return;
     }
@@ -62,7 +63,7 @@ export function createLinxSession({ config, onEvent = () => {}, WebSocketImpl = 
       })() });
     }
     const response = await requests.get(key).response;
-    if (state === 'ready') { try { send({ type: 'mcp', payload: response }); } catch { finish('Linx send failed'); } }
+    if (state === 'ready') { try { control({ type: 'mcp', payload: response }); } catch { finish('Linx send failed'); } }
   }
   return {
     connect() {
@@ -83,10 +84,16 @@ export function createLinxSession({ config, onEvent = () => {}, WebSocketImpl = 
           let message;
           try { message = JSON.parse(data.toString()); } catch { finish('Invalid Linx message'); return; }
           if (message?.type === 'hello' && state === 'connecting') {
-            const audio = message.audio_params;
-            if (message.transport !== 'websocket' || !audio || !['pcm','opus'].includes(audio.format) || ![16000,24000].includes(audio.sample_rate) || audio.channels !== 1) { finish('Invalid Linx hello'); return; }
-            sessionId = typeof message.session_id === 'string' ? message.session_id : undefined;
-            state = 'ready'; clearTimeout(timer); resolveConnect(); resolveConnect = rejectConnect = undefined; emit({type:'ready',audioParams:{...audio}});
+            // The documented abbreviated hello omits channels; absent audio metadata
+            // permits input/tools, but cannot establish an output codec or sample rate.
+            const audio = message.audio_params === undefined ? undefined : { channels: 1, ...message.audio_params };
+            if (message.transport !== 'websocket' || (Object.hasOwn(message, 'session_id') && !validSessionId(message.session_id)) ||
+                (Object.hasOwn(message, 'audio_params') && (!message.audio_params || !['pcm','opus'].includes(audio.format) || ![16000,24000].includes(audio.sample_rate) || audio.channels !== 1))) { finish('Invalid Linx hello'); return; }
+            sessionId = message.session_id;
+            state = 'ready'; clearTimeout(timer); resolveConnect(); resolveConnect = rejectConnect = undefined; emit({type:'ready',...(audio ? {audioParams:audio} : {})});
+          } else if (state === 'ready' && message && Object.hasOwn(message, 'session_id') &&
+              (!validSessionId(message.session_id) || (sessionId !== undefined && message.session_id !== sessionId))) {
+            finish('Invalid Linx session');
           } else if (state === 'ready' && message?.type === 'mcp') { void mcp(message.payload); }
           else if (state === 'ready' && message?.type === 'stt' && typeof message.text === 'string') emit({type:'stt',text:message.text});
           else if (state === 'ready' && message?.type === 'tts' && typeof message.state === 'string') emit({type:'tts',state:message.state,...(typeof message.text === 'string'?{text:message.text}:{}),...(typeof message.is_aborted === 'boolean'?{is_aborted:message.is_aborted}:{})});
