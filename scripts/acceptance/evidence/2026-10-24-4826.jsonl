@@ -1,0 +1,5 @@
+{"at":"2026-10-24T15:18:52.469Z","event":"mcp_request","method":"tools/call","tool":"codex_voice_acceptance"}
+{"at":"2026-10-24T15:18:52.470Z","event":"acceptance_started","code":"4826"}
+{"at":"2026-10-24T15:19:12.942Z","event":"codex_exit","exitCode":0}
+{"at":"2026-10-24T15:19:12.945Z","event":"acceptance_finished","code":"4826","status":"passed"}
+{"at":"2026-10-24T15:19:44.225Z","event":"mcp_request","method":"tools/call","tool":"codex_voice_acceptance_result"}

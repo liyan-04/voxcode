@@ -1,0 +1,21 @@
+{
+  "evidenceClass": "live",
+  "source": "vm6 independent SSH file inspection and Codex JSON event output",
+  "verificationCode": "4826",
+  "status": "passed",
+  "exitCode": 0,
+  "file": "/opt/voxcode-voice-acceptance-75/runs/4826/voice-acceptance.txt",
+  "fileContent": "VOXCODE_VOICE_4826\n",
+  "sizeBytes": 19,
+  "uid": 999,
+  "gid": 988,
+  "sha256": "d2c91998a941cd9ae820ae1d92f0e622bb66f1a11167e2bbe7e85e0bced657ca",
+  "startedAt": "2026-10-24T15:18:52.470Z",
+  "finishedAt": "2026-10-24T15:19:12.945Z",
+  "codexVersion": "0.162.1",
+  "model": "gpt-6.1-sol",
+  "voiceOrigin": "user reported speaking in the programming assistant browser page; microphone call UI was observed",
+  "audioRecordingStored": false,
+  "serviceStoppedAt": "2026-10-24T15:23:46Z",
+  "temporaryAppArmorProfileRemoved": true
+}

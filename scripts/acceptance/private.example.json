@@ -1,0 +1,5 @@
+{
+  "endpoint": "wss://xrobo.qiniu.com/v1/mcpproxy/connect?token=REPLACE_WITH_ENDPOINT_TOKEN",
+  "uid": 999,
+  "gid": 988
+}
