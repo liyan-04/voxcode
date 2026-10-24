@@ -1,5 +1,9 @@
 # Progress and verification
 
+## 2026-10-24: GitHub Actions checks disabled
+- Removed `.github/workflows/pr-policy.yml` and `.github/workflows/verify.yml` after GitHub reported the repository account could not start jobs because of billing or spending-limit restrictions. This removes the external Actions check path only; local hooks, `npm run test:policy`, component tests, coverage commands and human PR reviews remain required evidence.
+- Existing failed Actions runs are historical evidence of the account restriction. They are not treated as application test failures. Future PRs must state exact local commands, environment, unavailable native/live/device gates and the two independent review records.
+
 ## 2026-10-24: architect collaboration and post-merge cleanup policy
 - Added [the architect collaboration and cleanup policy](architecture/cleanup-policy.md): GitHub PRs remain the merge/evidence source; Issues/Projects coordinate active work; `docs/architecture/` and `docs/progress.md` retain durable decisions and evidence.
 - After a PR is merged into `codex/mvp`, only verified dependency-free topic branches, clean project-owned worktrees and disposable build artifacts may be removed. PRs, merge SHAs, reviews and progress records remain. Implementers report eligibility, architects check dependencies, and only the coordinator performs deletion.
