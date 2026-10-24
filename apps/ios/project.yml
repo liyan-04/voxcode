@@ -11,11 +11,18 @@ schemes:
       targets:
         VoxCode: all
         VoxCodeTests: [test]
-        VoxCodeUITests: [test]
     test:
       gatherCoverageData: true
       targets:
         - name: VoxCodeTests
+  VoxCodeUI:
+    build:
+      targets:
+        VoxCode: all
+        VoxCodeUITests: [test]
+    test:
+      gatherCoverageData: false
+      targets:
         - name: VoxCodeUITests
 targets:
   VoxCode:

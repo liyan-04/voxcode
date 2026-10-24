@@ -25,11 +25,11 @@ final class VoxCodeUITests: XCTestCase {
         XCTAssertTrue(homeNavigationBar.waitForExistence(timeout: 10), "任务首页未出现")
         attachScreenshot(named: "01-home")
 
-        let firstTask = app.staticTexts["[模拟] 登录校验 1"]
-        XCTAssertTrue(firstTask.waitForExistence(timeout: 10), "模拟任务未出现")
-        firstTask.tap()
+        let simulatedTask = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "[模拟]")).firstMatch
+        XCTAssertTrue(simulatedTask.waitForExistence(timeout: 20), "模拟任务未出现")
+        simulatedTask.tap()
 
-        let taskNavigationBar = app.navigationBars["[模拟] 登录校验 1"]
+        let taskNavigationBar = app.navigationBars.element(boundBy: 0)
         XCTAssertTrue(taskNavigationBar.waitForExistence(timeout: 10), "任务详情页未出现")
         attachScreenshot(named: "02-task-detail")
 

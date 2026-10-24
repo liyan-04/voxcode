@@ -128,7 +128,7 @@ jobs:
           xcrun simctl io "$VOXCODE_SIMULATOR_ID" recordVideo --codec=h264 "$RUNNER_TEMP/voxcode-ui-demo.mp4" &
           VOXCODE_VIDEO_PID=$!
           trap 'kill -INT "$VOXCODE_VIDEO_PID" 2>/dev/null || true; wait "$VOXCODE_VIDEO_PID" 2>/dev/null || true' EXIT
-          xcodebuild test -project VoxCode.xcodeproj -scheme VoxCode -only-testing:VoxCodeUITests/VoxCodeUITests/testDemoScreenshots -configuration Debug -destination "platform=iOS Simulator,id=$VOXCODE_SIMULATOR_ID" -derivedDataPath "$RUNNER_TEMP/voxcode-derived" -resultBundlePath "$RUNNER_TEMP/voxcode-ui-demo.xcresult" CODE_SIGNING_ALLOWED=NO
+          xcodebuild test -project VoxCode.xcodeproj -scheme VoxCodeUI -only-testing:VoxCodeUITests/VoxCodeUITests/testDemoScreenshots -configuration Debug -destination "platform=iOS Simulator,id=$VOXCODE_SIMULATOR_ID" -derivedDataPath "$RUNNER_TEMP/voxcode-derived" -resultBundlePath "$RUNNER_TEMP/voxcode-ui-demo.xcresult" CODE_SIGNING_ALLOWED=NO
           kill -INT "$VOXCODE_VIDEO_PID" 2>/dev/null || true
           wait "$VOXCODE_VIDEO_PID" 2>/dev/null || true
           trap - EXIT
