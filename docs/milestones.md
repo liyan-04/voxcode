@@ -9,7 +9,7 @@ The user requested a visible pull request at every verifiable milestone on 2026-
 - Each developer uses an independent Git worktree and component branch; the coordinator uses a separate integration worktree. Preserve the original shared checkout during migration. Every PR names its actual base and dependency. Retarget and rerun verification after dependencies merge; do not automatically merge.
 - The source PR remains draft until its recorded local validation and two independent reviews are resolved. Code review does not certify signing, device, live voice or outdoor delivery.
 - Save task ownership, commands, findings and resolutions in the repository and link them from the PR. Report real evidence classes and the reviewed revision.
-- Every PR receives an annotated tag on its exact commit using `VoxCode<major>.<minor>.<patch>`. Increment patch for a small PR, minor for a larger related progress step, and major for a major release or incompatible milestone. Create and push the tag only after verification, and put the exact tag in the PR's `## Milestone tag` section.
+- Every PR receives an annotated tag on its exact commit using the next `VoxCode<major>.<minor>.<patch>` after the highest existing semantic version. Increment patch for a small PR, minor for a larger compatible progress step, and major for a major release or incompatible milestone. Create and push the tag only after verification, and put the exact tag in the PR's `## Milestone tag` section.
 - After a milestone PR is merged, apply [the post-merge cleanup policy](architecture/cleanup-policy.md). Cleanup never removes the PR or its evidence; it removes only verified dependency-free topic resources, and only the coordinator performs it.
 
 ## Current milestones
