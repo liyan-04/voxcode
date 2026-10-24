@@ -1,5 +1,11 @@
 # Progress and verification
 
+## 2026-10-24: current README and parallel delivery slices (Issue #45)
+- Root README now leads with the actual phone/public Relay/company-Mac goal, merged capabilities, runnable entry points, installation boundaries and open signing/Linx/outdoor gates. Module README updates stay with their allocated developers.
+- Issues42/43/44 run in independent worktrees for the private Linx onboarding helper, actual voice-route smoke CLI and native device build entry. These are active work, not master-available tools or live results. Model429 causes cooldown/reduced concurrency rather than abandonment.
+- A fresh `node scripts/smoke-real-codex.mjs` on existing master-derived source failed with `Codex exited (1)` before file verification; separate stdio initialize diagnostics classified database/permission errors under the restricted local environment. No model-edit or follow-up success is claimed for this run.
+- Both the authorized remote preflight and the requested one-minute heartbeat creation were not executed because automatic approval review returned401 `model not in allowed model list`. No bypass or remote changes occurred. Local development continues; actual remote/native/cloud checks remain open.
+
 ## 2026-10-24: monitoring, PM and documentation milestones (Issue #40)
 - PR34 monitor contract, PR36 authenticated Relay monitor/package, PR37 PM collaboration, PR38 README/script ownership and PR39 Linx onboarding evidence are merged to master. Six verified merged remote heads retired; dirty worktrees remain preserved.
 - Final server local suite173/173 and changed coverage76/76lines44/48branches passed; two independent reviews resolved packaging closure and blocking readiness probe. Native PR35 remains Draft because native XCTest/SDK/coverage are unavailable, despite source reviews and6+3local shim checks.
