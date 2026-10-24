@@ -1,5 +1,10 @@
 # Progress and verification
 
+## 2026-10-24: native delivery preflight and archive/export tooling (Issue #44)
+- Added read-only Xcode/SDK/generator/signing/public-CA preflight and explicit fresh-output manual-development archive/export script, plus permanent controlled command fixtures and iOS README/runbook. This supplies a repeatable entry; no actual signed IPA exists from this environment.
+- Independent reviewers root and linx_onboarding caught app provisioning settings leaking globally to local Swift package targets. Fixed by changing only the staged App target; regression failed before fix and nine controlled scenarios now pass. Exact source hashes/review in reviews/ios-device-build-2026-10-24.md.
+- Actual preflight exit1: CLT-only, no iPhoneOS SDK/XcodeGen/signing identity or explicit team/bundle/profile/reviewed-CA inputs. Native XCTest/Swift coverage for PR35, signed install, actual microphone/playback and cellular/public Relay/company-Mac acceptance remain open. No threshold waiver or simulator-as-device claim.
+
 ## 2026-10-24: private Linx onboarding helper (Issue #42)
 - Added offline private software identity init/status and explicit official HTTPS activate/OTA helper. Saved env is0600 in an owned0700 directory; no overwrite, arbitrary token endpoint, firmware download or automatic retry. Activation code is shown only by explicit local interactive option; normal output/errors redact identity/token/code.
 - Focused onboarding18/18 and full Node191/191 passed after locked dependencies installed in isolated worktree. Root architect and independent product_manager reviewed exact four-file content snapshots with no outstanding findings; see reviews/linx-onboarding-2026-10-24.md.
