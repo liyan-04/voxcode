@@ -10,7 +10,7 @@ router port forwarding or inbound Mac firewall rule is needed. This is a single
 configured Mac MVP. Node >=22 and exact-pinned `ws` are required on both hosts.
 
 ```
-iPhone -- HTTPS --> fixed-IP TLS relay (:9899)
+iPhone (cellular + user VPN) -- HTTPS --> vm6 100.100.81.209:9899
                                |
 company Mac connector -- WSS --+
        |
@@ -30,9 +30,15 @@ key belongs only to the relay and connector, never to the phone. Keep the env
 file private and outside commits.
 
 Relay deployment is authorized on the designated personal vm6 host via the
-liyan-server skill; the earlier bili-xs8 route is superseded. Verify the target
-and public mapping, check9899 on that host, and stop if occupied. The intended endpoint is `https://121.52.250.201:9899`,
-with WSS upgrades on the same port. No domain or additional public port is needed.
+liyan-server skill; the earlier bili-xs8 route is superseded. The approved endpoint is `https://100.100.81.209:9899`,
+with WSS upgrades on the same port. The iPhone uses cellular + the user VPN;
+the Mac must also have a route to vm6. `121.52.250.201` belongs to bili-xs8,
+not this vm6 deployment; no mapping to that public IP is required. Follow
+[the VPN delivery/acceptance runbook](../../docs/architecture/vm6-vpn-delivery.md).
+Check9899 and process ownership first: stop if another service owns it or
+ownership is unclear. Update an existing owned VoxCode listener deliberately.
+No domain or additional port is needed. User-reported install/listener/TCP
+success does not prove matching-IP TLS, Connector or signed iPhone acceptance.
 
 ### Local trust material
 
@@ -88,7 +94,7 @@ node --env-file=.env relay-cli.mjs
 ```
 
 On the company Mac, start the normal Mac bridge on loopback. Set
-`VOXCODE_RELAY_URL=wss://121.52.250.201:9899/connector`, set `VOXCODE_TLS_CA`
+`VOXCODE_RELAY_URL=wss://100.100.81.209:9899/connector`, set `VOXCODE_TLS_CA`
 to the reviewed public CA PEM and set
 `VOXCODE_BRIDGE_URL` to its actual loopback HTTP origin, then run:
 
@@ -232,7 +238,7 @@ outside `test/*.test.mjs`, remains RED, and can be run explicitly when preview
 scope resumes. It is not counted as passing first-demo coverage.
 
 Fixtures do not prove deployed TLS, company outbound access, signed-device trust,
-live Codex/Linx or an outdoor iPhone round trip. SSH/public deployment verification remains incomplete.
+live Codex/Linx or an outdoor iPhone round trip. The user reports Relay installation/listening on vm6 and Mac TCP reachability; strict TLS for the new IP, live Connector, signed-device and cellular+VPN verification remain incomplete.
 The relay preserves audio bytes; codec negotiation/decoding/playback belong to
 the voice integration and native client.
 

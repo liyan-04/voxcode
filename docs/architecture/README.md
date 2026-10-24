@@ -1,5 +1,7 @@
 # Architect agent
 
+Current network decision and required verification: [vm6 VPN delivery](vm6-vpn-delivery.md), Issue #48. Every task brief and integration recommendation must use the accepted VPN endpoint and distinguish user-reported server evidence from same-build iPhone cellular+VPN acceptance; do not require the retired bili-xs8 mapping.
+
 The user requested a dedicated architect on 2026-10-23 to coordinate the existing three development agents. This is an active engineering role, governed by AGENTS.md, CONTRIBUTING.md and docs/agent-collaboration.md.
 
 ## Team and authority

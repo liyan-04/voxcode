@@ -1,11 +1,11 @@
 # VoxCode
 
-用 iPhone 上的原生 App，通过公网控制公司 Mac 上的 Codex；由 **灵矽 AI** 提供语音交互。手机负责说需求、确认指令、查看进度、检查代码和测试结果、追问与验收，Mac 执行实际开发任务。
+用 iPhone 上的原生 App，通过蜂窝网络加用户 VPN 控制公司 Mac 上的 Codex；由 **灵矽 AI** 提供语音交互。手机负责说需求、确认指令、查看进度、检查代码和测试结果、追问与验收，Mac 执行实际开发任务。
 
-**当前状态（2026-10-24）：核心模块及本地测试已具备，完整产品尚未交付。** Relay/Connector 可以进入测试部署；签名 iPhone 安装、真实灵矽语音、已部署公网到公司 Mac 的完整链路仍需逐项验证。安装包、本地 fixture、模拟器和配置存在均不能代替这些验收。
+**当前状态（2026-10-24）：核心模块及本地测试已具备，完整产品尚未交付。** 用户已在 vm6 安装并启动 Relay，报告 Mac TCP 访问成功；新 IP 严格 TLS、Mac Connector、签名 iPhone 安装、真实灵矽语音与蜂窝加 VPN 到公司 Mac 的完整链路仍需逐项验证。安装包、本地 fixture、模拟器和配置存在均不能代替这些验收。
 
 ```text
-iPhone 原生 App ── HTTPS ──> 公网 Relay :9899
+iPhone 原生 App（蜂窝 + VPN）── HTTPS ──> vm6 Relay 100.100.81.209:9899
                                   ↑
 公司 Mac 统一运行入口 ─── 出站 WSS ─┘
     ├─ Connector + 回环 Bridge
@@ -13,7 +13,7 @@ iPhone 原生 App ── HTTPS ──> 公网 Relay :9899
     └─ 灵矽 AI WSS → STT / MCP 草稿与查询 / TTS
 ```
 
-Mac 主动连接公网，不要求公司网络开放入站端口。预定公网入口为 `https://121.52.250.201:9899`，需要部署严格校验的 TLS；固定 IP 可使用经审核、随 App 分发的私有 CA 公开根证书，无需用户提供域名。手机不保存 Codex、灵矽或机器连接密钥。当前版本控制 VoxCode 创建的 Codex 会话，尚不接管已有 Codex Desktop 聊天。
+Mac 主动连接 VPN 可达的 vm6，不要求公司网络开放入站端口。已确认入口为 `https://100.100.81.209:9899`；手机开启用户 VPN，Mac 也须具备到该地址的路由。`121.52.250.201` 属于另一台 bili-xs8，不是 vm6 入口，本次无需配置两者的公网映射。使用自建 CA 和匹配新 IP 的服务器证书；公开根证书须经审核随 App 分发，无需域名。架构师和开发 agent 按[统一链路与验收](docs/architecture/vm6-vpn-delivery.md)验证；当前 iOS 旧 IP 实现仍需适配。手机不保存 Codex、灵矽或机器连接密钥。当前版本控制 VoxCode 创建的 Codex 会话，尚不接管已有 Codex Desktop 聊天。
 
 ## 手机可以做什么
 
@@ -30,10 +30,10 @@ Mac 主动连接公网，不要求公司网络开放入站端口。预定公网�
 | 部分 | 已有内容 | 尚未通过的关口 |
 | --- | --- | --- |
 | Mac / Codex | 持久任务、独立工作区、同会话追问、调度、授权/停止、版本结果与验收 | 当前环境真实 Codex 启动受数据库权限限制；需在允许的运行环境重新完成实际修改和追问 |
-| Relay / Connector | TLS、认证转发、断线重连、限额、聚合监控、手动安装包 | vm6 与公网 IP 映射、9899 空闲、真实部署及公司网络出站验证 |
+| Relay / Connector | TLS、认证转发、断线重连、限额、聚合监控、手动安装包 | 新 IP 证书验证、Mac Connector 实际接通、蜂窝加 VPN 和公司网络出站验证；用户已报告 vm6 Relay 安装/监听/TCP 成功 |
 | 原生 iPhone | SwiftUI 任务、录音/草稿、结果、配对和 PCM 播放实现 | 完整 Xcode/iOS SDK、签名、正式环境 CA 公开证书、真机安装与麦克风/可听播报；PR #35 仍为 Draft |
 | 灵矽 AI | 设备 WSS、PCM/Opus 适配、MCP 状态查询与待确认草稿、本地受控回归 | 用户测试智能体与绑定设备尚未准备；真实握手、STT/MCP/TTS 未验收 |
-| 工程验证 | 本地 Node 回归、benchmark、两名独立评审、PR 与证据记录 | 同一安装构建在蜂窝网络完成手机 → Relay → 公司 Mac Codex 全流程 |
+| 工程验证 | 本地 Node 回归、benchmark、两名独立评审、PR 与证据记录 | 同一签名构建在关闭 Wi-Fi、蜂窝网络加用户 VPN 时完成手机 → vm6 Relay → 公司 Mac Codex 全流程 |
 
 已合并的监控服务本地验证为 **173/173**，语音/集成验证为 **26/26**；这是特定版本的 local/fixture 证据，详情见[评审记录](docs/reviews/monitoring-2026-10-24.md)和[灵矽就绪记录](docs/verification/linx-readiness-2026-10-24.md)。不代表云端、真机或户外成功。
 
@@ -73,7 +73,7 @@ shasum -a 256 dist/voxcode-relay-0.1.0.tar.gz
 
 按照[安装包说明](apps/relay/packaging/README.md)部署。该包包含 Relay、Connector、锁定依赖、配置模板、启动/状态/停止脚本和可选 systemd 用户模板；**不包含 Mac Bridge/Codex、密钥或 TLS 证书**。Node.js 22+，安装器只写新的 prefix，拒绝覆盖已有安装。
 
-部署主机为授权的个人 vm6。先确认目标与公网映射、检查 9899；**端口被其他服务占用就停止，不修改现有业务**。私有配置与 TLS 材料留在部署侧。更新使用新的版本目录，保留旧配置，只停止本安装目录拥有的进程；验证后切换，失败回退旧目录。完整参数见 [Relay/Connector README](apps/relay/README.md)。
+部署主机为授权的个人 vm6 `100.100.81.209`，通过用户 VPN 访问。先确认目标、VPN 路由与 9899 进程归属；**端口被其他服务占用就停止，不修改现有业务**。私有配置与 TLS 材料留在部署侧。更新使用新的版本目录，保留旧配置，只停止本安装目录拥有的进程；验证后切换，失败回退旧目录。完整参数见 [Relay/Connector README](apps/relay/README.md)。
 
 公司 Mac 推荐使用[统一运行入口](apps/integration/README.md)启动 Bridge 和内置 Connector；也可单独安装 Connector 连接回环 Bridge。**同一机器身份只运行一个 Connector**。iPhone 通过 Relay 配对到指定 Mac/项目，使用 Mac 颁发的手机会话凭据。
 
@@ -91,4 +91,4 @@ shasum -a 256 dist/voxcode-relay-0.1.0.tar.gz
 - [接口契约](docs/contract.md) · [实施计划](docs/implementation-v1.md) · [需求审计](docs/requirements-audit.md) · [竞品调研](docs/research/competitors-mobile.md)
 - [进度与验证](docs/progress.md) · [独立评审](docs/reviews/README.md) · [覆盖率规则](docs/coverage.md) · [历史计划](docs/plan.md)
 
-最终验收使用**同一签名 iPhone 构建**完成真实灵矽语音草稿、用户确认、真实 Codex 修改/续接、diff/检查/验收、任务隔离及断网恢复，并单独留下蜂窝网络经公网访问公司 Mac 的记录。任何一个模块就绪都只关闭它自己的关口。
+最终验收使用**同一签名 iPhone 构建**完成真实灵矽语音草稿、用户确认、真实 Codex 修改/续接、diff/检查/验收、任务隔离及断网恢复，并单独留下关闭 Wi-Fi、蜂窝网络加用户 VPN 经 vm6 访问公司 Mac 的记录，包括 VPN 断开/恢复及不确定请求对账。任何一个模块就绪都只关闭它自己的关口。

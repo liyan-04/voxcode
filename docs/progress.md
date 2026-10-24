@@ -1,5 +1,10 @@
 # Progress and verification
 
+## 2026-10-24: confirmed vm6 VPN path (Issue #48)
+- User confirmed `121.52.250.201` belongs to bili-xs8; current Relay is installed on vm6 `100.100.81.209:9899`. The accepted phone path is cellular + user VPN, not a mapping between these two hosts.
+- User-reported evidence: install succeeded; HTTPS listener changed from127.0.0.1 to0.0.0.0; Mac TCP to vm6 succeeded; loopback curl returned503 `Mac is offline`. These outputs were not independently rerun by this documentation task. The curl resolved the old certificate IP to loopback and the browser bypassed trust: neither proves strict TLS for100.100.81.209.
+- [Architecture/development/acceptance runbook](architecture/vm6-vpn-delivery.md) now defines the shared endpoint, same-build cellular+VPN checks, VPN-loss recovery and evidence boundaries. iOS old-IP trust/default/ATS/tests, new-IP leaf certificate, actual Connector, signed device, Codex and Linx remain open. Documentation change only: no server action, private material, code implementation or live/device pass is claimed.
+
 ## 2026-10-24: current README and parallel delivery slices (Issue #45)
 - Root README now leads with the actual phone/public Relay/company-Mac goal, merged capabilities, runnable entry points, installation boundaries and open signing/Linx/outdoor gates. Module README updates stay with their allocated developers.
 - Issues42/43/44 run in independent worktrees for the private Linx onboarding helper, actual voice-route smoke CLI and native device build entry. These are active work, not master-available tools or live results. Model429 causes cooldown/reduced concurrency rather than abandonment.

@@ -1,11 +1,13 @@
 # Requirements audit: what must actually work
 
+**Current network decision, 2026-10-24 (Issue #48):** the user accepts cellular + their VPN to vm6 `100.100.81.209:9899`, with a private-CA IP certificate and strict client trust. `121.52.250.201` is bili-xs8, not vm6. Older direct-public/deferred-deployment statements below are historical evidence, superseded by [the VPN delivery runbook](architecture/vm6-vpn-delivery.md). The user reports vm6 Relay installed/listening and Mac TCP success; same-build signed iPhone cellular+VPN, matching-IP TLS and the real Mac/Linx loop remain unverified.
+
 Date: 2026-10-23. This audit separates a plausible design, implemented source, fixture verification and real device verification.
 
 Current scope: [phone demo](phone-demo-scope.zh-CN.md), approved by the user's "手机上打开app演示就可以" clarification. Native VoxCode results/diff/checks replace generated-site interactive preview in first-demo acceptance. Benchmark scripts remain required; a lightweight aggregate monitoring endpoint/page is planned. Original AirPlay competition compliance remains unconfirmed.
 
 ## User intent
-Carry only an iPhone outdoors, control Codex executing on a company Mac, use Linx AI meaningfully for voice collaboration, manage multiple tasks without cross-talk, receive inspectable results, review progress and accept changes. The user rejected a fixed two-task concurrency limit; the revised proposal targets at least 20 managed tasks, four default slots and configurable 1–8 slots. Available network resources are HTTP + IP:9899, without a domain or existing HTTPS. Deliver native iOS, record decisions and all work in liyan-04/voxcode, with two expert reviews per component, within two days. Deployment remains deferred; later use bili-xs8 on 9899 only if unoccupied.
+Carry only an iPhone outdoors, control Codex executing on a company Mac, use Linx AI meaningfully for voice collaboration, manage multiple tasks without cross-talk, receive inspectable results, review progress and accept changes. The user rejected a fixed two-task concurrency limit; the revised proposal targets at least 20 managed tasks, four default slots and configurable 1–8 slots. Available network resources are HTTP + IP:9899, without a domain or existing HTTPS. Deliver native iOS, record decisions and all work in liyan-04/voxcode, with two expert reviews per component, within two days. Current deployment uses VPN-reachable vm6:9899 under Issue #48; the retired bili-xs8 sequence is recorded below as history.
 
 ## Coverage
 
@@ -45,7 +47,7 @@ Mobile dispatch, voice transcription, task switching and completion notification
 
 Defer broad Desktop chat takeover, arbitrary projects, automatic integration/deploy, speech privilege approval and comprehensive APNs support. A source-only native client or STT-only pipeline must not be presented as the final voice collaboration demo.
 
-## Deployment status
+## Historical deployment record (superseded by Issue #48)
 Read-only JumpServer access confirmed bili-xs8 and 9899 TCP showed no listener at check time. A later login refresh returned HTTP 403; no deployment was performed. Recheck port immediately before any future deployment. Public IP/port is specified, but trusted HTTPS/WSS termination remains unresolved. Do not send bearer credentials over public plaintext HTTP.
 
 User subsequently selected loopback-only relay deployment initially, then explicitly deferred deployment until later after the JumpServer 403. No remote changes were made. Continue code and local verification. Earlier failed/interrupted real Codex attempts remain failures; a later explicitly authorized live-local two-turn smoke succeeded and verified file contents and the same owned thread. That success does not close phone, Linx or outdoor gates.

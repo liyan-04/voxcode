@@ -96,10 +96,10 @@ Before committing, the coordinator stages explicit paths, inspects the staged di
 | `local` | Code/tests/build executed locally; name real versus substituted dependencies |
 | `live` | Named real Codex/Linx service was exercised successfully |
 | `device` | Signed native app tested on a named class of iPhone/iOS version |
-| `outdoor` | Real phone cellular/company-Mac path tested through the deployed relay |
+| `outdoor` | Same signed iPhone build, Wi-Fi off, cellular + user VPN → vm6 `100.100.81.209:9899` → company Mac/Codex, with strict TLS and real evidence |
 
 Use the exact command, result/count, environment and revision. Failed and skipped checks remain visible. A successful unsigned simulator build is not an installable signed IPA. "Implemented", "reviewed", "live-tested" and "accepted" are separate states. Do not invent percentages or equate agent completion with product acceptance.
 
 Record durable progress/decisions in `docs/`; keep volatile coordination brief. At interruption, leave a resumable handoff with uncommitted paths, last command/result, pending gates and next step. Retain the original objective and latest user corrections across context changes.
 
-Deployment is currently deferred by the user. Do not deploy as part of integration or CI. If later resumed, check `bili-xs8:9899` first and stop if occupied. Completing a task never grants authority to merge, deploy or delete user data.
+The current accepted delivery path is [vm6 over the user VPN](architecture/vm6-vpn-delivery.md), Issue #48. Architecture briefs, developer checks and final evidence must use `100.100.81.209:9899`; `121.52.250.201` belongs to bili-xs8 and is retired for this deployment. User-reported vm6 install/listener evidence does not close device/outdoor gates. Deployment authorization is limited to personal vm6 and the existing host/port safety rules; no CI deployment or changes to other services. Follow the runbook for strict TLS, Connector and cellular+VPN checks. Completing a task never independently grants authority to merge, deploy or delete user data.

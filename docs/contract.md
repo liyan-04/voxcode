@@ -1,5 +1,7 @@
 # Shared contract v1
 
+Approved delivery transport (Issue #48): iPhone cellular + user VPN connects to `https://100.100.81.209:9899`; Mac actively connects to `wss://100.100.81.209:9899/connector`, forwarding only to the loopback Bridge. Strict IP-SAN/CA/expiry checks, pairing, session/machine credential separation and existing requestId semantics remain required. `121.52.250.201` is the separate bili-xs8 host, not the vm6 deployment. See [VPN delivery and acceptance](architecture/vm6-vpn-delivery.md). This decision does not claim the current iOS binary has the new fixed-IP trust configuration.
+
 This file is coordinator-owned. Implementers propose changes before changing a shared field.
 
 Current delivery scope: docs/phone-demo-scope.zh-CN.md. The first demo uses native task/results/voice views. Preview routes, preview cookie transport, WKWebView and onPreview publication below are reserved future interfaces, not phone-demo implementation or acceptance requirements; optional preview fields may remain null.

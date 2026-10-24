@@ -27,7 +27,7 @@ cd voxcode-relay-0.1.0
 
 安装要求 Node.js 22 或更高版本。`--skip-deps` 适用于离线安装，普通安装会在包内目录运行 `npm ci --omit=dev --ignore-scripts`，不会全局安装。
 
-编辑生成的 `config/relay.env` 或 `config/connector.env`，填入同一组机器 ID/密钥。密钥只放在配置文件中，不放进命令行、URL 或日志。Relay 的远端监听必须配置 TLS；Connector 的远端地址必须是 `wss://`。如果公网端口 9899 已被占用，不要启动 Relay，先检查并联系管理员。
+编辑生成的 `config/relay.env` 或 `config/connector.env`，填入同一组机器 ID/密钥。密钥只放在配置文件中，不放进命令行、URL 或日志。当前批准链路是手机蜂窝加用户 VPN → vm6 `https://100.100.81.209:9899`；公司 Mac Connector 使用 `wss://100.100.81.209:9899/connector`。详见[统一链路与验收](../../../docs/architecture/vm6-vpn-delivery.md)。Relay 远端监听仍必须配置 TLS，服务器证书 IP SAN 必须包含 `100.100.81.209`；模板默认回环地址需有意改为 `0.0.0.0` 才接收 VPN 网络连接。`121.52.250.201` 属于 bili-xs8，不是此部署。如果9899被其他服务占用或归属未知，停止并通知；已有 VoxCode 进程先确认归属，再按计划更新，禁止盲目杀进程。
 
 ## 运行
 

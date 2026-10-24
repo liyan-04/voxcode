@@ -1,9 +1,9 @@
 # Approved MVP Implementation Plan
 
-> For agentic workers: use subagent-driven-development. A dedicated architect coordinates the iOS, Mac and Relay developers; see docs/architecture/README.md. Coordinator owns shared contract application, integration and commits. User approved continuation on 2026-10-23; deployment remains deferred.
+> For agentic workers: use subagent-driven-development. A dedicated architect coordinates the iOS, Mac and Relay developers; see docs/architecture/README.md. Coordinator owns shared contract application, integration and commits. User approved continuation on 2026-10-23; the current network decision is [vm6 over user VPN](architecture/vm6-vpn-delivery.md), Issue #48. The user reports Relay installed and listening; remaining live/device gates are not closed.
 
 **Goal:** Complete the native phone-to-Mac voice development and evidence loop under the approved scope.
-**Architecture:** Native SwiftUI app, one public relay and one Mac launch entry point containing the outbound connector/task/result modules. Codex App Server and Linx AI remain dependencies. Interactive generated-site preview and a full Mac workbench are deferred.
+**Architecture:** Native SwiftUI app, one VPN-reachable vm6 TLS relay and one Mac launch entry point containing the outbound connector/task/result modules. Codex App Server and Linx AI remain dependencies. Interactive generated-site preview and a full Mac workbench are deferred.
 **Tech Stack:** Node >=22, SwiftUI iOS 17+, Codex App Server, PCM/Opus, pinned dependencies.
 **Spec:** docs/phone-demo-scope.zh-CN.md supersedes the historical broader proposal. Interfaces: docs/contract.md v1, using the phone-demo subset; preview routes are deferred.
 
@@ -13,7 +13,7 @@
 - The user approved demonstrating inside VoxCode on the phone. Results are real diff/files/checks/manual acceptance; no interactive generated-site preview or Mac workbench is required for this first demo. Original competition AirPlay compliance remains unconfirmed.
 - At least 20 managed tasks; default four execution slots, configurable 1–8; one active turn/task.
 - No plaintext remote credentials, arbitrary trust, public App Server, automatic merge/deployment, or fixture-as-live claims.
-- Keep existing dirty work; use focused codex/ branches and PRs targeting the verified integration base (currently codex/mvp). Follow CONTRIBUTING.md and docs/agent-collaboration.md. Deployment only after explicit later resumption, and never replace an occupied 9899 service.
+- Keep existing dirty work; use focused `codex/<issue>-<purpose>` branches and PRs targeting `master`. Follow CONTRIBUTING.md and docs/agent-collaboration.md. The approved phone path is cellular + user VPN to vm6 `100.100.81.209:9899`; no bili-xs8 public mapping is required. Use matching-IP strict TLS and the runbook, never replace another service on9899.
 - Two independent expert reviews per component; targeted red/green regressions; coordinator commits only after verification.
 
 ## Task 1: Durable execution and configurable scheduling
@@ -77,7 +77,7 @@ Owner: coordinator, with architect/Mac developer for monitoring interfaces. File
 - [ ] Verify real Codex creates a file and follows up using the same thread; retry prior failed live smoke only after meaningful diagnostic changes.
 - [ ] Run full Node tests, Swift core and native SDK build locally where the toolchain is available; two reviews for final shared behavior.
 - [ ] On specified iPhone, verify signing/install, microphone/interruption, 20-task navigation, four real parallel tasks, ten mixed-target instructions, uncertain-response retry, real diff/check inspection and versioned acceptance.
-- [ ] After separate deployment resumption, verify trusted IP TLS over cellular/company networks and respect occupied-port stop rule.
+- [ ] Follow Issue #48: adapt iOS fixed-IP trust/ATS/defaults/tests to `100.100.81.209`, issue a matching IP-SAN leaf, and verify the same signed iPhone build over cellular + user VPN, Connector recovery and real Codex/Linx. Respect the occupied-port/ownership rule and never infer this pass from loopback or browser bypass.
 - [ ] Record a clearly identified real three-to-five minute VoxCode phone demo. List remaining live gates; do not call source-only delivery complete. AirPlay rule compliance remains a separate organizer question, not an implemented feature claim.
 
 ## Deferred Work
