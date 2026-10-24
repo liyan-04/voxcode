@@ -20,7 +20,7 @@ const stage = join(stageRoot, packageName);
 
 try {
   for (const dir of ['app', 'bin', 'templates', 'systemd']) await mkdir(join(stage, dir), {recursive: true, mode: 0o755});
-  for (const file of ['connector-cli.mjs', 'connector.mjs', 'protocol.mjs', 'relay-cli.mjs', 'relay.mjs', 'package.json', 'package-lock.json']) await cp(join(relay, file), join(stage, 'app', file));
+  for (const file of ['connector-cli.mjs', 'connector.mjs', 'monitor.mjs', 'protocol.mjs', 'relay-cli.mjs', 'relay.mjs', 'package.json', 'package-lock.json']) await cp(join(relay, file), join(stage, 'app', file));
   await cp(join(relay, 'node_modules', 'ws'), join(stage, 'app', 'node_modules', 'ws'), {recursive: true});
   for (const file of ['install.sh', 'README.md']) await cp(join(relay, 'packaging', file), join(stage, file));
   for (const file of ['start-relay', 'start-connector', 'status', 'stop']) await cp(join(relay, 'packaging', 'bin', file), join(stage, 'bin', file));
