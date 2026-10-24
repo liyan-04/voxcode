@@ -1,5 +1,11 @@
 # Progress and verification
 
+## 2026-10-24: architect collaboration and post-merge cleanup policy
+- Added [the architect collaboration and cleanup policy](architecture/cleanup-policy.md): GitHub PRs remain the merge/evidence source; Issues/Projects coordinate active work; `docs/architecture/` and `docs/progress.md` retain durable decisions and evidence.
+- After a PR is merged into `codex/mvp`, only verified dependency-free topic branches, clean project-owned worktrees and disposable build artifacts may be removed. PRs, merge SHAs, reviews and progress records remain. Implementers report eligibility, architects check dependencies, and only the coordinator performs deletion.
+- GitHub Projects could not be read with the current CLI token because it lacks `read:project`; Issues/PR labels are the documented fallback until that scope is granted. No external project board was created or modified.
+- Existing development worktrees contain retained source changes and were not removed. No cleanup is claimed in this documentation milestone.
+
 ## 2026-10-23: initialization
 - Remote liyan-04/voxcode verified empty via gh repo view; cloned under workspace.
 - Node v26.0.0; codex-cli 0.154.0 available.
