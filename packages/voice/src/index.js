@@ -9,6 +9,11 @@ export function createLinxSession({ config, onEvent = () => {}, WebSocketImpl = 
   if (!/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(config.clientId)) throw new Error('Invalid client UUID');
   const timeout = config.handshakeTimeoutMs ?? 10000;
   if (!Number.isFinite(timeout) || timeout < 1 || timeout > 60000) throw new Error('Invalid handshake timeout');
+  const context = config.promptContext;
+  if (context !== undefined && (!context || typeof context !== 'object' || Array.isArray(context) ||
+      Object.entries(context).some(([key, value]) => !/^[a-z_]{1,64}$/.test(key) || typeof value !== 'string') ||
+      Buffer.byteLength(JSON.stringify(context)) > 10000)) throw new Error('Invalid prompt context');
+  const agentParams = context ? { custom_replace_prompt: { ...context } } : undefined;
   const registry = new Map();
   for (const tool of tools) {
     if (!tool || typeof tool.name !== 'string' || registry.has(tool.name) || typeof tool.invoke !== 'function' || !tool.inputSchema) throw new Error('Invalid tool registration');
@@ -31,10 +36,17 @@ export function createLinxSession({ config, onEvent = () => {}, WebSocketImpl = 
     emit({ type: 'mcp', payload });
     if (state !== 'ready') return;
     if (payload?.jsonrpc !== '2.0' || !['string','number'].includes(typeof payload.id) || typeof payload.method !== 'string') return;
+    if ((typeof payload.id === 'string' && payload.id.length > 128) || (typeof payload.id === 'number' && !Number.isSafeInteger(payload.id))) return;
     const key = `${typeof payload.id}:${payload.id}`;
+    const fingerprint = JSON.stringify([payload.method, payload.params ?? null]);
+    if (Buffer.byteLength(fingerprint) > 32768 || (requests.has(key) && requests.get(key).fingerprint !== fingerprint)) {
+      try { send({ type: 'mcp', payload: { jsonrpc: '2.0', id: payload.id, error: { code: -32602, message: 'Conflicting or oversized tool request' } } }); }
+      catch { finish('Linx send failed'); }
+      return;
+    }
     if (!requests.has(key)) {
       if (requests.size >= 256) { finish('Linx MCP request limit reached'); return; }
-      requests.set(key, (async () => {
+      requests.set(key, { fingerprint, response: (async () => {
         const base = { jsonrpc: '2.0', id: payload.id };
         if (payload.method === 'initialize') return { ...base, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'VoxCode', version: '0.1.0' } } };
         if (payload.method === 'tools/list') return { ...base, result: { tools: [...registry.values()].map(({name,description,inputSchema}) => ({name,description,inputSchema})), nextCursor: null } };
@@ -47,9 +59,9 @@ export function createLinxSession({ config, onEvent = () => {}, WebSocketImpl = 
           catch { return { ...base, error: { code: -32603, message: 'Tool execution failed' } }; }
         }
         return { ...base, error: { code: -32601, message: 'Unknown method' } };
-      })());
+      })() });
     }
-    const response = await requests.get(key);
+    const response = await requests.get(key).response;
     if (state === 'ready') { try { send({ type: 'mcp', payload: response }); } catch { finish('Linx send failed'); } }
   }
   return {
@@ -63,7 +75,7 @@ export function createLinxSession({ config, onEvent = () => {}, WebSocketImpl = 
         socket = new WebSocketImpl(url.href, { headers: { Authorization: `Bearer ${config.token}`, 'Device-Id': config.deviceId, 'Client-Id': config.clientId, 'Protocol-Version': '1' }, maxPayload: 1024 * 1024, followRedirects: false, handshakeTimeout: timeout });
         socket.on('open', () => {
           if (state !== 'connecting') return;
-          try { send({ type: 'hello', version: 1, features: { mcp: true }, transport: 'websocket', audio_params: { format: 'pcm', sample_rate: 16000, channels: 1, bit_depth: 16, endianness: 'little', frame_duration: 20, frame_size: 320, sample_format: 'signed_int16', play_buffer_duration: 1000 } }); } catch { finish('Linx send failed'); }
+          try { send({ type: 'hello', version: 1, features: { mcp: true }, transport: 'websocket', ...(agentParams ? { agent_params: agentParams } : {}), audio_params: { format: 'pcm', sample_rate: 16000, channels: 1, bit_depth: 16, endianness: 'little', frame_duration: 20, frame_size: 320, sample_format: 'signed_int16', play_buffer_duration: 1000 } }); } catch { finish('Linx send failed'); }
         });
         socket.on('message', (data, binary) => {
           if (state === 'closed') return;
@@ -77,7 +89,7 @@ export function createLinxSession({ config, onEvent = () => {}, WebSocketImpl = 
             state = 'ready'; clearTimeout(timer); resolveConnect(); resolveConnect = rejectConnect = undefined; emit({type:'ready',audioParams:{...audio}});
           } else if (state === 'ready' && message?.type === 'mcp') { void mcp(message.payload); }
           else if (state === 'ready' && message?.type === 'stt' && typeof message.text === 'string') emit({type:'stt',text:message.text});
-          else if (state === 'ready' && message?.type === 'tts' && typeof message.state === 'string') emit({type:'tts',state:message.state,...(typeof message.text === 'string'?{text:message.text}:{})});
+          else if (state === 'ready' && message?.type === 'tts' && typeof message.state === 'string') emit({type:'tts',state:message.state,...(typeof message.text === 'string'?{text:message.text}:{}),...(typeof message.is_aborted === 'boolean'?{is_aborted:message.is_aborted}:{})});
           else if (message?.type === 'error') finish('Linx server reported an error');
         });
         socket.on('error', () => finish('Linx connection failed'));

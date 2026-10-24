@@ -6,6 +6,7 @@ import {
   writeFileSync,
   symlinkSync,
   realpathSync,
+  existsSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -182,4 +183,200 @@ test("adapter child excludes bridge and voice configuration while preserving cod
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
   }
+});
+
+const protocol = (cwd) =>
+  readFileSync(`${cwd}/protocol.jsonl`, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+test("durable thread identity is saved before dispatch and follow-up resumes it with the same permissions", async () => {
+  const cwd = repository();
+  const sessions = [];
+  await execute(cwd, "new", {
+    onSession: async (session) => {
+      if (!session.turnId) {
+        assert.equal(
+          protocol(cwd).some((m) => m.method === "turn/start"),
+          false,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      sessions.push(session);
+    },
+  });
+  assert.deepEqual(sessions, [
+    { threadId: "thread" },
+    { threadId: "thread", turnId: "turn" },
+  ]);
+  const started = protocol(cwd).find((m) => m.method === "thread/start");
+  assert.equal(started.params.ephemeral, false);
+  await execute(cwd, "new", {
+    task: { prompt: "new", codexThreadId: "thread" },
+    onSession: (session) => sessions.push(session),
+  });
+  const messages = protocol(cwd);
+  assert.equal(messages.filter((m) => m.method === "thread/start").length, 1);
+  const resumed = messages.find((m) => m.method === "thread/resume");
+  assert.equal(resumed.params.threadId, "thread");
+  for (const name of ["cwd", "approvalPolicy", "approvalsReviewer", "sandbox"])
+    assert.equal(resumed.params[name], started.params[name]);
+  const turns = messages.filter((m) => m.method === "turn/start");
+  assert.deepEqual(turns[1].params.sandboxPolicy, {
+    type: "workspaceWrite",
+    writableRoots: [cwd],
+    networkAccess: false,
+    excludeSlashTmp: true,
+    excludeTmpdirEnvVar: true,
+  });
+  assert.equal(turns[1].params.cwd, cwd);
+  assert.equal(turns[1].params.threadId, "thread");
+});
+
+test("unavailable resume never creates a replacement thread or dispatches a new turn", async () => {
+  const cwd = repository();
+  await assert.rejects(
+    execute(cwd, "new", {
+      task: { prompt: "new", codexThreadId: "missing-thread" },
+      args: [fixture, "resume-error"],
+    }),
+    /fixture thread unavailable/,
+  );
+  const methods = protocol(cwd).map((m) => m.method);
+  assert.ok(methods.includes("thread/resume"));
+  assert.equal(methods.includes("thread/start"), false);
+  assert.equal(methods.includes("turn/start"), false);
+});
+
+test("lost turn dispatch response is reported as uncertain after owned process teardown", async () => {
+  await assert.rejects(
+    execute(repository(), "new", {
+      args: [fixture, "turn-timeout"],
+      requestTimeoutMs: 500,
+    }),
+    {
+      dispatchUncertain: true,
+    },
+  );
+});
+
+test("command failures carry structured trusted evidence rather than a successful prose claim", async () => {
+  const evidence = [];
+  await execute(repository(), "command-failure", {
+    onEvidence: (kind, label, value, details) =>
+      evidence.push({ kind, label, value, details }),
+  });
+  const failure = evidence.find((e) => e.details?.command === "npm test");
+  assert.ok(failure);
+  assert.equal(failure.details.status, "failed");
+  assert.equal(failure.details.exitCode, 1);
+  assert.equal(failure.value, "assertion failed");
+});
+
+test("resume history and foreign completion notifications cannot complete the new owned turn", async () => {
+  await assert.rejects(
+    execute(repository(), "error", {
+      task: { prompt: "error", codexThreadId: "thread" },
+      args: [fixture, "stale-events"],
+    }),
+    /fixture turn failed/,
+  );
+});
+
+const approvalFixture = fileURLToPath(
+  new URL("./fixtures/approval-ownership.mjs", import.meta.url),
+);
+for (const mode of [
+  "foreign-before-dispatch",
+  "owned-before-dispatch",
+  "foreign-thread",
+  "old-turn",
+  "missing-identity",
+])
+  test(`adapter declines ${mode} approvals without asking the task owner`, async () => {
+    const cwd = repository();
+    let calls = 0;
+    await execute(cwd, mode, {
+      task: { prompt: mode, codexThreadId: "thread" },
+      args: [approvalFixture, mode],
+      onApproval(_details, reply) {
+        calls++;
+        reply("accept");
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(
+      JSON.parse(readFileSync(`${cwd}/decision.json`)).result.decision,
+      "decline",
+    );
+  });
+
+test("adapter waits for the dispatched turn identity before exposing a legitimate early approval", async () => {
+  const cwd = repository();
+  let calls = 0;
+  await execute(cwd, "early", {
+    task: { prompt: "early", codexThreadId: "thread" },
+    args: [approvalFixture, "early"],
+    onApproval(_details, reply) {
+      assert.equal(existsSync(`${cwd}/turn-response.json`), true);
+      calls++;
+      reply("accept");
+    },
+  });
+  assert.equal(calls, 1);
+  assert.equal(
+    JSON.parse(readFileSync(`${cwd}/decision.json`)).result.decision,
+    "accept",
+  );
+});
+
+test("an approval decision arriving after its turn completes cannot authorize the command", async () => {
+  const cwd = repository();
+  await execute(cwd, "late-decision", {
+    task: { prompt: "late-decision", codexThreadId: "thread" },
+    args: [approvalFixture, "late-decision"],
+    onApproval(_details, reply) {
+      setTimeout(() => reply("accept"), 10);
+    },
+  });
+  assert.equal(
+    JSON.parse(readFileSync(`${cwd}/decision.json`)).result.decision,
+    "decline",
+  );
+});
+
+test("a rejected dispatch never exposes its buffered command approval", async () => {
+  const cwd = repository();
+  let calls = 0;
+  await assert.rejects(
+    execute(cwd, "early-rejected", {
+      task: { prompt: "early-rejected", codexThreadId: "thread" },
+      args: [approvalFixture, "early-rejected"],
+      onApproval() {
+        calls++;
+      },
+    }),
+    /fixture dispatch denied/,
+  );
+  assert.equal(calls, 0);
+  assert.equal(
+    JSON.parse(readFileSync(`${cwd}/decision.json`)).result.decision,
+    "decline",
+  );
+});
+
+test("early approvals share the bounded dispatch buffer and overflow without exposing commands", async () => {
+  let calls = 0;
+  await assert.rejects(
+    execute(repository(), "early-overflow", {
+      task: { prompt: "early-overflow", codexThreadId: "thread" },
+      args: [approvalFixture, "early-overflow"],
+      requestTimeoutMs: 500,
+      onApproval() {
+        calls++;
+      },
+    }),
+    /exceeded the dispatch buffer/,
+  );
+  assert.equal(calls, 0);
 });

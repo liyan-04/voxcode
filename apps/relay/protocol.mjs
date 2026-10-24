@@ -1,6 +1,7 @@
 export const DEFAULT_BODY_LIMIT = 1024 * 1024;
 export const DEFAULT_RESPONSE_LIMIT = 2 * 1024 * 1024;
 export const MAX_INFLIGHT = 32;
+export const MAX_MEDIA_INFLIGHT = 8;
 export const FRAME_LIMIT = 3 * 1024 * 1024;
 export function credentials(machineId, machineKey) {
   if (typeof machineId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(machineId)) throw new Error('Invalid machine ID');
@@ -20,18 +21,23 @@ export function route(method, path) {
   if (method === 'GET' && pathname === '/api/health') kind = 'health';
   if (method === 'POST' && pathname === '/api/pair') kind = 'pair';
   if (method === 'POST' && pathname === '/api/unpair') kind = 'json';
+  if (['GET','POST'].includes(method) && pathname === '/api/settings') kind = 'json';
   if (['GET','POST'].includes(method) && pathname === '/api/tasks') kind = 'json';
   if (method === 'GET' && new RegExp(`^/api/tasks/${id}$`).test(pathname)) kind = 'json';
   if (method === 'GET' && (new RegExp(`^/api/tasks/${id}/events$`).test(pathname) || new RegExp(`^/api/voice/sessions/${id}/events$`).test(pathname))) kind = 'events';
   if (method === 'POST' && new RegExp(`^/api/tasks/${id}/(messages|cancel|accept)$`).test(pathname)) kind = 'json';
   if (method === 'POST' && new RegExp(`^/api/tasks/${id}/approvals/${id}$`).test(pathname)) kind = 'json';
+  if (method === 'POST' && new RegExp(`^/api/tasks/${id}/criteria/${id}$`).test(pathname)) kind = 'json';
   if (method === 'POST' && pathname === '/api/voice/sessions') kind = 'json';
   if (method === 'POST' && new RegExp(`^/api/voice/sessions/${id}/audio$`).test(pathname)) kind = 'binary';
-  if (method === 'POST' && new RegExp(`^/api/voice/sessions/${id}/stop$`).test(pathname)) kind = 'json';
+  if (method === 'POST' && new RegExp(`^/api/voice/sessions/${id}/(stop|abort)$`).test(pathname)) kind = 'json';
   if (method === 'DELETE' && new RegExp(`^/api/voice/sessions/${id}$`).test(pathname)) kind = 'empty';
   if (!kind) return null;
   if (query !== undefined && (kind !== 'events' || !/^after=(0|[1-9][0-9]{0,14})$/.test(query))) return { error: 400 };
-  return { kind, public: ['health','pair'].includes(kind) };
+  return { kind, public: ['health','pair'].includes(kind), media: kind === 'binary' || (kind === 'events' && pathname.startsWith('/api/voice/')) };
+}
+export function atCapacity(entries, media) {
+  return entries.size >= MAX_INFLIGHT || (media && [...entries.values()].filter(entry => entry.media).length >= MAX_MEDIA_INFLIGHT);
 }
 export function bearer(value) {
   return typeof value === 'string' && /^Bearer [A-Za-z0-9._~+\/-]{1,512}={0,2}$/.test(value);

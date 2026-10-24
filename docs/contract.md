@@ -36,7 +36,8 @@ Evidence: `{kind:"test"|"screenshot"|"diff"|"note",label,value,version}`. No fab
 Approval: `{id,command,cwd,description,version}`. Single use, invalidated by cancellation.
 Event: `{seq,taskId,type,message,createdAt}`. Persisted by bridge; cursor monotonically increases per task.
 Task status and acceptance enums follow design.md. Version is a nonnegative integer bumped whenever execution input changes; client sends the snapshot version.
-Errors use 400 invalid, 401 unauthenticated, 403 denied, 404 unknown, 409 stale/conflict, 429 throttled, 503 unavailable.
+Errors use 400 invalid, 401 unauthenticated, 403 denied, 404 unknown, 409 stale/blocked/conflict, 429 throttled, 503 unavailable.
+For task mutations, `409 blocked` means a business precondition rejected this request before side effects (for example, failed required checks or an expired approval). The client may clear that pending attempt while preserving the user's edits. `409 conflict` denotes a request-ID/payload identity conflict and remains uncertain; retain the original request ID and payload for reconciliation. Unknown errors, timeouts and server failures must not clear uncertain submissions. Clients talking to an older server that returns `conflict` for business rejection remain conservative.
 
 ## Trusted executor callbacks
 
