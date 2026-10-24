@@ -4,6 +4,11 @@
 - Removed `.github/workflows/pr-policy.yml` and `.github/workflows/verify.yml` after GitHub reported the repository account could not start jobs because of billing or spending-limit restrictions. This removes the external Actions check path only; local hooks, `npm run test:policy`, component tests, coverage commands and human PR reviews remain required evidence.
 - Existing failed Actions runs are historical evidence of the account restriction. They are not treated as application test failures. Future PRs must state exact local commands, environment, unavailable native/live/device gates and the two independent review records.
 
+## 2026-10-24: delivery target clarification
+- Corrected the delivery wording after user clarification: the target is the combined loop of a native app installed on a real iPhone **and** that same build controlling Codex on the company Mac through the public Relay/Connector path. Neither a simulator demo nor an install-only result closes the project.
+- G4 device evidence and G5 outdoor evidence must identify the same signed build, device/iOS version, relay endpoint, Mac connector and Codex requestId. Current local state has neither a signed iPhone build nor a live public/outdoor run; these gates remain blocked by the missing Xcode/signing and deferred deployment resources.
+- A deployment attempt using the authorized `liyan-server` workflow reached `100.100.81.209` but SSH authentication returned `Permission denied (publickey,password)` before any command ran. No files, processes or ports were changed. The local relay package remains ready for a later authenticated attempt; the public link is still unverified.
+
 ## 2026-10-24: architect collaboration and post-merge cleanup policy
 - Added [the architect collaboration and cleanup policy](architecture/cleanup-policy.md): GitHub PRs remain the merge/evidence source; Issues/Projects coordinate active work; `docs/architecture/` and `docs/progress.md` retain durable decisions and evidence.
 - After a PR is merged into `codex/mvp`, only verified dependency-free topic branches, clean project-owned worktrees and disposable build artifacts may be removed. PRs, merge SHAs, reviews and progress records remain. Implementers report eligibility, architects check dependencies, and only the coordinator performs deletion.
