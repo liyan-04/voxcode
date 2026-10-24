@@ -123,6 +123,7 @@ version checks, approval rules or authorization.
 Only these exact method/path families are forwarded:
 
 - `GET /api/health`, `POST /api/pair`.
+- `GET /api/monitor` (requires the paired phone session bearer; no query).
 - `POST /api/unpair` (requires the phone session bearer).
 - `GET|POST /api/settings`.
 - `GET|POST /api/tasks`, `GET /api/tasks/:id`.
@@ -140,8 +141,42 @@ allow a query, and only a nonnegative integer `after` is accepted. No remote
 destination, arbitrary path, file serving, generic proxy or Codex App Server
 endpoint is exposed. Evidence in task JSON is forwarded; there is no preview
 file/port tunnel. Preview bootstrap/cookies/static routes are deferred and are
-not exposed. `/api/monitor` remains authenticated Mac loopback-only and is not
-in this relay's allowlist.
+not exposed. Monitor forwarding uses the same fixed loopback bridge and its
+session authorization; the machine key cannot read phone monitoring data.
+
+### Paired monitoring
+
+`GET /api/monitor` returns only the documented Mac aggregate snapshot plus a
+fixed `relay` object after a successful, valid Mac response. Missing, invalid,
+revoked and machine-key credentials never acquire Relay metrics. Offline and
+timeout reads remain HTTP 503/504 errors; Relay does not create an offline
+snapshot. Malformed successful Mac monitor JSON returns a generic 502. Unknown
+fields are omitted, and monitor errors never forward raw bridge messages.
+
+Mac `readiness.codexAvailable` means the Codex executable is present;
+`readiness.voiceConfigured` means a voice handler is configured. Neither proves
+an authenticated model call or live Linx speech. Mac RSS/heap cover the bridge's
+Node process only. The snapshot contains no prompts, code, task IDs, audio,
+tokens, private paths, raw exceptions or arbitrary metric labels.
+
+Relay counters cover this process's HTTP requests for its single configured
+machine, across its paired phone sessions. Each finished HTTP response increments
+`requestsTotal` once; `responsesTotal` counts status below 400, `errorsTotal`
+counts status 400 or above, and `timeoutsTotal` counts the 504 subset. Rejected
+routes/authentication and transport errors are included. Unfinished client
+aborts are not counted. `inFlight` counts pending connector requests and can
+include the monitor read itself; its unfinished response is excluded from the
+finished counters. `connected` reports the currently connected authenticated
+connector and appears only on a successful forwarded snapshot.
+
+`latencySamples` is bounded to the most recent 128 finished requests. Monotonic
+durations run from Relay HTTP ingress through response finish, including upload,
+connector and Mac work. `latencyP50Ms`/`latencyP95Ms` use the nearest-rank values,
+or JSON null with zero samples. They are not network RTT, model runtime, STT or
+TTS latency. Counters and samples reset on Relay restart; no historical uptime
+or availability percentage is implied. All fields have fixed keys, without
+per-path, identity or content labels. TLS and device/outdoor acceptance remain
+separate from local loopback monitoring tests.
 
 POST bodies require `application/json` (optional UTF-8 charset); audio uploads
 require `application/octet-stream`. GET/DELETE must have no body and may omit

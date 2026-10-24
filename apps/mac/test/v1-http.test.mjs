@@ -257,9 +257,12 @@ test("monitor HTTP returns exact bounded aggregates, distinguishes accepted and 
       "recoveryRequired",
       "counts",
       "memory",
+      "readiness",
     ].sort(),
   );
   assert.equal(monitor.body.executionLimit, 2);
+  assert.equal(typeof monitor.body.readiness.codexAvailable, "boolean");
+  assert.equal(monitor.body.readiness.voiceConfigured, false);
   assert.equal(monitor.body.activeExecutions, 2);
   assert.equal(monitor.body.counts.waiting_approval, 1);
   assert.equal(monitor.body.counts.stopping, 1);
@@ -283,4 +286,14 @@ test("monitor HTTP returns exact bounded aggregates, distinguishes accepted and 
   assert.ok(!encoded.includes(accepted.id));
   app.service.revoke(token);
   assert.equal((await call("/api/monitor")).status, 401);
+});
+
+test("monitor readiness reports configured voice without claiming a live provider connection", async (t) => {
+  let calls = 0;
+  const { call } = await fixture(t, { voiceHandler() { calls++; throw new Error("PRIVATE_PROVIDER_FAILURE"); } });
+  const monitor = await call("/api/monitor");
+  assert.equal(monitor.status, 200);
+  assert.equal(typeof monitor.body.readiness.codexAvailable, "boolean");
+  assert.equal(monitor.body.readiness.voiceConfigured, true);
+  assert.equal(calls, 0);
 });

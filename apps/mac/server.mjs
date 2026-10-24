@@ -59,7 +59,13 @@ export function createServer(options) {
         const peer = req.socket.remoteAddress;
         if (peer !== "::1" && !/^(::ffff:)?127\./.test(peer ?? ""))
           throw new ApiError(403, "denied");
-        return send(res, 200, service.monitor());
+        return send(res, 200, {
+          ...service.monitor(),
+          readiness: {
+            codexAvailable: codexAvailable(),
+            voiceConfigured: !!options.voiceHandler,
+          },
+        });
       }
       if (url.pathname.startsWith("/api/voice")) {
         if (options.voiceHandler)
