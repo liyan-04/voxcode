@@ -16,7 +16,7 @@ node --test packages/voice/test/*.test.js apps/integration/test/*.test.mjs
 
 ## 不需要新增硬件的接入路径
 
-Mac 进程作为灵矽的软件设备，负责云端 WSS 和协议适配；手机负责录音、确认草稿和播放。官方 OTA 文档允许 MAC 或硬件 ID 生成的伪 MAC，并提供 `xiaoling-web-test` 示例。VoxCode 语音适配器已支持该设备协议，但**自动 OTA 注册/激活尚未实现**，需要先按平台流程完成软件测试设备绑定。软件设备是否对当前账号开放、可用 board 类型和资源额度，以平台实际返回和账号权限为准，不能把文档示例当成已开通。
+Mac 进程作为灵矽的软件设备，负责云端 WSS 和协议适配；手机负责录音、确认草稿和播放。官方 OTA 文档允许 MAC 或硬件 ID 生成的伪 MAC，并提供 `xiaoling-web-test` 示例。VoxCode 提供[私有软件设备激活工具](../../packages/voice/README.md#local-software-device-onboarding)，按下述协议完成本机辅助操作；**真实账号绑定和云端语音仍未验证**。软件设备是否对当前账号开放、可用 board 类型和资源额度，以平台实际返回和账号权限为准，不能把文档示例当成已开通。
 
 1. 在[灵矽 AI](https://linx.qiniu.com/)登录后创建一个比赛专用测试智能体，选择可用的模型、中文音色，使用平台支持的设备接入/MCP 配置。控制台页面名称可能变化；若无设备入口，需要平台管理员开通测试设备权限。
 2. 为这个 Mac 软件设备保存固定 Device-Id（符合 MAC 格式）和 Client-Id（UUID）。已有设备使用已绑定标识；不要每次启动生成新身份，不要用任意 API Key 替代设备 token。
@@ -31,7 +31,19 @@ Mac 进程作为灵矽的软件设备，负责云端 WSS 和协议适配；手�
 
 **你现在只需完成：**在本人灵矽 AI 账号创建比赛测试智能体，确认账号能进入设备绑定/激活入口，然后告诉工程协调者“智能体已建、设备入口可用”。不要发送登录密码、token 或完整控制台截图。若没有入口，向平台管理员申请软件测试设备接入权限，反馈是否开通即可。这是用户资源准备完成的检查点，不要求你自行拼写 OTA 请求。
 
-**工程协调者负责下一段：**在 Mac 私有目录生成并持久化软件 Device-Id/UUID，按上述官方 web-test 请求完成首次 OTA、只在本机显示激活码，等你在本人控制台绑定，再重新取得 token 并保存 `.env.linx`。该步骤尚未实现/执行，需单独可评审的激活辅助工具切片；当前指引不冒充一键接入。设备身份、token 与私有配置均不写入 Issue。
+**工程协调者负责下一段：**使用下方工具在 Mac 私有目录生成并持久化软件 Device-Id/UUID，按官方 web-test 请求完成 OTA、只在交互终端显式显示激活码，等你在本人控制台绑定，再取得 token 并保存私有 `.env.linx`。工具已有本地受控测试；实际用户设备绑定尚未执行。设备身份、token 与私有配置均不写入 Issue。
+
+```sh
+# init/status 离线；目录父级必须存在，使用无符号链接的真实绝对路径
+node packages/voice/tools/onboard.mjs init --dir /Users/your-name/.voxcode-linx
+node packages/voice/tools/onboard.mjs status --dir /Users/your-name/.voxcode-linx
+# 用户已完成智能体/设备入口检查后，在私人交互终端显式发起注册
+node packages/voice/tools/onboard.mjs activate --dir /Users/your-name/.voxcode-linx --show-code
+# 用户在控制台绑定后再运行，保存 token，不打印 token
+node packages/voice/tools/onboard.mjs activate --dir /Users/your-name/.voxcode-linx
+```
+
+默认 JSON 只显示 initialized/unconfigured/pending/configured 等状态；配置存在不代表云端通过。已有身份/配置不会被覆盖；权限、符号链接、响应上限和固定 HTTPS/WSS 端点均检查。每次请求最多10秒、64KiB，不重试、不下载固件、不自动操作用户控制台。Node 可用 `--env-file=/Users/your-name/.voxcode-linx/.env.linx` 启动现有统一入口。完整安全边界与回退见模块 README。
 
 **配置完成后的支持动作：**保持工程协调者会话，由协调者使用真实协议 smoke 客户端做 L1–L3；目前该客户端尚待实现。用户无需寻找不存在的 CLI 或把 configured 当成成功。下方启动命令只启动服务，不自动开始录音。真机 App 就绪后，由用户在 App 关闭模拟演练、配对测试 Mac、打开新任务录音，才是现有录音入口；签名安装尚未具备时不会用该入口证明通过。
 
@@ -81,4 +93,4 @@ L1–L3 可先在本机真实协议客户端验证；本仓库目前没有独立
 - [OTA 协议源码](https://github.com/qiniu/Xrobot-docs/blob/main/docs/xrobot/platform/OTA.md)：伪 MAC、软件 web-test 示例、激活码、绑定后 token、快速激活检查。
 - [本地适配器说明](../../packages/voice/README.md)、[集成入口](../../apps/integration/README.md)。
 
-此次未调用真实 OTA 注册接口、创建云资源或发送录音；GitHub tree API 返回403，但上述两份 raw 文档读取成功。
+原 Issue #27 文档调查未调用 OTA 注册接口、创建云资源或发送录音；GitHub tree API 返回403，但上述两份 raw 文档读取成功。Issue #42 工具开发的一次早期测试曾因传输注入遗漏误发一条格式无效的合成 OTA 请求，未携带真实用户身份/token，未建立绑定或云端成功证据；随后已加入默认禁止 HTTPS 的测试保护。准确披露见[工具评审记录](../reviews/linx-onboarding-2026-10-24.md)，不能将本次累计工作描述为零网络尝试。

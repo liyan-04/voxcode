@@ -1,5 +1,10 @@
 # Progress and verification
 
+## 2026-10-24: private Linx onboarding helper (Issue #42)
+- Added offline private software identity init/status and explicit official HTTPS activate/OTA helper. Saved env is0600 in an owned0700 directory; no overwrite, arbitrary token endpoint, firmware download or automatic retry. Activation code is shown only by explicit local interactive option; normal output/errors redact identity/token/code.
+- Focused onboarding18/18 and full Node191/191 passed after locked dependencies installed in isolated worktree. Root architect and independent product_manager reviewed exact four-file content snapshots with no outstanding findings; see reviews/linx-onboarding-2026-10-24.md.
+- One early wrapper test accidentally attempted a malformed synthetic OTA request before injection existed; no real identity/token/account resource or successful enrollment was established. Subsequent tests use process-wide default-deny HTTPS, verified by regression. Actual user account/device binding and live L1-L5 remain pending. Real-protocol smoke client and native build are separate Issues43/44.
+
 ## 2026-10-24: current README and parallel delivery slices (Issue #45)
 - Root README now leads with the actual phone/public Relay/company-Mac goal, merged capabilities, runnable entry points, installation boundaries and open signing/Linx/outdoor gates. Module README updates stay with their allocated developers.
 - Issues42/43/44 run in independent worktrees for the private Linx onboarding helper, actual voice-route smoke CLI and native device build entry. These are active work, not master-available tools or live results. Model429 causes cooldown/reduced concurrency rather than abandonment.

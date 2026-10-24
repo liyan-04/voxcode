@@ -37,7 +37,7 @@ Mac 主动连接公网，不要求公司网络开放入站端口。预定公网�
 
 已合并的监控服务本地验证为 **173/173**，语音/集成验证为 **26/26**；这是特定版本的 local/fixture 证据，详情见[评审记录](docs/reviews/monitoring-2026-10-24.md)和[灵矽就绪记录](docs/verification/linx-readiness-2026-10-24.md)。不代表云端、真机或户外成功。
 
-并行任务：[灵矽设备激活工具 #42](https://github.com/liyan-04/voxcode/issues/42)、[语音联调 CLI #43](https://github.com/liyan-04/voxcode/issues/43)、[iPhone 构建交付 #44](https://github.com/liyan-04/voxcode/issues/44)。未合并工具的命令不作为 master 可用入口。当前远端操作与后台每分钟巡检创建均被审批服务 `401 model not in allowed model list` 阻塞，动作未执行；本地开发继续。
+灵矽[设备激活辅助工具](packages/voice/README.md#local-software-device-onboarding)支持离线身份初始化、固定官方 HTTPS 激活及私有配置保存，需用户先准备测试智能体与设备入口；本地测试不代表已绑定。其余并行任务：[语音联调 CLI #43](https://github.com/liyan-04/voxcode/issues/43)、[iPhone 构建交付 #44](https://github.com/liyan-04/voxcode/issues/44)。未合并工具的命令不作为 master 可用入口。当前远端操作与后台每分钟巡检创建均被审批服务 `401 model not in allowed model list` 阻塞，动作未执行；本地开发继续。
 
 ## 本地启动与检查
 
