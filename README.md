@@ -46,8 +46,6 @@ Mac 和原生 iPhone App 不是当前方案的必需组件。页面保持现有�
 ```sh
 # 安装当前 master 中的锁定依赖，运行已有回归
 npm ci --ignore-scripts
-npm ci --ignore-scripts --prefix packages/voice
-npm ci --ignore-scripts --prefix apps/relay
 npm test
 ```
 
