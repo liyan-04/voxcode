@@ -6,6 +6,10 @@ Current delivery scope: docs/phone-demo-scope.zh-CN.md. The first demo uses nati
 
 Current deployment: [server execution](architecture/server-execution.md). Native iPhone connects only to the server; the same server hosts Relay, the existing loopback Bridge/Connector/voice runtime and local stdio Codex. Historical “Mac” module/metric wording below identifies this retained execution runtime, not a required separate company Mac. HTTP shapes and authentication are unchanged. Linx uses the current documented WebSocket plus device-MCP protocol with a server-hosted software device; it is distinct from cloud HTTP/SSE MCP and third-party business SSE callbacks. No callback identity header is user authorization.
 
+## Phone duplex WSS
+
+Required current design: [phone-duplex-wss.md](architecture/phone-duplex-wss.md), Issue62. Authenticated `/api/stream` carries simultaneous audio and real task/voice event pushes; HTTPS below retains pairing, durable mutations, full snapshots and evidence. This is a pending protocol extension, not implemented by the existing HTTP audio/event routes or the separate machine `/connector` WSS. The design freezes authentication, ordering, replay, limits, interruption and disconnect behavior before implementation.
+
 ## HTTP
 All `/api/*` except health and pair require `Authorization: Bearer <sessionToken>`.
 JSON errors: `{ "error": { "code": "string", "message": "string" } }`.

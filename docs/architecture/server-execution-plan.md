@@ -46,3 +46,7 @@
 - [ ] master上完整Node+政策+相关原生回归；检查安装包/说明/真实启动参数一致。
 - [ ] 获得可执行远端入口后在普通用户隔离项目做Linux回归、真实Codex修改/续接/停止、严格TLS和真实灵矽。每项失败保留脱敏证据，不猜测认证成功。
 - [ ] Xcode完成后签名实际iPhone安装，同一构建完成蜂窝VPN、语音确认、真实任务与验收全链路。
+
+## 手机双工补充（Issue62）
+
+用户进一步明确手机↔服务器也必须WSS双工；仅灵矽↔服务器WSS不够。以[冻结设计](phone-duplex-wss.md)为实现依据：先固定loopback Relay代理和Bridge stream鉴权，再抽离语音会话引擎/真实任务订阅，最后接原生URLSessionWebSocketTask与同时录放。保留HTTPS持久操作，不扩展Connector HTTP封装为流隧道。各组件独立Issue/worktree/双review/PR；无SDK或live证据继续保持对应关口开放。

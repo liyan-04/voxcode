@@ -1,5 +1,7 @@
 # 服务器执行架构与验收
 
+**双工补充（Issue62，待实现）：**手机与Relay必须通过WSS同时收发音频/实时事件，Relay固定代理到同机Bridge。HTTPS保留配对、持久操作、快照和完整证据。现行HTTP音频上传/轮询不是最终通道；详见[手机WSS合同](phone-duplex-wss.md)。
+
 日期：2026-10-24。主任务：[Issue53](https://github.com/liyan-04/voxcode/issues/53)。用户明确选择：原生 iPhone 只连接服务器，服务器连接灵矽 AI 并运行服务器上的 Codex；本轮不限制 AirPlay 协议。本文取代此前把公司 Mac 在线作为必需条件的部署解释，保留任务、语音、身份和结果验收约束。
 
 ## 产品定位与场景

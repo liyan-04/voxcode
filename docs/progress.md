@@ -1,5 +1,10 @@
 # Progress and verification
 
+## 2026-10-24: phone duplex WSS design checkpoint (Issue62)
+- User requires actual simultaneous phone↔server WSS. Architect and PM recommend authenticated `/api/stream` through a fixed same-host Relay→Bridge proxy, with HTTPS retained for pairing, durable mutations and full evidence. Existing machine Connector and provider Linx WSS are separate connections.
+- Design freezes pre-upgrade authorization/revocation, JSON/binary framing, audio credits and bounded queues, ACK-before-events, real task subscriptions/replay/gaps, immutable recording targets and no old audio on reconnect. iOS must change record-only audio/session behavior as well as transport.
+- Disposable loopback WS proxy probe passed header auth, backend-before-frontend upgrade, text-before-stop and binary echo after dependency-path correction. It is not product code or TLS/native/provider evidence. Implementation/live/signing gates remain open; [design](architecture/phone-duplex-wss.md) is the next bounded work basis.
+
 ## 2026-10-24: dedicated server entry and source bundle (Issue55)
 - Added non-root, redacted preflight/start entry that reuses the existing runtime, canonical verified project/data, explicit TTY-only pairing code and owned shutdown. Relay remains separate; no service/account/dependency automation or unrelated listener mutation.
 - Explicit Git-blob allowlist/source manifest excludes private configuration and honors the requested commit even with local replacement refs. Two independent reviews fixed Git-replace, writable-ancestor and path-alias findings; [report](reviews/server-source-delivery-2026-10-24.md) records hashes and regressions.
