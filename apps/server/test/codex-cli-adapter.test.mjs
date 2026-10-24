@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {EventEmitter} from 'node:events';
+import {createCodexCliAdapter} from '../codex-cli-adapter.mjs';
+async function fixture(t,extra={}){const root=await mkdtemp(join(tmpdir(),'vox-cli-'));t.after(()=>rm(root,{recursive:true,force:true}));let p,calls=0;const spawnImpl=()=>{calls++;p=new EventEmitter();p.stdout=new EventEmitter();p.stderr=new EventEmitter();p.stdin={on(){},end(){}};p.kill=s=>p.emit('close',null,s);return p;};const opts={projectRoot:root,dataDir:join(root,'data'),spawnImpl,...extra};return {a:createCodexCliAdapter(opts),opts,get p(){return p},get calls(){return calls}};}
+test('draft requires confirmation and parses JSON results',async t=>{const f=await fixture(t);const {taskId}=await f.a.startTask({prompt:'hello'});assert.equal(f.calls,0);await f.a.confirmTask(taskId);f.p.stdout.emit('data',Buffer.from('{"type":"thread.started","thread_id":"session-1"}\n{"type":"item.completed","item":{"type":"agent_message","text":"done"}}\n'));f.p.emit('close',0);const task=await f.a.getTask(taskId);assert.equal(task.status,'completed');assert.equal(task.output,'done');assert.equal(task.sessionId,'session-1');assert.equal((await f.a.getDiff(taskId)).collected,false);});
+test('rejects invalid prompt and external project',async t=>{const f=await fixture(t);await assert.rejects(f.a.startTask({prompt:''}),/prompt/);await assert.rejects(f.a.startTask({prompt:'x',projectRoot:'/tmp'}),/project/);});
+test('restart marks running interrupted without spawning',async t=>{const f=await fixture(t);const {taskId}=await f.a.startTask({prompt:'x'});await f.a.confirmTask(taskId);const b=createCodexCliAdapter(f.opts);assert.equal((await b.getTask(taskId)).status,'interrupted');assert.equal(f.calls,1);f.p.emit('close',0);await f.a.getTask(taskId);});
+test('cancellation retains slot until process close',async t=>{const signals=[];const f=await fixture(t,{signalGroup:(pid,s)=>signals.push(s),killGraceMs:5});const {taskId}=await f.a.startTask({prompt:'x'});await f.a.confirmTask(taskId);f.p.pid=123;const cancelled=f.a.cancelTask(taskId);await new Promise(r=>setTimeout(r,15));assert.deepEqual(signals,['SIGTERM','SIGKILL']);assert.equal((await f.a.status()).activeTasks,1);f.p.emit('close',null,'SIGKILL');assert.equal((await cancelled).status,'cancelled');assert.equal((await f.a.status()).activeTasks,0);});
