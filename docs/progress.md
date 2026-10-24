@@ -1,5 +1,10 @@
 # Progress and verification
 
+## 2026-10-24: bounded voice HTTP smoke tooling (Issue #43)
+- Added actual authenticated loopback voice-route client, explicit synthetic PCM input, paced/bounded uploads and polling, redacted stage/event report, independent abort/delete cleanup and identical-ID uncertain-create reconciliation only for cleanup. No task dispatch, approval, result acceptance or playback.
+- Root and independent linx_onboarding review found event-type array coercion could fake observed stages; now requires string types. Also bounded decoded frames to negotiated16/24kHz120ms. Regression RED/GREEN and final focused14/14 passed; source review/evidence in reviews/linx-smoke-2026-10-24.md.
+- Evidence is local HTTP fixtures, not real provider proof. Actual account/device config still pending; full L3 tool semantics, audible iPhone and cellular/company-Mac gates stay open. README/readiness now point to implemented helper/client rather than nonexistent tools.
+
 ## 2026-10-24: native delivery preflight and archive/export tooling (Issue #44)
 - Added read-only Xcode/SDK/generator/signing/public-CA preflight and explicit fresh-output manual-development archive/export script, plus permanent controlled command fixtures and iOS README/runbook. This supplies a repeatable entry; no actual signed IPA exists from this environment.
 - Independent reviewers root and linx_onboarding caught app provisioning settings leaking globally to local Swift package targets. Fixed by changing only the staged App target; regression failed before fix and nine controlled scenarios now pass. Exact source hashes/review in reviews/ios-device-build-2026-10-24.md.
