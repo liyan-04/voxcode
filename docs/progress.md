@@ -1,5 +1,10 @@
 # Progress and verification
 
+## 2026-10-24: dedicated server entry and source bundle (Issue55)
+- Added non-root, redacted preflight/start entry that reuses the existing runtime, canonical verified project/data, explicit TTY-only pairing code and owned shutdown. Relay remains separate; no service/account/dependency automation or unrelated listener mutation.
+- Explicit Git-blob allowlist/source manifest excludes private configuration and honors the requested commit even with local replacement refs. Two independent reviews fixed Git-replace, writable-ancestor and path-alias findings; [report](reviews/server-source-delivery-2026-10-24.md) records hashes and regressions.
+- Coordinator full230/230, exactbase211/211; changed runtime99.33%lines/95.57%branches, no overall decrease. Source archive built from97e7f8f and extracted install/start verified with fixtures. Root test discovery and runtime coverage include apps/server; thresholds unchanged. Linux/live/device and new phone-WSS Issue62 remain open.
+
 ## 2026-10-24: latest official Linx server protocol (Issue #57)
 - Pinned current official docs revision `20ce1b29a1bdff575a4c3317689bae30a7e08535` (2026-10-22); server integrates outbound WSS software-device voice plus device MCP. Cloud SSE callbacks and third-app SSE are alternative routes, not required services for this path. Phone holds no Linx credentials.
 - Validates supplied session IDs before STT/TTS/MCP, binds all MCP replies, accepts documented optional hello metadata and never invents an output codec/rate. Voice tools return drafts; explicit phone confirmation remains the execution boundary.
