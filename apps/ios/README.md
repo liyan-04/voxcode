@@ -4,14 +4,40 @@ SwiftUI iOS 17+ phone controller. Current scope: `docs/phone-demo-scope.zh-CN.md
 
 ## Build
 
-Requires full Xcode 16 or newer, iOS SDK, Apple signing account, and XcodeGen 2.44.1. No iOS build has been verified on the development machine (only Command Line Tools is installed).
+Requires a Mac with full Xcode 16+, the iPhoneOS SDK >=17, Python 3, OpenSSL, and preinstalled **XcodeGen exactly 2.44.1**. The app targets iPhone/iOS 17+. Use the operator's existing Apple signing account, development identity/private key in Keychain and installed development provisioning profile. The script never installs tools, downloads trust assets, generates/copies private keys, changes accounts/profiles or invokes provisioning updates. It does not select Xcode globally or run `sudo`.
 
-1. Install Xcode and select it with `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
-2. Install pinned XcodeGen 2.44.1 from its upstream release. In this directory run `xcodegen generate --spec project.yml`.
-3. Open `VoxCode.xcodeproj`. Select the VoxCode target, set a unique bundle identifier and your development team under Signing & Capabilities.
-4. Attach an iPhone running iOS 17+, trust the Mac, enable Developer Mode, and Run. A paid account is needed for TestFlight distribution; free personal signing can install to your own device with its provisioning limits. Record the signed build identifier, Bundle ID, device model and iOS version.
-5. Configure the bridge behind trusted HTTPS reachable from the phone. Enter its root URL and expiring pairing code in Settings. Tokens stay in device-only Keychain. Never enter Linx or Codex credentials on the phone.
-6. Complete the remote delivery check with this same installed build: turn off Wi-Fi, use cellular data and the user VPN, pair through vm6 Relay `https://100.100.81.209:9899`, confirm the company Mac Connector is online, submit a real Codex task, and record the returned requestId/result. An installed app without this cellular+VPN Mac task is only a device milestone; a working relay without this signed install is only an infrastructure milestone.
+`Scripts/device-build.sh` defaults to a read-only preflight. It checks each prerequisite with a time/output bound, captures sensitive tool output internally and emits only pass/fail summaries. All signing inputs below are required, including for preflight; missing inputs return nonzero before generating a project or archive. This is an inventory/consistency check, not proof that Keychain access, archive/export or device installation will succeed.
+
+From this directory, set explicit local inputs in your shell (replace placeholders; do not paste signing material or profile contents into logs):
+
+```sh
+export DEVELOPER_DIR='/Applications/Xcode.app/Contents/Developer'
+export VOXCODE_XCODEGEN='/absolute/path/to/xcodegen-2.44.1'
+export VOXCODE_TEAM_ID='<10-character-team-id>'
+export VOXCODE_BUNDLE_ID='<your.unique.bundle-id>'
+export VOXCODE_SIGNING_IDENTITY='<40-hex-SHA1-of-existing-signing-identity>'
+export VOXCODE_PROVISIONING_PROFILE='/absolute/path/to/installed-development.mobileprovision'
+export VOXCODE_CA_DER='/absolute/path/to/reviewed-public-VoxCodeCA.der'
+export VOXCODE_CA_SHA256='<64-hex-SHA256-approved-in-public-CA-review>'
+bash Scripts/device-build.sh preflight
+```
+
+`DEVELOPER_DIR` affects only the current process; if omitted the current `xcode-select -p` selection is checked. `VOXCODE_XCODEGEN` may be omitted when the exact pinned version is on PATH. The team and bundle must match an unexpired explicit App ID profile with this signing certificate and at least one registered device. Wildcard profiles and the sample bundle `io.voxcode.client` are rejected. The profile must already be installed in Xcode's normal profile store; this script only reads its explicit path and never installs it. Use Xcode's account/signing UI separately to prepare missing resources. The operator checks that the intended iPhone is included; device identifiers and full provisioning data stay local.
+
+The CA path contains **public DER only**, with a separately reviewed SHA-256. The script checks exact bytes, DER format, CA basicConstraints and validity, then stages it as `VoxCode/VoxCodeCA.der`. A public CA certificate does not itself identify the fixed IP: deployment review must confirm that this is the intended Relay's issuing CA for vm6 `100.100.81.209` and that the leaf has the matching IP SAN. Do not use a loopback test CA or treat a locally computed hash as an independent trust review.
+
+After preflight passes, explicitly build into a **new absolute directory outside `apps/ios` whose parent already exists**:
+
+```sh
+export VOXCODE_OUTPUT_DIR='/absolute/private/builds/voxcode-device-unique-run'
+bash Scripts/device-build.sh archive
+```
+
+This repeats preflight, exclusively creates the output directory, copies only app/package inputs into `project/`, stages the reviewed public CA, and runs XcodeGen there. It writes team/bundle/manual-signing/profile settings only under the staged `VoxCode` app target; SwiftPM package and unit-test configuration remain intact. These settings are never global `xcodebuild` overrides. It invokes `xcodebuild archive` with `-sdk iphoneos`, `-destination 'generic/platform=iOS'`, Release and the existing iOS17 target configuration; then verifies the archive's iPhoneOS bundle/CA/signature and invokes `xcodebuild -exportArchive` with development (`debugging`) export and the same identity/profile. No `-allowProvisioningUpdates` or registration/download flags are used. Simulator output is rejected. The archive, xcresult, DerivedData, ExportOptions, IPA, checksum and logs stay under the chosen directory; reruns never reuse or delete it, even after failure. Build commands have 30-minute archive/15-minute export limits; a nonzero exit or validation failure prevents a success claim and preserves partial output for diagnosis. Keep the directory private: native Xcode logs and signed bundles can contain local paths and public signing/profile metadata. Do not publish raw contents; only share redacted evidence/approved public CA metadata.
+
+The script does not install the IPA. Use Xcode Devices and Simulators (or the operator's normal authorized Apple device workflow) to install the exported **development IPA on an iPhone included in its profile**; trust the Mac and enable Developer Mode. This does not produce App Store/TestFlight distribution. Personal-team and paid-team signing have Apple's normal device/expiry limits; unsupported export fails honestly rather than changing signing mode. Record revision/build number, bundle ID, IPA checksum, device model/iOS version and actual installation result without publishing a UDID or provisioning contents.
+
+Configure vm6 Relay `https://100.100.81.209:9899` behind strict TLS, with VPN routes available on the phone and Mac, then enter its root URL and expiring pairing code in Settings. Tokens stay in device-only Keychain; Linx/Codex credentials remain server-side. Complete the remote delivery check with this same installed build: turn off Wi-Fi, use cellular data and the user VPN, confirm the company Mac Connector is online, submit a real Codex task, and retain the returned requestId plus current-version diff/check/result evidence. Installation and that cellular+VPN Mac task are separate required gates. Full evidence and remaining PR35 test/coverage gates are in [iPhone delivery verification](../../docs/verification/ios-device-delivery.md).
 
 This build requires HTTPS. Ordinary hosts use system certificate trust; the configured fixed IP uses the explicit reviewed CA trust path described below. Arbitrary self-signed certificates are rejected. Path-prefixed URLs, userinfo, query and fragments are explicitly rejected. Settings edits a separate draft address: only a successful unauthenticated pairing replaces the origin/token record together in Keychain. Polling always uses that paired origin; old unbound token-only records are ignored and require re-pairing. Local network and microphone permission descriptions are included. The app does not discover hosts with Bonjour.
 
@@ -26,6 +52,14 @@ Recording is foreground-only. App backgrounding, audio interruption, or an input
 Recording freezes task ID, version and request ID before any permission or network await. The bridge retains this mapping. AVAudioEngine converts microphone audio to 16 kHz mono signed PCM16, uploads ordered chunks, and stops on upload overflow. Stop drains pending audio then ends listening; editable STT never automatically submits. Once a user edits text, later recognition cannot overwrite edits. First submission freezes the entire mutation and route; while awaiting confirmation, fields lock and Retry sends the identical payload and request ID, even if server polling already advanced its version. Errors also refresh server tasks for reconciliation. A changed task version blocks a first submission and requires reopening the composer. The bridge decodes negotiated provider Opus to bounded PCM and the native player handles ordered frames with abort/recording epochs. Live cloud output and audible iPhone playback remain unverified; no output is simulated.
 
 ## Verification
+
+Build-entry command fixtures (Python3.9+, macOS public root store/OpenSSL):
+
+```sh
+python3 Scripts/device-build-tests.py
+```
+
+These nine scenarios run the actual delivery script with controlled Apple-tool substitutes, including timeout, preserved output, signing/CA mismatch and simulator rejection. They create no keys and prove no native build/signature/device result.
 
 Core regression tests: `swift test` in this directory (requires a toolchain with XCTest; Command Line Tools alone may lack it). With full Xcode/iOS SDK, run:
 
