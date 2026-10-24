@@ -4,7 +4,7 @@ Applies equally to humans, the coordinator and AI workers. Read [AGENTS.md](AGEN
 
 ## Branches and change boundaries
 
-- Use `codex/<short-purpose>`, for example `codex/ios-task-filter`. The current remote default branch is `codex/mvp`; verify the PR base instead of assuming `main`.
+- Use `codex/<issue-number>-<short-purpose>`, for example `codex/21-issue-collaboration`. Existing branches may keep their names. Verify the remote default and actual PR base; stacked work may target an integration branch.
 - Direct commits and pushes to protected branches (`main`, `master`, `codex/mvp`) are prohibited. Every submitted change must be pushed to a `codex/*` topic branch and merged through a pull request. The local commit and pre-push hooks enforce this when installed; repository branch protection/rulesets remain the authoritative GitHub control. GitHub Actions workflows are disabled, so each PR must include exact local validation evidence.
 - One PR addresses one reviewable behavior or closely related set of changes. Prefer small PRs; roughly 400 changed source lines is a review prompt, not a reason to split inseparable changes or omit tests. Exclude generated files when judging size.
 - One commit is one coherent change, with its tests and essential documentation. A regression fix belongs with its regression test. Do not split a knowingly broken intermediate state into the shared branch.
@@ -55,6 +55,10 @@ The hook checks the subject only. It is bypassable and is not a substitute for r
 
 ## Pull requests
 
+Create or claim one GitHub Issue before new feature, bugfix, architecture, deployment or acceptance work. Follow [Issue collaboration](docs/issue-collaboration.md): define an owner/agent role, exclusive paths, dependencies and observable criteria; use child Issues and independent worktrees for parallel work. The coordinator serializes assignment and shared-file changes. Record start, blocker and handoff evidence on the Issue through an authorized coordinator.
+
+Each PR contains a visible `Refs #N` or `Fixes #N` line linking its primary Issue. `Refs` is for partial work or outstanding criteria; `Fixes` means that Issue's criteria are satisfied. Source PRs can complete while separate live/device/outdoor acceptance Issues stay open. GitHub automatically closes linked Issues only when a closing PR reaches the repository default branch. Verify Issue closure after merging into an integration branch.
+
 The PR title follows the same subject format. Fill all five template sections with concrete content; English headings are stable for automation, content may be Chinese. Every PR must include its incremented three-level `VoxCode` tag.
 
 | Section | Required content |
@@ -81,6 +85,8 @@ Prefer squash merge after review, using the conventional PR title. Do not automa
 ## Automated policy and its limits
 
 GitHub Actions workflows are disabled because the repository account cannot currently run them within its billing quota. The former PR policy and verification workflows remain in Git history but do not run or provide merge status. The coordinator must run `npm run test:policy`, applicable component tests, `git diff --check` and any available native/device checks locally, then record exact commands, results, environment and unavailable gates in the PR. Local hooks apply only in checkouts where installed; they do not replace human review, branch protection or product acceptance.
+
+`node scripts/check-pr-policy.mjs --pr-file <metadata.json>` validates the actual PR metadata, including a visible Issue reference outside comments and code examples. `npm run test:policy` tests the checker; it does not fetch or validate an actual GitHub PR. Linkage checking is syntactic and does not prove that the Issue exists, is assigned, or has passed acceptance. Git commit/pre-push hooks continue to check subjects and protected branches; they do not query GitHub or reserve Issues. The coordinator verifies Issue identity, ownership and criteria before merge.
 
 ## References and local adaptations
 

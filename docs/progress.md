@@ -1,5 +1,12 @@
 # Progress and verification
 
+## 2026-10-24: Issue collaboration policy (Issue #21)
+- Added feature/task, bug/regression and acceptance/deployment Issue forms with required scope, owner, dependencies, checks and evidence fields. Forms reuse existing repository labels.
+- Added coordinator allocation, separate child Issues/worktrees, exclusive paths, start/blocker/handoff records and Issue-to-PR linkage. Existing tasks retain their names; unavailable GitHub access uses a local pending record until linked before ready-for-review.
+- The local PR metadata checker now requires a visible `Refs #N` or `Fixes #N` line; comments, code examples, placeholders and zero are rejected. This is syntax validation only, not Issue existence, ownership or acceptance verification. Git hooks and Actions settings are unchanged.
+- Local Node 26: focused PR policy tests passed 16/16; full `npm run test:policy` passed 30/30 on the initial base and 31/31 after aligning this change with `origin/master`. YAML parsing and required/unique form field checks passed for all three templates. Regression first reproduced the comment-only false positive, then passed after Markdown token validation. No product runtime, device, deployment or outdoor acceptance is claimed by this policy change.
+- A path error initially placed four governance edits and four added files in the shared checkout. After explicit user approval, only those verified task-owned edits were removed; other worker changes were preserved. Final changes are isolated on `codex/21-issue-collaboration`.
+
 ## 2026-10-24: GitHub Actions checks disabled
 - Removed `.github/workflows/pr-policy.yml` and `.github/workflows/verify.yml` after GitHub reported the repository account could not start jobs because of billing or spending-limit restrictions. This removes the external Actions check path only; local hooks, `npm run test:policy`, component tests, coverage commands and human PR reviews remain required evidence.
 - Existing failed Actions runs are historical evidence of the account restriction. They are not treated as application test failures. Future PRs must state exact local commands, environment, unavailable native/live/device gates and the two independent review records.

@@ -1,6 +1,9 @@
 ## Summary
 <!-- State the trigger/problem and resulting behavior. Link the task/contract/decision where relevant. -->
 
+<!-- Replace with one visible Refs #N or Fixes #N line. Use Fixes only when that Issue's criteria are met. -->
+Issue: Refs #<number>
+
 ## Validation
 <!-- List commands, outcomes and environment. Distinguish simulation/fixture/local/live/device/outdoor.
 Say explicitly which relevant checks were not run and why. Never invent a pass. -->

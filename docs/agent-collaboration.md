@@ -1,11 +1,14 @@
 # Human and AI collaboration
 
+Use [Issue collaboration](issue-collaboration.md) for task ownership, dependencies, start/blocker/handoff records and PR linkage. Existing work keeps its identifiers; new work starts from a GitHub Issue before dispatch.
+
 ## Start with a bounded task
 
 Read `AGENTS.md`, `CONTRIBUTING.md`, the active implementation plan and relevant contract before editing. Use concise task/decision records, not private chains of thought. A task must identify:
 
 ```text
 Task ID / goal:
+GitHub Issue / parent / dependencies:
 Base revision / dependency:
 Owner and exclusive writable paths:
 Inputs / shared interfaces:
@@ -28,7 +31,7 @@ Keep tasks small enough to verify independently. Parallelize independent paths; 
 
 The user has authorized parallel agent development for this project. Keep concurrency within available tool slots and independently owned work. Two reviews means two independent reviewers, not one implementer reviewing its own output twice. A reviewer may review multiple components it did not implement; targeted rereview follows material fixes.
 
-The user additionally requires a PR at every verifiable milestone. Follow [milestone publication](milestones.md): the coordinator publishes a scoped Draft PR after relevant checks pass, identifying the implementation agent, task and pending reviews. Review proceeds on that visible snapshot; do not wait until all components finish to publish a combined PR. Keep the source PR draft until the two independent review gates are resolved.
+The user additionally requires a PR at every verifiable milestone. Follow [milestone publication](milestones.md): the coordinator publishes a scoped Draft PR after relevant checks pass, identifying the implementation agent, primary Issue, task and pending reviews. Review proceeds on that visible snapshot; do not wait until all components finish to publish a combined PR. Keep the source PR draft until the two independent review gates are resolved.
 
 The architect directs the existing iOS, Mac and Relay agents through bounded task briefs and receives their handoffs. See [architect role](architecture/README.md). Contract changes are proposed by the architect and applied to shared files by the coordinator before affected developers proceed. The architect's cross-component check is additional to each component's two independent reviews.
 
