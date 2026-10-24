@@ -55,7 +55,13 @@ test('rejects overall baseline regression even when changed code is covered', ()
 test('checks overall branch regression independently of changed lines', () => {
   const head = parsed([[1, 1]], [[1, '0', 1], [1, '1', 0]]);
   const baseline = parsed([[1, 1]], [[1, '0', 1], [1, '1', 1]]);
-  assert.ok(run(head, baseline, new Map()).errors.some(error => error.includes('overall branches decreased')));
+  assert.ok(run(head, baseline, new Map([[source, new Set([1])]])).errors.some(error => error.includes('overall branches decreased')));
+});
+
+test('does not fail overall branch drift when a PR has no eligible Node source changes', () => {
+  const head = parsed([[1, 1]], [[1, '0', 1], [1, '1', 0]]);
+  const baseline = parsed([[1, 1]], [[1, '0', 1], [1, '1', 1]]);
+  assert.deepEqual(run(head, baseline, new Map()).errors, []);
 });
 
 test('missing changed source coverage fails, while excluded tests and comment-only changes do not invent executable lines', () => {
