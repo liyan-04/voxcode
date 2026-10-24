@@ -14,6 +14,7 @@
 - Do not commit another worker's changes. Coordinator makes scoped commits after verification.
 - Each implementation component requires two reviews independent of its implementer; save reviewed revision, findings and resolutions under docs/reviews/. AI reports are not human GitHub approvals or user acceptance.
 - Record real verification commands and outcomes in docs/progress.md. Pending verification stays pending.
+- After a PR is merged into the current base, follow [docs/architecture/cleanup-policy.md](docs/architecture/cleanup-policy.md): preserve PR/review/progress evidence, then let the coordinator remove only verified, dependency-free topic branches, clean worktrees and disposable build artifacts. Never delete protected branches, unmerged work or a dirty worktree.
 
 ## Safety and correctness
 - Codex is local to the Mac. Do not automate IDE keystrokes or expose an unauthenticated App Server.
@@ -28,7 +29,7 @@
 
 ## Git
 - Required subject: type(scope): summary, lowercase type/scope, at most 100 Unicode characters. Types: feat, fix, docs, test, refactor, chore, ci, perf, build, revert. Example: feat(mac): add durable task snapshots.
-- Use codex/ branches and verify the target base (currently codex/mvp). Never force-push, commit secrets or merge unreviewed implementation.
+- Use codex/ branches and verify the target base (currently codex/mvp). Direct commits or pushes to `main`, `master` or `codex/mvp` are forbidden; submit every change through a PR from a `codex/*` topic branch. Never force-push, commit secrets or merge unreviewed implementation.
 - Commit one coherent change with relevant tests/docs and validation evidence. Coordinator stages explicit paths and inspects the staged diff; never git add . in a shared checkout.
 - Follow the PR template: Summary, Validation, Risks, Review. Keep incomplete work/reviews in draft; prefer reviewed squash merges. Do not merge or deploy automatically.
 - Install npm run hooks:install in each active checkout. Run npm run test:policy when changing repository policy. CI checks metadata/subjects; required merge enforcement still depends on GitHub branch protection.

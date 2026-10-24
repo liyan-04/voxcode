@@ -41,6 +41,7 @@ test('accepts complete PR metadata without demanding invented device evidence', 
 
 test('requires an explicit codex branch and all four substantive sections', () => {
   assert.ok(validatePullRequest({ ...pr, headRef: 'main' }).length > 0);
+  assert.ok(validatePullRequest({ ...pr, headRef: 'codex/mvp' }).some(error => /protected/u.test(error)));
   for (const section of ['Summary', 'Validation', 'Risks', 'Review']) {
     assert.ok(validatePullRequest({ ...pr, body: body.replace(`## ${section}`, '## Other') }).length > 0, section);
   }

@@ -1,5 +1,9 @@
 # Outdoor iPhone relay
 
+## 手动安装包
+
+在仓库根目录运行 `npm run package:relay` 可生成 `dist/voxcode-relay-0.1.0.tar.gz`。包内包含 Relay、Connector、配置模板、前台/后台启动脚本、状态/停止脚本和手动 systemd 用户服务模板；安装器只写入新的私有 prefix，已存在的 prefix 会拒绝覆盖。完整步骤见 [`packaging/README.md`](packaging/README.md)。
+
 The public relay accepts phone HTTPS API calls and forwards them over the company
 Mac's **outbound** WSS connection. The Mac's bridge stays on loopback; no company
 router port forwarding or inbound Mac firewall rule is needed. This is a single

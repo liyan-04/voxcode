@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { marked } from 'marked';
+import { protectedBranches } from './branch-policy.mjs';
 
 const subjectPattern = /^(feat|fix|docs|test|refactor|perf|chore|ci|build|revert)\([a-z][a-z0-9-]*\)!?: \S(?:[^\r\n]*\S)?$/u;
 const requiredSections = ['Summary', 'Validation', 'Risks', 'Review'];
@@ -53,6 +54,8 @@ export function validatePullRequest(pr) {
   const errors = validateTitle(pr.title);
   if (typeof pr.headRef !== 'string' || !/^codex\/\S+$/u.test(pr.headRef)) {
     errors.push('PR head branch must start with codex/.');
+  } else if (protectedBranches().includes(pr.headRef)) {
+    errors.push(`PR head branch ${pr.headRef} is protected; create the change on a separate codex/* branch.`);
   }
   const { sections, duplicates } = sectionsIn(typeof pr.body === 'string' ? pr.body : '');
   for (const section of requiredSections) {

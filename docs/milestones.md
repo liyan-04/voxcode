@@ -9,15 +9,16 @@ The user requested a visible pull request at every verifiable milestone on 2026-
 - Each developer uses an independent Git worktree and component branch; the coordinator uses a separate integration worktree. Preserve the original shared checkout during migration. Every PR names its actual base and dependency. Retarget and rerun verification after dependencies merge; do not automatically merge.
 - The source PR remains draft until its required checks and two independent reviews are resolved. Code review does not certify signing, device, live voice or outdoor delivery.
 - Save task ownership, commands, findings and resolutions in the repository and link them from the PR. Report real evidence classes and the reviewed revision.
+- After a milestone PR is merged, apply [the post-merge cleanup policy](architecture/cleanup-policy.md). Cleanup never removes the PR or its evidence; it removes only verified dependency-free topic resources, and only the coordinator performs it.
 
 ## Current milestones
 
 | Milestone | Implementation owner | Scope and evidence | Pull request |
 | --- | --- | --- | --- |
-| M0 / ARCH-002 | `/root/architect` with `/root` for shared contracts | Source tasks released; PCM and authenticated local monitor interfaces applied; a352757 | [Draft #2](https://github.com/liyan-04/voxcode/pull/2) |
-| M1 / MAC-002+003 | `/root/mac_v1` | Durable sessions, scheduling, acceptance and local aggregates. MAC-004/005 sourcef4114f2 repairs authorization/approval P1s, split UTF-8 bodies and no-effect business rejection. Root and both independent reviewers reproduced74/74; source CI passed. | [Draft #3](https://github.com/liyan-04/voxcode/pull/3) |
-| M2 / RELAY-002 | `/root/relay_v1` | Strict fixed-IP TLS, exact routes, certificate helper. RELAY-003 de8fc2d repairs accepted pre-TLS socket shutdown; 28 local/fixture passes, Linux Node 22 CI and two independent targeted reviews passed. | [Draft #4](https://github.com/liyan-04/voxcode/pull/4) |
-| M3 / VOICE-002+RUNTIME-001 | `/root` | Linx tools/drafts, PCM codec, unified launch and24-task controlled benchmark. Integration3fca98f:151 Node checks passed, lines92.51%/branches83.26%; two real local Codex turns/file verification previously passed. Voice sourcebdd7f29 has two independent reviews; native final CI tracked below. Real Linx unavailable. | [Draft #6](https://github.com/liyan-04/voxcode/pull/6) |
-| M4 / IOS-002+003 | `/root/ios_v1` | Native task/results/acceptance, strict trust, PCM and labelled24-task simulation. IOS-004/005 source5c2b9a7 fixes definite rejection, refresh/replay ordering and re-record identity. Both independent targeted reviews complete; final exact-source CI39988267625 passed coverage, unsigned SDK build and native XCTest. | [Draft #5](https://github.com/liyan-04/voxcode/pull/5) |
+| M0 / ARCH-002 | `/root/architect` with `/root` for shared contracts | Source tasks released; PCM and authenticated local monitor interfaces applied | Pending publication |
+| M1 / MAC-002+003 | `/root/mac_v1` | Durable sessions, configurable scheduling, versioned acceptance and local aggregates; worker reports 41 local/fixture tests passed. Root verified a real local two-turn Codex file edit/follow-up separately. Two source reviews pending. | Pending publication |
+| M2 / RELAY-002 | `/root/relay_v1` | Strict fixed-IP TLS, bounded exact routes, certificate helper; worker reports 28 local/fixture tests passed. Deferred preview remains unimplemented. Two source reviews pending. | Pending publication |
+| M3 / VOICE-002+RUNTIME-001 | `/root` | Linx tools/drafts, PCM codec, unified Mac launch and 24-task controlled benchmark; 22 voice/runtime checks passed locally. Independent reviews in progress; real Linx unavailable. | Pending publication |
+| M4 / IOS-002+003 | `/root/ios_v1` | Native recording ownership, task/results/acceptance, strict trust, PCM and labelled simulation; implementation and SDK verification in progress | Pending publication |
 
 Deployment remains deferred. All milestone publication is a code/document checkpoint, not completion of the native phone or outdoor acceptance gates.

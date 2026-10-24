@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+prefix="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+env_file="$prefix/config/connector.env"
+[[ -r "$env_file" ]] || { echo "Missing $env_file" >&2; exit 1; }
+node_bin="${NODE_BIN:-node}"
+command -v "$node_bin" >/dev/null 2>&1 || { echo "Node executable not found: $node_bin" >&2; exit 1; }
+daemon=0
+[[ "${1:-}" == --daemon ]] && daemon=1
+run=("$node_bin" "--env-file=$env_file" "$prefix/app/connector-cli.mjs")
+if (( daemon )); then
+  [[ ! -e "$prefix/run/connector.pid" ]] || { echo "Connector pid file already exists: $prefix/run/connector.pid" >&2; exit 1; }
+  nohup "${run[@]}" >> "$prefix/log/connector.log" 2>&1 < /dev/null &
+  pid=$!
+  printf '%s\n' "$pid" > "$prefix/run/connector.pid"
+  echo "Started connector pid $pid"
+else
+  exec "${run[@]}"
+fi

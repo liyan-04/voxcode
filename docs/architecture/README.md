@@ -29,3 +29,5 @@ Use short coordination rounds: record blockers, assign work, then yield while de
 The architect may edit only its explicitly assigned coordination record under `docs/architecture/`. Reports include current task ownership, dependency matrix, next task briefs, actual evidence, blockers, review status and the next checkpoint. Keep missing checks visible.
 
 No staging, commits, stash, branch switches, pushes, merges, deployment, credential access or edits to implementation/shared contract files. Request ownership changes through the coordinator. Deployment remains deferred. Do not discard existing red tests or unfinished files; use them as resumable work with their original owners.
+
+All agents follow [the Agent work agreement and acceptance standard](agent-work-agreement.md). Post-merge branch/worktree cleanup follows [cleanup-policy.md](cleanup-policy.md).
