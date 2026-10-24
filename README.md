@@ -2,10 +2,10 @@
 
 用原生 iPhone App 连接服务器，通过 **灵矽 AI** 语音控制服务器上的 Codex。手机负责录音/播放、确认指令、查看进度、检查 diff/测试结果、追问与验收；服务器接入灵矽并执行实际开发任务。
 
-**当前状态（2026-10-24）：核心模块及本地测试已具备，完整产品尚未交付。** 已完成新架构的PM/架构师评估和本地受控串联验证，正在并行改造服务器交付、iOS入口和现行灵矽协议；Linux真实Codex、签名iPhone安装、真实灵矽及户外链路仍需验证。安装包、本地 fixture、模拟器和配置存在均不能代替这些验收。
+**当前状态（2026-10-24）：核心模块及本地测试已具备，完整产品尚未交付。** 已完成新架构的PM/架构师评估和本地受控串联验证，最新灵矽协议已通过双独立评审并经 PR #59 合并；服务器交付、iOS入口和手机双工WSS仍在推进；Linux真实Codex、签名iPhone安装、真实灵矽及户外链路仍需验证。安装包、本地 fixture、模拟器和配置存在均不能代替这些验收。
 
 ```text
-iPhone 原生 App ── HTTPS ──> vm6 Relay :9899
+iPhone 原生 App ── WSS双工（待实现）+ HTTPS ──> vm6 Relay :9899
                                   ↑ 同机严格 WSS
 服务器统一运行入口 ──────────────┘
     ├─ Connector + 127.0.0.1 Bridge
@@ -35,7 +35,7 @@ iPhone 原生 App ── HTTPS ──> vm6 Relay :9899
 | 灵矽 AI | 设备 WSS、PCM/Opus 适配、MCP 状态查询与待确认草稿、本地受控回归 | 用户测试智能体与绑定设备尚未准备；真实握手、STT/MCP/TTS 未验收 |
 | 工程验证 | 本地 Node 回归、benchmark、两名独立评审、PR 与证据记录 | 同一安装构建在蜂窝网络完成手机 → vm6 Relay → 服务器 Codex 全流程 |
 
-已合并的监控服务本地验证为 **173/173**，语音/集成验证为 **26/26**；这是特定版本的 local/fixture 证据，详情见[评审记录](docs/reviews/monitoring-2026-10-24.md)和[灵矽就绪记录](docs/verification/linx-readiness-2026-10-24.md)。不代表云端、真机或户外成功。
+最新灵矽协议完整 Node 回归 **211/211**，两名独立评审各自运行语音/集成 **50/50**；见[精确版本与覆盖率证据](docs/reviews/linx-current-protocol-2026-10-24.md)。手机双工 WSS 为新增必需能力，当前仍使用 HTTP 音频块和事件轮询，改造由 [Issue #62](https://github.com/liyan-04/voxcode/issues/62) 跟踪。这些 local/fixture 结果不代表云端、真机或户外成功。
 
 灵矽[设备激活辅助工具](packages/voice/README.md#local-software-device-onboarding)支持离线身份初始化、固定官方 HTTPS 激活及私有配置保存，需用户先准备测试智能体与设备入口；本地测试不代表已绑定。[语音联调 CLI](docs/verification/linx-smoke.md)可对实际执行端语音路由发送合成 PCM，输出脱敏事件观察和清理结果；真实提供商、工具语义和可听播放需另行验收。[iPhone 打包入口](apps/ios/README.md#build)提供只读前置检查和显式开发签名归档/导出流程，仍需完整 Xcode、有效签名和经审核的公开 CA 证书，未在本机产出真机包。当前远端操作与后台每分钟巡检创建均被审批服务 `401 model not in allowed model list` 阻塞，动作未执行；本地开发继续。
 
@@ -77,7 +77,7 @@ shasum -a 256 dist/voxcode-relay-0.1.0.tar.gz
 
 服务器复用[统一运行入口](apps/integration/README.md)启动Bridge、语音和内置Connector，与同机Relay连接；**同一机器身份只运行一个Connector**。iPhone配对到授权服务器项目。完整服务器预检/源码包正在[Issue55](https://github.com/liyan-04/voxcode/issues/55)实现，现有Relay包不能当作完整执行服务。Codex任务使用专用非root账户，Relay私钥应由不同身份保护；当前工作区/环境过滤不是完整安全沙箱。
 
-灵矽接入先按[接入指引](docs/verification/linx-readiness-2026-10-24.md)创建测试智能体、确认设备绑定入口。凭据只放服务器私有配置，不发到聊天或仓库。当前云端验证仍待资源准备，`voiceConfigured`只表示配置存在。[现行WebSocket](https://linx.qiniu.com/docs/xrobot/platform/websocket)及[端侧MCP](https://linx.qiniu.com/docs/xrobot/mcp/hardware-mcp)由服务器软件设备实现；[云端SSE MCP](https://linx.qiniu.com/docs/xrobot/mcp/software-mcp)是另一个接入方式，本轮不增加公开回调入口。最新文档对齐见[Issue57](https://github.com/liyan-04/voxcode/issues/57)。
+灵矽接入先按[接入指引](docs/verification/linx-readiness-2026-10-24.md)创建测试智能体、确认设备绑定入口。凭据只放服务器私有配置，不发到聊天或仓库。当前云端验证仍待资源准备，`voiceConfigured`只表示配置存在。[现行WebSocket](https://linx.qiniu.com/docs/xrobot/platform/websocket)及[端侧MCP](https://linx.qiniu.com/docs/xrobot/mcp/hardware-mcp)由服务器软件设备实现；[云端SSE MCP](https://linx.qiniu.com/docs/xrobot/mcp/software-mcp)是另一个接入方式，本轮不增加公开回调入口。最新文档对齐已通过[PR #59](https://github.com/liyan-04/voxcode/pull/59)合并。测试智能体尚未准备，按[服务器接入指引](docs/verification/linx-readiness-2026-10-24.md)从控制台、私有软件设备绑定与角色配置逐步完成。
 
 ## 协作、文档与验收
 

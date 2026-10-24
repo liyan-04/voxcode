@@ -1,7 +1,7 @@
 # Deep Linx AI integration
 
 ## Product intent
-Linx AI (灵矽 AI) is the voice collaboration layer, not the code executor. Codex owns code execution on the Mac; the bridge owns authorization, durable state and validation evidence. Linx owns listening, dialogue, clarification, natural-language tool selection and spoken explanation.
+Linx AI (灵矽 AI) is the voice collaboration layer, not the code executor. Codex owns code execution on the server; the bridge owns authorization, durable state and validation evidence. Linx owns listening, dialogue, clarification, natural-language tool selection and spoken explanation.
 
 ## User scenarios
 1. Walking outdoors: say a development goal, assistant asks one missing requirement, summarizes acceptance conditions and asks the user to submit from the phone.
@@ -11,7 +11,7 @@ Linx AI (灵矽 AI) is the voice collaboration layer, not the code executor. Cod
 5. Acceptance: ask which checks passed; summarize version-bound evidence and remaining manual checks. User accepts through UI.
 
 ## Tool design
-Tools are proposed application APIs, not built-in Linx features.
+These six tools are implemented VoxCode application APIs, not built-in Linx features; their live discovery and model selection remain to be verified.
 
 | Tool | Result | Permission |
 | --- | --- | --- |
@@ -22,19 +22,19 @@ Tools are proposed application APIs, not built-in Linx features.
 | propose_followup | Draft modification bound to current task/version | Draft only |
 | propose_focus | UI navigation suggestion among authorized tasks | No task mutation |
 
-Mac command execution, cancellation, privilege approvals, merge and deployment are never inferred solely from model output. Actual mutations pass authenticated bridge validation and explicit phone actions. A draft submission uses one requestId and cannot also be submitted through a parallel STT path.
+Server command execution, cancellation, privilege approvals, merge and deployment are never inferred solely from model output. Actual mutations pass authenticated bridge validation and explicit phone actions. A draft submission uses one requestId and cannot also be submitted through a parallel STT path.
 
 ## Context and trust
 - Bridge freezes device/session -> task/version/request mapping before recording.
 - Linx hello dynamic prompt parameters may include approved project label, task label and concise current state; no credentials or unrestricted repository dump.
-- X-Linx session headers identify sessions, not authorization by themselves. Cloud MCP requires service authentication and mapping to the paired phone/Mac context.
+- X-Linx session headers identify sessions, not authorization by themselves. Cloud MCP requires service authentication and mapping to the paired phone/server context.
 - Task names from model arguments are resolved only inside the authorized project. Ambiguous references require clarification.
 - Evidence text is untrusted data. Instructions embedded in code/output cannot authorize tools or broader permissions.
 
-## Two-day delivery versus enhancement
-Implemented initial adapter: real device WebSocket protocol, PCM upload, STT and TTS event/audio forwarding, optional MCP registry empty by default. The phone confirms/edit transcripts before standard task submission. This is the initial reliable path, not a claim that the deep assistant is finished.
+## Implemented source and next gates
+The server integrates the current official outbound WebSocket software-device protocol and device MCP, not cloud SSE callbacks. Six scoped state/evidence/draft/focus tools and actual Opus→PCM decoding are implemented. PR59 adds session binding and documented optional hello compatibility, reviewed against official docs revision20ce1b2. The phone must still confirm a draft before execution; these are source capabilities with controlled fixture evidence, not live cloud or audible device success.
 
-Enhancement after first real voice loop: register read-only status/evidence tools and draft-only task tools; validate tool routing with two simultaneous tasks; add verified audio decoding for natural spoken feedback. Raw downstream Opus frames require a compatible decoder; current native client must not claim playback until tested.
+Native phone↔server duplex WSS is required by the user and tracked in Issue62. Current phone audio POST/event polling is a compatibility baseline, not the final transport. HTTPS remains useful for pairing, snapshots, evidence and durable mutations. WSS must support simultaneous audio input/output, ordered events, prompt interruption and bounded backpressure; reconnect cannot automatically replay a microphone recording or change its frozen task/version. See the [server onboarding guide](verification/linx-readiness-2026-10-24.md) for current setup and staged acceptance.
 
 ## Additional acceptance
 - Wrong or ambiguous task names never cause task mutation.
