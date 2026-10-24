@@ -13,3 +13,9 @@ For a low-risk change, explain why; do not leave a bare "None". -->
 <!-- Link independent reports and finding resolutions for the exact revision reviewed.
 Implementation components require two independent reviewers. Pending reviews keep the PR in draft.
 AI reports are evidence, not human GitHub approvals or acceptance. -->
+
+## Milestone tag
+<!-- Every verifiable milestone must have an annotated Git tag on the milestone commit.
+Name it as `milestone/<short-name>` and include the exact tag here. The coordinator creates
+and pushes the tag only after the milestone checks pass; this section is required for every PR. -->
+Tag: milestone/<short-name>

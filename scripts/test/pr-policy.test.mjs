@@ -15,6 +15,8 @@ Local fixture: node --test apps/preview/test/*.test.mjs; 4 passed. Device: not r
 Native WebView cookie propagation remains unverified.
 ## Review
 Independent review reports are pending; keep this PR in draft.
+## Milestone tag
+Tag: milestone/preview-expiry
 `;
 const pr = { title: 'fix(preview): reject expired preview sessions', body, headRef: 'codex/preview-expiry' };
 
@@ -36,6 +38,12 @@ test('limits title to 100 Unicode characters rather than bytes', () => {
 });
 
 test('accepts complete PR metadata without demanding invented device evidence', () => {
+  assert.deepEqual(validatePullRequest(pr), []);
+});
+
+test('requires a milestone tag in every PR and validates its format', () => {
+  assert.ok(validatePullRequest({ ...pr, body: body.replace('## Milestone tag\nTag: milestone/preview-expiry\n', '') }).some(error => error.includes('Milestone tag')));
+  assert.ok(validatePullRequest({ ...pr, body: body.replace('milestone/preview-expiry', 'release-1') }).some(error => error.includes('must name a tag')));
   assert.deepEqual(validatePullRequest(pr), []);
 });
 

@@ -5,7 +5,7 @@ import { marked } from 'marked';
 import { protectedBranches } from './branch-policy.mjs';
 
 const subjectPattern = /^(feat|fix|docs|test|refactor|perf|chore|ci|build|revert)\([a-z][a-z0-9-]*\)!?: \S(?:[^\r\n]*\S)?$/u;
-const requiredSections = ['Summary', 'Validation', 'Risks', 'Review'];
+const requiredSections = ['Summary', 'Validation', 'Risks', 'Review', 'Milestone tag'];
 
 export function validateTitle(title) {
   if (typeof title !== 'string' || !subjectPattern.test(title) || /[\r\n]/u.test(title)) {
@@ -61,6 +61,10 @@ export function validatePullRequest(pr) {
   for (const section of requiredSections) {
     if (!sections.has(section) || !hasContent(sections.get(section))) errors.push(`PR requires substantive ## ${section} content.`);
     if (duplicates.has(section)) errors.push(`PR must contain only one ## ${section} section.`);
+  }
+  if (sections.has('Milestone tag') && hasContent(sections.get('Milestone tag'))) {
+    const tagText = textIn(sections.get('Milestone tag')).join(' ');
+    if (!/\bmilestone\/[a-z0-9][a-z0-9._-]*\b/u.test(tagText)) errors.push('PR Milestone tag section must name a tag matching milestone/<name>.');
   }
   return errors;
 }
