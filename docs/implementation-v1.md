@@ -38,7 +38,7 @@ Owner: iOS worker. Files: apps/ios/**. Consumes contract v1; coordinator integra
 - [ ] Add fixed-IP-only private-CA trust configuration for URLSession; reject wrong IP/CA/expiry and plaintext. Keep paired origin/token atomic. WKWebView is deferred.
 - [ ] Render version-bound files/diff/check results and manual acceptance in native views; do not show unavailable interactive-preview controls.
 - [ ] Consume version-bound voice drafts in the existing composer; preserve immutable uncertain-response retries and frozen target.
-- [ ] Run Swift core tests and actual Xcode SDK build in CI; get two independent reviews. Signing/install remains separately recorded.
+- [ ] Run Swift core tests and an actual Xcode SDK build on a machine with full Xcode; record the local evidence and get two independent reviews. Signing/install remains separately recorded.
 
 ## Task 3: Fixed-IP TLS relay and core transport
 
@@ -72,10 +72,10 @@ Owner: coordinator, with architect/Mac developer for monitoring interfaces. File
 
 ## Task 6: Verification and delivery
 
-- [ ] Publish verified source/documents through focused codex/ commits and PRs targeting the verified base; run GitHub Actions native SDK build and repair actual failures.
+- [ ] Publish verified source/documents through focused codex/ commits and PRs targeting the verified base; run the applicable local native SDK build and repair actual failures.
 - [ ] Publish each verifiable component milestone promptly as its own Draft PR with implementation-agent attribution, actual checks and pending reviews; maintain docs/milestones.md rather than hiding progress in a final combined PR.
 - [ ] Verify real Codex creates a file and follows up using the same thread; retry prior failed live smoke only after meaningful diagnostic changes.
-- [ ] Run full Node tests, Swift core and native SDK build; two reviews for final shared behavior.
+- [ ] Run full Node tests, Swift core and native SDK build locally where the toolchain is available; two reviews for final shared behavior.
 - [ ] On specified iPhone, verify signing/install, microphone/interruption, 20-task navigation, four real parallel tasks, ten mixed-target instructions, uncertain-response retry, real diff/check inspection and versioned acceptance.
 - [ ] After separate deployment resumption, verify trusted IP TLS over cellular/company networks and respect occupied-port stop rule.
 - [ ] Record a clearly identified real three-to-five minute VoxCode phone demo. List remaining live gates; do not call source-only delivery complete. AirPlay rule compliance remains a separate organizer question, not an implemented feature claim.
