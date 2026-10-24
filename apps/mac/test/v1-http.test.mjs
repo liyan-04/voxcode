@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer } from "../server.mjs";
 
@@ -296,4 +296,27 @@ test("monitor readiness reports configured voice without claiming a live provide
   assert.equal(typeof monitor.body.readiness.codexAvailable, "boolean");
   assert.equal(monitor.body.readiness.voiceConfigured, true);
   assert.equal(calls, 0);
+});
+
+// A blocked executable probe must not hold the bridge event loop or be repeated by polling.
+test("monitor readiness probe is bounded, asynchronous and cached across health reads", async (t) => {
+  const directory = mkdtempSync(`${tmpdir()}/vox-slow-cli-`);
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const marker = `${directory}/calls`;
+  writeFileSync(`${directory}/codex`, `#!/bin/sh\nprintf 'probe\\n' >> '${marker}'\nexec /bin/sleep 5\n`, { mode: 0o755 });
+  const previousPath = process.env.PATH;
+  process.env.PATH = directory;
+  let f;
+  try { f = await fixture(t); } finally { process.env.PATH = previousPath; }
+  const secondToken = f.app.service.pair(f.app.service.pairCode);
+  const secondMonitor = fetch(`http://127.0.0.1:${f.app.server.address().port}/api/monitor`, { headers: { authorization: `Bearer ${secondToken}` } });
+  let monitorSettled = false;
+  const monitor = f.call("/api/monitor").then(result => { monitorSettled = true; return result; });
+  assert.equal((await f.call("/api/settings")).status, 200);
+  assert.equal(monitorSettled, false, "slow readiness must not block ordinary task/settings requests");
+  f.app.service.revoke(f.token);
+  assert.equal((await monitor).status, 401, "revocation during a pending readiness sample must not return a snapshot");
+  assert.equal((await (await secondMonitor).json()).readiness.codexAvailable, false, "probe expires before slow CLI reports success");
+  assert.equal((await f.call("/api/health", undefined, false)).body.codexAvailable, false);
+  assert.equal(readFileSync(marker, "utf8"), "probe\n", "repeated monitor/health reuses one startup sample");
 });

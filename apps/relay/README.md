@@ -240,3 +240,5 @@ Benchmark callers can time HTTPS requests and connector `start()`/`close()`,
 observe redacted `onStatus` callbacks, and use the returned Node `server`'s
 connection events/`getConnections()` to check cleanup. Local timings measure
 transport fixtures only. No measurements or latency thresholds are claimed here.
+
+Codex executable readiness is a single asynchronous startup sample with a two-second timeout. Monitor and health reuse it; restart the Mac runtime after installing or changing the CLI. It does not prove authentication or model execution.
