@@ -14,7 +14,7 @@ runtime closes both bridge and connector together. See `apps/relay/README.md`.
 
 Real voice additionally requires all three supported device onboarding values:
 `LINX_TOKEN`, `LINX_DEVICE_ID`, `LINX_CLIENT_ID`. `LINX_WS_URL` optionally overrides
-the documented WSS endpoint. Keep credentials on the Mac; never include them in
+the documented WSS endpoint. Keep credentials on the execution server; never include them in
 the phone, repository or logs. Without voice configuration the task bridge still
 works and voice endpoints explicitly report unavailable.
 
