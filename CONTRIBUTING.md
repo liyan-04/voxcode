@@ -50,7 +50,7 @@ npm run hooks:install
 npm run test:policy
 ```
 
-The hook checks the subject only. It is bypassable and is not a substitute for CI or review. Do not bypass it for routine work; if tooling fails, fix the checker or document an explicitly approved exception.
+The hook checks the subject only. It is bypassable and does not replace local tests or review. Do not bypass it for routine work; if tooling fails, fix the checker or document an explicitly approved exception.
 
 ## Pull requests
 
@@ -81,7 +81,7 @@ Prefer squash merge after review, using the conventional PR title. Do not automa
 
 `PR Policy / Commit and PR policy` validates the title, `codex/` branch, substantive template sections and every PR commit subject. It rejects incomplete commit pagination rather than silently accepting an unchecked tail. `Verify VoxCode` runs implementation tests and the unsigned native simulator build. Neither check can infer the truth of a review or a real-device claim.
 
-These workflows report status. They become a mandatory GitHub merge gate only when repository rulesets/branch protection require them. This change does not enable branch protection or invent human approvals. Local hooks apply only in checkouts where installed. Existing history is preserved; the policy applies to new PR commits. Because a PR can change its checker/workflow, policy changes require human review; this status is not a tamper-proof security boundary.
+GitHub Actions workflows are intentionally disabled. Local hooks, explicit validation commands and independent review remain the project checks; branch protection and human review are managed separately. Existing history is preserved and local hooks apply only in checkouts where installed.
 
 ## References and local adaptations
 
