@@ -1,0 +1,46 @@
+name: Bug or regression
+description: Track a reproducible defect, failed check or security regression
+title: "fix(component): "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Symptom and impact
+      description: State observed behavior, affected users and severity.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include deterministic steps, environment and failing command.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and writable paths
+      description: Identify component and exclusive paths for the fix.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Fix acceptance
+      description: Include regression coverage and evidence class.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks, dependencies and blockers
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Primary owner and agent role
+      description: Name the GitHub owner and agent role; coordinator confirms assignment.
+    validations:
+      required: true

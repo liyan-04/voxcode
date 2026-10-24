@@ -1,0 +1,48 @@
+name: Feature or task
+description: Define a user-facing capability or bounded engineering task
+title: "feat(component): "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What user or product outcome is required?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and writable paths
+      description: State included/excluded work and exclusive paths.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Base revision, related Issues/PRs and contracts.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable results, commands and evidence class.
+      placeholder: "- [ ] ... (simulation/local/fixture/live/device/outdoor)"
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and blockers
+      description: Record missing resources and who can unblock them.
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Primary owner
+      placeholder: "@username or agent role"
+    validations:
+      required: true
