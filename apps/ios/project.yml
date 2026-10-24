@@ -11,10 +11,12 @@ schemes:
       targets:
         VoxCode: all
         VoxCodeTests: [test]
+        VoxCodeUITests: [test]
     test:
       gatherCoverageData: true
       targets:
         - name: VoxCodeTests
+        - name: VoxCodeUITests
 targets:
   VoxCode:
     type: application
@@ -43,3 +45,14 @@ targets:
     dependencies:
       - target: VoxCode
       - package: VoxCodeCore
+  VoxCodeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    settings:
+      base:
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: VoxCode
