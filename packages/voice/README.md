@@ -74,23 +74,93 @@ task/version, supplied through documented hello prompt placeholders. Closing or
 revoking expires tools, drafts and audio; slow request bodies recheck authorization
 before provider creation. Phone confirmation remains the only execution path.
 
-## Real integration gate
+## Local software-device onboarding
 
-Register/bind a device to a Linx agent and obtain its real device token through
-the platform's supported device onboarding flow. Use its registered MAC as
-Device-Id and a persistent software UUID as Client-Id. An arbitrary API key,
-made-up MAC or unbound device is not a verified credential. Keep tokens only on
-the Mac, never in the phone bundle, repository, error output or HTTP responses.
-The WSS endpoint can be obtained through the documented OTA onboarding; the
-documented default is shown in `.env.example`. No registration/OTA API is invented
-by this module. No real credentials were available for this implementation, so
-live authentication, STT quality, MCP behavior and output playback remain pending.
+The helper uses the official OTA web-test device format. It needs Node >=22 and
+no voice package dependencies. Choose a new, absolute private directory outside
+this repository, with an existing parent owned by you or root. It creates only
+the final directory (0700), `identity.json` (0600) and, after binding, `.env.linx`
+(0600). It rejects symlinks in the path, public permissions, hardlinked files,
+wrong ownership, corrupt identities and existing runtime credentials. On macOS,
+use `/Users/your-name/...` or `/private/...`; `/tmp` and `/var` are symlink aliases
+and are intentionally rejected. Do not use a shared, recorded or synced folder.
 
-Sources retrieved by curl from upstream main on 2026-10-23:
+From the repository root, replace the example path with your own absolute path:
 
+```sh
+node packages/voice/tools/onboard.mjs init --dir /Users/your-name/.voxcode-linx
+node packages/voice/tools/onboard.mjs status --dir /Users/your-name/.voxcode-linx
+```
+
+`init` is offline. It persists a random locally administered unicast MAC and
+UUIDv4, reuses valid existing identity, and never resets it. It does not read
+hardware addresses. `status` is also offline: `unconfigured` means the identity
+has no saved env file; `configured` means a valid private env file matches that
+identity. Neither state proves cloud authorization, connectivity or speech.
+Output JSON contains only these states and creation/save flags, never identifiers,
+activation codes, tokens, complete responses or private paths.
+
+First create a competition test agent in [your own Linx console](https://linx.qiniu.com/)
+and confirm that its device binding/activation entry is available. If that entry
+is unavailable, ask the platform administrator to enable software test devices.
+Do not send credentials or screenshots to an Issue or chat. This is the user
+console checkpoint; the helper does not create agents or operate your account.
+
+After the account checkpoint and authorization to register this software device,
+run this explicitly in a private local terminal:
+
+```sh
+node packages/voice/tools/onboard.mjs activate --dir /Users/your-name/.voxcode-linx --show-code
+```
+
+`activate` makes a POST to the official HTTPS activation check, then the official
+HTTPS OTA endpoint. A pending device returns `pending` with `codeAvailable:true`.
+Only `--show-code` with both terminal input and terminal error output displays the
+six-digit code on stderr; redirected/noninteractive use is rejected before any
+request. The code is not saved. Bind it to your test agent in your own console,
+then rerun `activate` to obtain and privately save the device runtime token:
+
+```sh
+node packages/voice/tools/onboard.mjs activate --dir /Users/your-name/.voxcode-linx
+node packages/voice/tools/onboard.mjs status --dir /Users/your-name/.voxcode-linx
+VOXCODE_PROJECT=/absolute/path/to/authorized-test-project node --env-file=/Users/your-name/.voxcode-linx/.env.linx apps/integration/cli.mjs
+```
+
+The saved env contains `LINX_WS_URL`, `LINX_TOKEN`, `LINX_DEVICE_ID` and
+`LINX_CLIENT_ID`; Node loads it directly. Never place the token in CLI arguments,
+phone configuration, shell history, logs or source control. No token CLI option,
+force/refresh, identity import or overwrite operation is provided. Existing env
+files stop activation before network access. Preserve the directory for the same
+bound software identity; credential rotation/recovery requires a separately
+reviewed platform procedure. Rollback is to stop using the helper/configuration;
+no cloud unbinding, existing configuration mutation or cleanup is automatic.
+
+Requests have a 10-second deadline each and a 64 KiB response limit. The tool
+accepts only `https://xrobo.qiniuapi.com/v1/ota/` and its documented `/activate`
+endpoint, rejects redirects, never downloads firmware and never retries itself.
+The only accepted WebSocket destination is the official WSS endpoint; the exact
+official WS default is mapped to its documented WSS equivalent before saving.
+Other addresses fail closed for platform review. HTTP200 JSON business errors,
+malformed replies, missing tokens after a successful binding check and unsafe
+token encodings fail with generic errors. If rate limited or timed out, wait and
+retry explicitly; do not start a polling loop. Platform account/device availability
+and the sample `xiaoling-web-test` board type still need live confirmation.
+
+The source milestone has fixture/local evidence only. Live L1–L5 remain open:
+L1 authenticated handshake; L2 real STT and an editable draft without automatic
+execution; L3 real MCP tools with frozen task/version and actual state; L4 audible
+phone playback and abort; L5 credential expiry/revocation and the signed phone
+cellular-to-Mac path. `configured` and local tests do not close these gates. See
+[the readiness guide](../../docs/verification/linx-readiness-2026-10-24.md).
+
+Sources retrieved from upstream main on 2026-10-24:
+
+- https://github.com/qiniu/Xrobot-docs/blob/main/docs/xrobot/platform/OTA.md
 - https://github.com/qiniu/Xrobot-docs/blob/main/docs/xrobot/platform/websocket.md
 - https://github.com/qiniu/Xrobot-docs/blob/main/docs/xrobot/mcp/hardware-mcp.md
 
-Tests use an injected protocol transport, not the Linx cloud. They verify headers,
-hello readiness, deadline/closure, manual PCM lifecycle, STT/TTS/audio forwarding,
-generic error handling and explicitly registered MCP dispatch with duplicate IDs.
+Adapter tests use an injected protocol transport. Onboarding tests inject controlled
+request/response transports with a process-wide default-deny HTTPS mock; they
+verify persistent identity, permissions, no clobber, endpoint restrictions,
+pending/bound and error states, deadlines/body limits and redacted output. These
+checks do not prove cloud enrollment, STT quality, MCP behavior or phone playback.
