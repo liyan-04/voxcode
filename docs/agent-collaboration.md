@@ -6,7 +6,7 @@ Use [Issue collaboration](issue-collaboration.md) for task ownership, dependenci
 
 Read `AGENTS.md`, `CONTRIBUTING.md`, the active implementation plan and relevant contract before editing. Use concise task/decision records, not private chains of thought.
 
-The final integration branch is `master`. Start new isolated topic work from current `origin/master` and target PRs at `master`. A retained dirty worktree on a retired branch is a recovery snapshot, not a base for new work; preserve its files and port only reviewed differences into a fresh topic branch.
+The current topology is native iPhone → vm6 TLS Relay → co-located runtime/Linx/Codex, with no AirPlay constraint; see [server execution](architecture/server-execution.md). Retained Mac worker/module names below are historical ownership labels. The final integration branch is `master`. Start new isolated topic work from current `origin/master` and target PRs at `master`. A retained dirty worktree on a retired branch is a recovery snapshot, not a base for new work; preserve its files and port only reviewed differences into a fresh topic branch.
 
 A task must identify:
 
@@ -102,4 +102,4 @@ Use the exact command, result/count, environment and revision. Failed and skippe
 
 Record durable progress/decisions in `docs/`; keep volatile coordination brief. At interruption, leave a resumable handoff with uncommitted paths, last command/result, pending gates and next step. Retain the original objective and latest user corrections across context changes.
 
-Deployment is currently deferred by the user. Do not deploy as part of integration or CI. If later resumed, check `bili-xs8:9899` first and stop if occupied. Completing a task never grants authority to merge, deploy or delete user data.
+Current user authorization permits coordinator-reviewed PR integration and designated vm6 validation/deployment under [server execution](architecture/server-execution.md). It does not permit changing unrelated services. Inspect the existing9899listener ownership before changes; unrelated occupancy means stop/notify. Do not use the superseded bili-xs8 address. Source merge does not close live/device/outdoor gates; cleanup still follows the qualification policy.
