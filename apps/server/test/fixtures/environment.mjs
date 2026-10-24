@@ -16,4 +16,3 @@ export async function fixture(t) {
   for (const key of Object.keys(env)) if (key.startsWith('LINX_')) delete env[key];
   return { dir, project, privateDir, bin, env };
 }
-
