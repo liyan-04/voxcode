@@ -1,5 +1,10 @@
 # Progress and verification
 
+## 2026-10-24: monitoring, PM and documentation milestones (Issue #40)
+- PR34 monitor contract, PR36 authenticated Relay monitor/package, PR37 PM collaboration, PR38 README/script ownership and PR39 Linx onboarding evidence are merged to master. Six verified merged remote heads retired; dirty worktrees remain preserved.
+- Final server local suite173/173 and changed coverage76/76lines44/48branches passed; two independent reviews resolved packaging closure and blocking readiness probe. Native PR35 remains Draft because native XCTest/SDK/coverage are unavailable, despite source reviews and6+3local shim checks.
+- [Exact review/evidence and remaining priorities](reviews/monitoring-2026-10-24.md) distinguish implementation from real Linx, signed iPhone and cellular/company-Mac acceptance.
+
 ## 2026-10-24: architect documentation and delivery ownership (Issue #33)
 - User assigned root/module README and build/deployment script consistency to the architect. Added role/PR checkpoints and corrected conflicting iOS TTS/TLS statements and runtime environment-file instructions.
 - Package module closure is audited with server monitoring Issue #29; its new runtime module must be included and imported from the extracted installation package. No remote deployment, signed build or live Linx pass is claimed by these documentation changes.
