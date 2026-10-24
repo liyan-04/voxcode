@@ -1,190 +1,96 @@
-# Server execution entry (source delivery)
+# Server task runtime
 
-This entry runs the existing integration runtime on an authorized server: local
-Codex App Server stdio plus Bridge/Connector/voice. iPhone talks only to the
-existing authenticated TLS Relay. `apps/mac` remains the execution module name;
-it does not require a company Mac to remain online. No server sound card is
-needed. This source bundle is neither an iPhone installation nor a live deployment.
+`apps/server` 是当前 VoxCode 主线中的服务器任务层。它把已登记的 Git 项目映射到任务服务，由专用非 root 用户通过 Codex CLI 执行任务。当前可直接启动的入口是 `task-cli.mjs`；HTTP 页面、MCP dispatcher 和出站 WSS bridge 是库模块，尚未由一个生产 launcher 组合起来。
 
-Two persistent Node processes are required: existing Relay, and this runtime.
-Active Codex turns create additional managed child processes. Bridge always binds
-127.0.0.1; the only external entry is Relay. No new proxy, API or account automation
-is provided. Do not run the old connector/integration CLI in parallel with this
-entry using the same machine identity or state directory.
+## 支持的入口
 
-## Manual preparation
+| 文件 | 用途 | 当前状态 |
+| --- | --- | --- |
+| `task-cli.mjs start` | 启动项目/任务服务和受保护 Unix socket | 支持 |
+| `project-service.mjs` | 项目注册、任务元数据、归档/恢复、软删除 | 被 task runtime 使用 |
+| `codex-cli-adapter.mjs` | Codex CLI 草稿、确认、JSONL 事件、取消和证据占位 | 被 task runtime 使用 |
+| `task-rpc.mjs` | Unix socket JSON-RPC 白名单 | 被 task runtime 使用 |
+| `http-server.mjs` | 登录、项目/任务 HTTP API 和静态页面 handler | 库/fixture |
+| `mcp-server.mjs` | 受 token 保护的 MCP dispatcher | 库/fixture |
+| `mcp-proxy-bridge.mjs` | 服务器到远端 MCP WSS 的重连与请求去重 | 库/fixture |
+| `cli.mjs` | 旧 preflight/Relay runtime 入口 | 遗留；依赖已移除的旧模块，不要启动 |
 
-Use Node >=22, npm, Git, and a manually installed/authenticated Codex CLI. Run
-tasks as an ordinary dedicated execution user: **start refuses root**. Arrange
-that account, an authorized existing Git checkout with a HEAD commit, Codex
-authentication and approved check commands manually. A config.toml or missing
-auth.json alone does not establish whether authentication works. Linux cannot
-build Xcode/iPhone apps; signing and installation still require Mac/Xcode.
+`task-cli.mjs` 不打开 TCP/HTTP 端口，也不接收浏览器或语音凭据。它只创建一个受保护的 Unix socket。HTTP/MCP/语音产品链路必须先完成组合 launcher、认证边界和真实验收，才能从“库模块”升级为部署入口。
 
-Keep Relay TLS private key/config under a separate service account. Runtime uses
-only its public CA file, machine credentials and optional Linx credentials. A
-0600 file is still readable by a task running under the same UID. Environment
-filtering and Codex `workspace-write` do not provide full file-read isolation or
-multi-tenant security. A dedicated user limits scope; further voice/execution
-identity separation or container controls are needed for stronger isolation.
+## 配置和启动
 
-Prepare a state parent outside the project owned by the execution user with mode
-0700, plus private configuration files outside the source checkout (0600, parent
-0700). The data directory may be absent; preflight never creates it. Do not copy
-credentials into an archive, command argument or phone. Commands below use only
-private file paths as arguments; avoid shell tracing and shared terminal capture.
-Every canonical state-path ancestor must belong to this execution user or root
-and must not permit group/other writes. Root-owned sticky temporary directories
-(such as `/tmp`) are allowed. A 0700 leaf under an untrusted writable ancestor
-is insufficient because its directory entry can be renamed/replaced. This is a
-read-only POSIX owner/mode precheck, not a sandbox or protection against root,
-same-UID changes, ACL grants or filesystem changes after checking.
-The runtime uses the exact checked canonical project/state paths held privately
-by preflight. It does not resolve the original environment paths again: a mutable
-symlink alias cannot redirect launch to a different unchecked target. Private paths
-remain absent from the JSON report.
+需要 Node.js 22+、Git、已认证的 Codex CLI，以及一个专用非 root 运行用户。安装 server 锁定依赖：
 
-The runtime environment file uses existing names:
+```sh
+npm ci --ignore-scripts --prefix apps/server
+```
+
+创建由运行用户拥有、推荐权限为 `0600` 的项目注册表：
+
+```json
+{
+  "projects": [
+    {
+      "id": "demo",
+      "name": "Demo project",
+      "root": "/srv/authorized/demo",
+      "enabled": true
+    }
+  ]
+}
+```
+
+每个 `root` 必须是已存在且有 HEAD 的 Git checkout。服务会检查项目根、Codex 可执行文件和配置文件的 canonical path、owner、权限及祖先目录；配置文件不能是 symlink，也不能把状态目录放在项目内。
+
+使用私有环境文件启动：
 
 ```dotenv
-VOXCODE_PROJECT=/srv/authorized-project
-VOXCODE_DATA=/srv/private-executor/state
-VOXCODE_PORT=8787
-VOXCODE_RELAY_URL=wss://100.100.81.209:9899/connector
-VOXCODE_MACHINE_ID=replace-with-existing-machine-id
-VOXCODE_MACHINE_KEY=replace-with-private-base64url-key-32-to-256-characters
-VOXCODE_TLS_CA=/srv/executor-config/public-ca.pem
+VOXCODE_PROJECTS_FILE=/srv/voxcode/projects.json
+VOXCODE_TASK_DATA=/srv/voxcode/state
+VOXCODE_TASK_SOCKET=/srv/voxcode/task.sock
+VOXCODE_CODEX_COMMAND=/usr/local/bin/codex
 ```
-
-Optional voice requires all `LINX_TOKEN`, `LINX_DEVICE_ID` (MAC-form software
-device identifier), `LINX_CLIENT_ID` (UUID). `LINX_WS_URL` optionally replaces the
-default `wss://xrobo-io.qiniuapi.com/v1/ws/`. Configure/bind the Linx software
-device/agent manually; the phone stores no provider credentials. Omit every Linx
-input to disable voice. Configuration is never proof of live success.
-
-For a new Relay only, its separate account's private env file supplies the same
-machine identity/key plus `VOXCODE_RELAY_HOST`, `VOXCODE_RELAY_PORT=9899`,
-`VOXCODE_TLS_CERT` and `VOXCODE_TLS_KEY`. Follow the existing Relay README for
-strict certificate/IP SAN and trust. This entry never starts or replaces Relay.
-
-## Build and install the source bundle
-
-From a reviewed, committed repository revision, choose an unused output outside
-the checkout:
 
 ```sh
-node scripts/build-server-package.mjs --output /tmp/voxcode-server-source.tar.gz --revision HEAD
-tar -tzf /tmp/voxcode-server-source.tar.gz
+node --env-file=/srv/voxcode/task.env apps/server/task-cli.mjs start
 ```
 
-The builder reads only the explicit allowlisted blobs at the resolved Git commit,
-ignoring local Git replace objects even if the working tree differs. `manifest.json` records the full revision and
-SHA-256 per source/lockfile. Uncommitted new server files must be reviewed and
-committed by the coordinator before a deliverable can be built. Required missing
-files/symlinks, unsafe paths and existing output are rejected. No node_modules,
-.git, private env/CA/key files or test state enters the bundle.
+`VOXCODE_CODEX_COMMAND` 默认为 `/usr/local/bin/codex`，但仍需通过可信 executable 检查。任务进程使用 `codex exec --json --sandbox workspace-write -`，工作目录固定为登记的项目根；任务不能把路径或 shell 参数传给 RPC。
 
-Unpack into a new version directory after reviewing the listing/manifest. From
-that package root install dependencies manually from the three exact lockfiles:
+## RPC 和任务边界
+
+RPC 每个请求是一行 JSON，响应也是一行 JSON。允许的方法是：
+
+```text
+status, listProjects, getProject, listTasks, getTask,
+startTask, confirmTask, cancelTask,
+archiveTask, deleteTask, restoreTask,
+getLogs, getDiff, getChecks
+```
+
+创建任务只生成草稿；必须携带匹配的 `revision` 和 `requestId` 才能确认执行。`requestId` 用于持久去重，JSON-RPC `id` 不能代替它。停止任务只请求取消，不回滚文件。进程归属或持久化清理无法确认时，任务进入 quarantine，服务不会自动重跑。
+
+当前版本只保证一个全局活动 Codex execution slot。项目注册表支持多个项目，但尚未提供每任务独立 worktree 或多租户文件隔离。`getDiff` 和 `getChecks` 在没有采集证据时返回 `collected: false`，不能解释为检查通过。
+
+## 停止和恢复
+
+只向本次启动且已确认归属的服务发送 `SIGINT`/`SIGTERM`。关闭顺序是：关闭 RPC、取消活动任务、等待子进程组清理、确认状态。清理失败时不要删除 socket、清空状态或复用旧 PID；先核对进程组、cwd、owner 和任务状态，再按项目的恢复流程处理。
+
+## 本地验证
+
+安装依赖后运行当前 server 核心 fixture：
 
 ```sh
-npm ci --ignore-scripts
-npm ci --ignore-scripts --prefix apps/relay
-npm ci --ignore-scripts --prefix packages/voice
+node --test \
+  apps/server/test/codex-cli-adapter.test.mjs \
+  apps/server/test/http-server.test.mjs \
+  apps/server/test/mcp-proxy-bridge.test.mjs \
+  apps/server/test/mcp-server.test.mjs \
+  apps/server/test/project-service.test.mjs \
+  apps/server/test/task-cli.test.mjs \
+  apps/server/test/task-rpc.test.mjs
 ```
 
-Launching never installs dependencies. Root dev dependencies are included by the
-root lock; module dependencies are not bundled. Full regression tests remain in
-the repository, rather than this runtime source archive.
+本次刷新实际结果为 74/74（macOS arm64、Node.js 26，fixture/local）。这覆盖任务状态、请求去重、取消、Unix socket 边界、HTTP/MCP 认证和 WSS bridge 行为；不覆盖真实 Codex 模型、灵矽服务、Linux、TLS 证书、手机或公网网络。
 
-## Check, launch and pair
-
-First identify listeners and ownership on 9899 and 8787 with authorized local
-tools such as `ss -ltnp` or `lsof -nP -iTCP:9899 -sTCP:LISTEN`. vm6's reported
-9899 Node listener must be identified; do not kill/replace it. If it is unrelated
-or ownership is uncertain, stop and notify the operator. An existing intended
-Relay must use the agreed machine identity and valid TLS. Check the configured
-Bridge port is free. Preflight does not connect to or mutate services.
-
-From the package root as the dedicated execution user:
-
-```sh
-node --env-file=/srv/executor-config/runtime.env apps/server/cli.mjs preflight
-node --env-file=/srv/executor-config/runtime.env apps/server/cli.mjs start
-```
-
-Preflight emits only bounded check names/statuses, parsed tool versions and HEAD;
-it does not echo private paths, URLs, identities, keys or provider output. It checks
-Node, non-root UID, Git/Codex versions, existing checkout HEAD, private owned
-writable state parent, strict WSS configuration, public CA syntax, port syntax and
-optional Linx completeness. It creates no state, installs nothing and makes no
-provider/Relay requests. It cannot prove port availability, account authorization,
-certificate hostname validity, authentication, model execution or live voice.
-
-For first pairing, use an explicitly private interactive terminal:
-
-```sh
-node --env-file=/srv/executor-config/runtime.env apps/server/cli.mjs start --show-pairing-code
-```
-
-The opt-in code goes only to a TTY stderr and expires after five minutes. The flag
-is rejected before startup when stderr is redirected. Ordinary logs contain no
-pairing code. Pair the phone through Relay using this code; do not copy the code
-to logs or chat. If it expires, cleanly stop this owned runtime and restart with
-the flag for a new code. Existing phone sessions persist across clean restarts.
-
-Only if preparing a new, verified-free Relay, run this separately as its owner:
-
-```sh
-node --env-file=/srv/relay-config/relay.env apps/relay/relay-cli.mjs
-```
-
-This is the second Node process. Do not run it when the intended Relay already
-exists. Same-host Connector still uses strict WSS and CA/IP SAN verification;
-never replace WSS with plaintext or disable certificate validation for routing.
-
-## Stop, recovery and rollback
-
-Send Ctrl-C/SIGTERM only to the runtime you started and positively identify by
-live ownership/command/cwd. It closes its Connector, Bridge, voice and managed
-executions; after 15 seconds an unresolved shutdown exits with a generic warning.
-Verify owned children have stopped before restarting. Never signal an unrelated
-listener, saved PID or service, and leave the separate Relay running when it is
-still needed. Do not run two runtimes on the same state directory.
-
-After an unclean stop, the existing runtime quarantines unknown execution state.
-Use Linux `ps`/`ss`/`lsof` to verify process ancestry, group, cwd and ownership;
-do not assume a saved PID is still the same process. Follow
-`apps/mac/README.md` and `apps/mac/recover.mjs --confirm-executions-stopped` only
-after verifying all affected owned executions stopped. This does not reconcile
-unknown Codex turn dispatch; those tasks remain blocked. Do not clear snapshots
-or change data directories to bypass quarantine.
-
-For a source update, stop the owned runtime, preserve private state/config backups,
-unpack into a fresh version directory, manually install locks, preflight and
-restart. Roll back source only after verifying stopped owned processes and data
-compatibility; retain the previous package. Do not overwrite configuration or
-restore a snapshot that would discard newer results without an explicit recovery
-decision. No systemd/user creation, provider onboarding or automatic rollback is
-included.
-
-## Evidence and open gates
-
-Local fixtures test read-only/redacted preflight, launch rejection, strict local
-TLS runtime lifecycle, exact Git source packaging, manual locked dependency
-installation and an unpacked runtime startup. Tool fixtures are synthetic;
-no real Codex/Linx model success is claimed. Run from the full repository:
-
-```sh
-node --test apps/server/test/*.test.mjs scripts/test/server-package.test.mjs
-```
-
-The unpacked install fixture uses npm's offline cache populated by the three
-manual installs above. If those installs used a custom cache, pass the same npm
-`npm_config_cache` environment setting when running tests. OpenSSL and tar are
-also required for these local fixtures.
-
-Linux x86_64/Node22, real Codex two-turn edit/check/resume/cancellation, intended
-Relay ownership and TLS, live Linx ASR/MCP/audio, signed iPhone and cellular/VPN
-acceptance remain separate gates. User-reported vm6 tooling/ports are preparation
-evidence; this source task performs no SSH or live deployment.
+根 `npm test`、`scripts/build-server-package.mjs` 及其测试仍引用已经从主线删除的旧目录。它们属于待清理的迁移遗留，不能作为当前 server runtime 的安装或发布步骤。任何部署前 source bundle 都必须先更新 allowlist、锁文件和解包测试，并重新验证。
