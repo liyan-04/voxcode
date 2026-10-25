@@ -5,7 +5,7 @@ paired Mac architecture. Linux manages **only `voxcode-control.service`**. The
 historical `scripts/server` commands and `voxcode.service`/`voxcode-task.service`
 are separate deployments.
 
-## Five Shell Entry Points
+## Five Lifecycle Shell Entry Points
 
 Run these on the actual service host from a Git checkout (the scripts locate their
 own directory, regardless of your current directory). Linux requires a root
@@ -23,7 +23,8 @@ export VOXCODE_DEPLOY_CONFIG=/absolute/private/deployment.json
 ./deploy.sh
 ```
 
-All five accept `--config PATH`, `--dry-run`, `--help`. Default config paths are
+The five lifecycle entries accept `--config PATH`, `--dry-run`, and `--help`. The
+separate workstation-only `publish.sh` handoff is documented below. Default config paths are
 `/etc/voxcode-control/deployment.json` on Linux and
 `~/Library/Application Support/VoxCodeControl/private/deployment.json` on Mac.
 Linux root must use a trusted root-owned checkout and tools; do not run lifecycle
@@ -80,6 +81,33 @@ node scripts/control/package.mjs --root /path/to/voxcode \
 Record the returned SHA-256 alongside the reviewed revision. Supply both to the
 installer; a digest computed from an unreviewed input is not source approval.
 Output must be a new file. No credentials or private configuration are bundled.
+
+## External artifact handoff
+
+When the service host does not contain the trusted checkout, prepare the reviewed
+artifact from a workstation with the repository and hand it to the host through an
+approved file publisher. `publish.sh` fetches `origin/master` first, packages the
+exact `FETCH_HEAD` commit, invokes the selected QUP binary from the package's
+directory, and prints one JSON record containing the archive path, full revision,
+SHA-256 and download URL:
+
+```sh
+./publish.sh \
+  --output /private/tmp/voxcode-control-$(date +%Y%m%d-%H%M%S).bundle.gz \
+  --qup /absolute/path/to/qup-mac.2026
+```
+
+The output path must be new. `publish.sh` is the provenance gate: it fetches
+`origin/master` and reports `sourceRef: "origin/master"` with the full revision and
+digest. On the service host, download the printed URL and verify the digest before
+giving the archive to `linux.mjs update`; also compare that revision with
+`origin/master` and `HEAD` in the trusted controller checkout. The standalone
+lifecycle archive contains no Git remote proof, so `linux.mjs update` can validate
+its format and bytes but cannot infer whether an operator supplied a topic or stale
+bundle. If either comparison differs, stop and do not update. The handoff only
+transfers and verifies a release package; it does not change a service until the
+normal lifecycle command passes its ownership, preflight and strict TLS health
+checks.
 
 ## Linux Prerequisites
 

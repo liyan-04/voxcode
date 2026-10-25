@@ -1,5 +1,28 @@
 # Progress and verification
 
+## 2026-10-26: exact master QUP publishing handoff (Issue #129)
+
+- Added `publish.sh` and `scripts/control/upload-master.mjs` for a workstation
+  handoff that fetches `origin/master`, packages the exact fetched commit,
+  re-hashes the new archive before QUP, and emits its revision, digest, source
+  ref and download URL. The lifecycle guide records the required service-host
+  comparison against `origin/master` and the trusted controller `HEAD`; the
+  standalone archive cannot prove its Git remote provenance by itself.
+- Two independent implementation/document reviews are recorded in
+  `docs/reviews/qup-release-flow-upload-2026-10-26.md` and
+  `docs/reviews/qup-release-flow-docs-2026-10-26.md`. A Git bundle was rejected
+  by the control archive reader, and upload-path, digest, revision and QUP URL
+  regressions pass.
+- `npm test`: 499 tests, 498 passed, 0 failed, 1 skipped. `npm run test:policy`:
+  121 tests, 120 passed, 0 failed, 1 skipped. Focused publish/entry tests:
+  12 passed, 0 failed. `node --check`, `sh -n` and `git diff --check` passed.
+- Real QUP upload succeeded for fetched master
+  `bde7697f7bc166282855d4e73b7512ad9571859b`, digest
+  `355784cccc8f59b3de9882ffa0a539974c8ede40656fec7cddab577504dac59c`, URL
+  `http://qupfile.cloudvdn.com/voxcode-control-20261026-129.bundle.gz`.
+  This transferred an artifact only; vm6, Mac Agent, Server Codex, phone,
+  Linx and microphone acceptance remain separate and unclaimed.
+
 ## 2026-10-26: lifecycle administrative command lookup (Issue #150)
 
 - Formal vm6 adoption with PR149 succeeded, but release staging failed before
