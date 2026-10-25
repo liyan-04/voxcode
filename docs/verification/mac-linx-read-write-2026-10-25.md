@@ -73,4 +73,24 @@ macOS 不允许在本次工具外层限制沙箱中嵌套启动 Seatbelt，因�
 
 本次未进行人声麦克风、ASR/TTS、手机/户外、桌面 Codex 既有聊天控制或 resume 验证。MCP 可调用不是可信 voice-capture 关联的证明。环境变量过滤不是同 UID 文件读取隔离；生产身份分离另行验证。结果 diff/checks 来自此验收脚本的独立采集，运行时不可变结果快照仍未实现。
 
-本机 LaunchAgent 保持登录自启；现网编程助手仍使用原 MCP 绑定。两份独立实现审查尚未完成，本次仓库发布保持 Draft，不合并。
+本机 LaunchAgent 保持登录自启；现网编程助手仍使用原 MCP 绑定。初次发布时，两份独立实现审查尚未完成，PR 以 Draft 发布。
+
+## PR #105 冲突解决
+
+用户随后要求解决冲突，并在解决后合并。同步 `master` 的 `b23d2c2` 时，仅
+`apps/server/codex-cli-adapter.mjs` 发生冲突：PR #106 已在主线合入同一个正常退出清理修复，并新增说明注释。
+本次保留主线的完整适配器版本；`git diff --exit-code origin/master -- apps/server/codex-cli-adapter.mjs`
+退出 0，PR 相对该主线不再修改生产运行时源码，仅保留验收工具、测试和文档。
+
+冲突解决后的本机验证：
+
+```sh
+node --test scripts/acceptance/mac-codex/*.test.mjs apps/server/test/*.test.mjs
+npm run test:policy
+git diff --cached --check
+git diff --name-only --diff-filter=U
+```
+
+结果：服务端及验收测试 **135/135 通过**，policy 测试 **62/62 通过**；staged whitespace 检查通过，未解决冲突列表为空。
+这些是同步主线后的本机回归结果；未再次调用生产模型，也未改变已安装的本机桥接配置。
+原始现网证据仍对应上文时间与源码基线。此次按用户明确要求完成冲突处理和合并，不将本机自检表述为两份独立审查。

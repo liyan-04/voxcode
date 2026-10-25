@@ -20,6 +20,28 @@ test('concurrent confirmations spawn only once',async t=>{const f=await fixture(
 
 const waitFor=async(predicate,timeout=1000)=>{const until=Date.now()+timeout;while(!predicate()){if(Date.now()>until)throw Error('fixture condition timed out');await new Promise(r=>setTimeout(r,2));}};
 const bounded=async promise=>Promise.race([promise,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('operation remained pending')),1000);timer.unref();})]);
+for(const [code,expected]of [[0,'completed'],[7,'failed']]){
+  test(`descendant cleanup preserves ${expected} CLI exit`,async t=>{
+    const signals=[];
+    const f=await fixture(t,{killGraceMs:1,groupExists:()=>!signals.includes('SIGKILL'),signalGroup:(_pid,signal)=>signals.push(signal)});
+    const {taskId}=await f.a.startTask({prompt:'x'});await f.a.confirmTask(taskId);f.p.pid=424242;
+    f.p.stdout.emit('data',Buffer.from('{"type":"item.completed","item":{"type":"agent_message","text":"result"}}\n'));
+    f.p.emit('close',code);
+    const result=await bounded(f.a.getTask(taskId));
+    assert.ok(signals.includes('SIGTERM')&&signals.includes('SIGKILL'));
+    assert.equal(result.status,expected);assert.equal(result.exitCode,code);assert.equal(result.output,'result');
+    assert.equal(result.revision,3);assert.equal((await f.a.status()).activeTasks,0);
+  });
+}
+test('explicit cancellation during descendant cleanup remains cancelled',async t=>{
+  const signals=[];
+  const f=await fixture(t,{killGraceMs:20,groupExists:()=>!signals.includes('SIGKILL'),signalGroup:(_pid,signal)=>signals.push(signal)});
+  const {taskId}=await f.a.startTask({prompt:'x'});await f.a.confirmTask(taskId);f.p.pid=424242;f.p.emit('close',0);
+  await waitFor(()=>signals.includes('SIGTERM'));
+  const result=await bounded(f.a.cancelTask(taskId));
+  assert.equal(result.status,'cancelled');assert.equal(result.exitCode,0);
+  assert.ok(signals.includes('SIGKILL'));assert.equal((await f.a.status()).activeTasks,0);
+});
 test('cancel accepted during confirmation persistence prevents launch',async t=>{
   const tasks=new Map();let release,entered=false;
   const f=await fixture(t,{storeFactory:()=>({list:async()=>[...tasks.values()],put:async task=>{const snapshot=structuredClone(task);if(snapshot.status==='running'&&!entered){entered=true;await new Promise(r=>release=r);}tasks.set(snapshot.id,snapshot);}})});
