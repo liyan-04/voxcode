@@ -84,6 +84,11 @@ and task launchd labels, then reconcile active tasks before changing task runtim
   confirmation/cancellation, MCP status and offline behavior.
 - c8 changed control modules: lines 95.75%, branches 83.05%.
 - Repository policy: 62/62. Whitespace checks pass.
+- Real headless Chromium fixture: desktop 1440x900 and mobile 390x844 login,
+  project/task switching, two unknown writes, background-read isolation, reload,
+  query/reconcile without resubmission and offline draft preservation pass.
+  Dynamic status/recovery bands share a flex viewport; the mobile inspector is
+  anchored to its workspace rather than a fixed header offset.
 - Two independent integration reviewers and a separate transport reviewer;
   resolutions under `docs/reviews/mac-control-runtime-2026-10-25.md`.
 

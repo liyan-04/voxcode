@@ -34,3 +34,10 @@ cases. The coordinator ran all 149 server tests, focused coverage and policy.
 AI reviews do not constitute human GitHub approval or live user acceptance.
 
 Real Codex model execution, deployment, phone and Linx audio are separate gates.
+
+Browser follow-up: actual headless Chromium found fixed workspace heights did
+not account for dynamic control bands. The coordinator replaced those heights
+with a bounded flex viewport and positioned the mobile inspector in the workspace.
+mac_agent_probe and gateway_impl independently reviewed that CSS change.
+Desktop 1440x900 and mobile 390x844 fixture workflows passed with no browser
+errors, document overflow, band overlap or composer/inspector displacement.

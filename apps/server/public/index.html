@@ -23,7 +23,12 @@
   <div class="tree" id="project-tree"><p class="tree-empty">登录后查看项目与任务。</p></div>
   <div class="side-bottom"><div class="avatar">VC</div><p>你的开发工作空间<br><small>文字与语音 · 同一份任务</small></p></div>
 </aside>
-<style>#execution-status{min-height:30px;padding:7px 16px;background:#eef6f2;border-bottom:1px solid #d5e5dc;color:#355847;font-size:11px;line-height:16px;overflow-wrap:anywhere}main:has(#execution-status:not([hidden])) .workspace{height:calc(100dvh - 151px)}</style>
+<style>
+body{overflow:hidden}main{height:100dvh;display:flex;flex-direction:column;min-width:0}main>header,main>.tabs,main>.preview-bar{flex-shrink:0}main .workspace,main:has(#execution-status:not([hidden])) .workspace,main .preview-bar:not([hidden])~.workspace{position:relative;flex:1;height:auto;min-height:0}.conversation,.messages{min-height:0}.conversation{overflow:auto}
+#execution-status{flex-shrink:0;min-height:30px;padding:7px 16px;background:#eef6f2;border-bottom:1px solid #d5e5dc;color:#355847;font-size:11px;line-height:16px;overflow-wrap:anywhere}
+#operation-recovery{display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0;padding:5px 16px;border-bottom:1px solid var(--line);background:#fff8e8;font-size:11px}#operation-choice{min-width:0;max-width:420px;flex:1;font:inherit}#operation-message,#query-operation{flex-shrink:0}
+@media(max-width:1100px){.result-open .inspector{position:absolute;inset:0 0 0 auto;max-width:100%}}
+</style>
 <main>
 <div id="execution-status" role="status" hidden></div>
 <div id="operation-recovery" hidden><select id="operation-choice" aria-label="待核对操作"></select><span id="operation-message">操作结果未知</span><button class="icon-button" id="query-operation" title="查询操作结果" aria-label="查询操作结果">↻</button></div>
@@ -102,7 +107,7 @@ $('#delete-close').onclick=()=>{$('#delete-overlay').hidden=true;state.deleteTas
 try{const tabs=JSON.parse(sessionStorage.getItem('voxcode:tabs')||'[]'),target=JSON.parse(sessionStorage.getItem('voxcode:target')||'null');if(Array.isArray(tabs))state.tabs=tabs.filter(t=>t&&typeof t.projectId==='string'&&typeof t.key==='string').slice(-20);if(target&&typeof target.projectId==='string'){state.projectId=target.projectId;state.selected=typeof target.selected==='string'?target.selected:null;state.parentTaskId=typeof target.parentTaskId==='string'?target.parentTaskId:null;}}catch{}
 const unknownOperations=new Map();let unknownOperation=null;
 try{for(const id of JSON.parse(sessionStorage.getItem('voxcode:unknown-operations')||'[]').slice(0,32))if(typeof id==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(id))unknownOperations.set(id,id);}catch{}
-function renderRecovery(){const select=$('#operation-choice');select.replaceChildren();for(const id of unknownOperations.keys()){const option=element('option','',id);option.value=id;select.append(option);}unknownOperation=unknownOperations.has(unknownOperation)?unknownOperation:unknownOperations.keys().next().value??null;if(unknownOperation)select.value=unknownOperation;$('#operation-recovery').hidden=!unknownOperation;try{sessionStorage.setItem('voxcode:unknown-operations',JSON.stringify([...unknownOperations.keys()]));}catch{}}
+function renderRecovery(){const select=$('#operation-choice');select.replaceChildren();for(const id of unknownOperations.keys()){const option=element('option','',id);option.value=id;select.append(option);}unknownOperation=unknownOperations.has(unknownOperation)?unknownOperation:unknownOperations.keys().next().value??null;if(unknownOperation)select.value=unknownOperation;$('#operation-message').textContent='等待核对';$('#operation-recovery').hidden=!unknownOperation;try{sessionStorage.setItem('voxcode:unknown-operations',JSON.stringify([...unknownOperations.keys()]));}catch{}}
 const requestApi=api;
 api=async(path,options)=>{const mutation=options?.method==='POST'&&path.startsWith('/api/tasks');if(mutation&&unknownOperations.size>=32)throw Error('请先核对已有操作结果。');try{return await requestApi(path,options);}catch(error){if(mutation&&error.operationId){unknownOperations.set(error.operationId,error.operationId);if(!unknownOperation)unknownOperation=error.operationId;renderRecovery();$('#operation-message').textContent='操作结果未知';}throw error;}};
 $('#operation-choice').onchange=event=>{unknownOperation=event.target.value;$('#operation-message').textContent='等待核对';};
