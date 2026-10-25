@@ -1,5 +1,22 @@
 # Progress and verification
 
+## 2026-10-26: lifecycle administrative command lookup (Issue #150)
+
+- Formal vm6 adoption with PR149 succeeded, but release staging failed before
+  service stop: `runuser` is `/usr/sbin/runuser`, absent from the lifecycle
+  runner's former `/usr/bin:/bin` PATH. A read-only real spawn reproduced
+  `ENOENT`; the installed gateway stayed5e/PID486363 and no activation began.
+- Added only fixed system administration directories to the runner's clean
+  default environment. Explicit command environments, service-account preflight,
+  ownership checks and activation order remain intact.
+- Local real-child regressions failed2/2 before the fix and passed2/2 afterward:
+  system administration tool lookup and no ambient credential inheritance.
+  Focused Linux/Mac lifecycle, entry, bundle and tool fixtures passed38/38 on
+  macOS arm64/Node26; repository policy passed114 tests with one opt-in
+  installed-launchd fixture skipped after locked root dependencies were installed.
+  Both independent reviews passed and are saved under docs/reviews/.
+  Linux installed-tool and actual update remain pending after source merge; physical phone and voice acceptance are separate gates.
+
 ## 2026-10-25: legacy server CLI retirement (Issue #139)
 
 - Removed the obsolete scripts/server/cli.mjs command entry and its active
