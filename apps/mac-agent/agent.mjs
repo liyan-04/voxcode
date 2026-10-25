@@ -129,7 +129,7 @@ export async function createMacAgent({endpoint, deviceId, token, capabilities = 
  }
  const schedule = () => {
   if(stopped || halted || retryTimer)return;
-  retryTimer=setTimeout(()=>{retryTimer=undefined;connect();},Math.min(retryMaxMs,retryMinMs*2**Math.min(attempt++,8)));retryTimer.unref?.();
+  retryTimer=setTimeout(()=>{retryTimer=undefined;connect();},Math.min(retryMaxMs,retryMinMs*2**Math.min(attempt++,8)));
  };
  function connect(){
   if(stopped||halted)return;
