@@ -1,5 +1,11 @@
 # Mac agent
 
+日常安装、启动、停止、重启和发布统一使用仓库根目录的
+`install.sh`、`start.sh`、`stop.sh`、`restart.sh`、`deploy.sh`。
+首次准备和现有服务接管见[生命周期部署说明](../../docs/deployment/control-lifecycle.md)。
+下文保留模块级前台调试命令。
+
+
 The agent connects outbound over verified WSS to the VoxCode server. The server
 forwards registered-device commands; Codex runs on the Mac through the existing
 private task service socket. The agent exposes no listening TCP port and does

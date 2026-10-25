@@ -289,3 +289,38 @@
 - Independent tasks:55server delivery/preflight/source bundle;56iOS endpoint/trust/server copy;57latest Linx docs and session/protocol/headless regression. Each has an independent worktree and explicit paths, two reviewer requirement and PR-onlymaster integration. Existing Issue48/PR51 endpoint work stays Draft pending scope reconciliation; no worktree reset/overwrite.
 - Official Linx docs source commit20ce1b29a1bdff575a4c3317689bae30a7e08535 (2026-10-22) verified. WebSocket+deviceMCP via server-hosted software device avoids a new callback. CloudSSE GET/mcp POST/mcp/message and X-Linx correlation headers are distinct and never sufficient auth. OldC++Demo is not the protocol authority; no physical server audio is needed.
 - PersonalTeam first-install guidance reviewed by two independent agents and merged via PR54 into masterd710d7c. OfficialXcodeGen2.44.1 asset SHA256 checked and staged project generated;205/205Node tests passed after all documented locked module dependencies installed. No native compile/sign/install orIPA; fullXcode download ongoing, Issue52 stays open.
+
+
+## 2026-10-25 — #141 shell lifecycle integration
+
+Owner: current chat coordinator; isolated `codex/141-shell-lifecycle` from `5e01b5d`.
+Paths: root lifecycle shell scripts, scripts/control/**, control fixture tests,
+root/module READMEs and deployment/review evidence. Reuses copies of #122 candidate
+controllers without changing original owner worktrees; #137 unload/PID waiting and
+transient bootstrap retry lessons are covered in the Mac controller.
+
+Behavior: five shell entry points on Linux/Mac; deploy reads latest fetched master
+blobs without changing the caller checkout, updates owned installations with
+activation/health/recovery, and preserves private state. install only registers.
+Mac stop refuses active/quarantined/unknown state, unloads Agent first, waits for
+process exit, and starts task RPC before Agent. Existing deployments require
+explicit adoption. Linux independent executor provisioning remains #134.
+
+Verification (local/fixture, macOS): `npm test` 448/448 passed; separate
+`node --test apps/mac-agent/test/*.test.mjs` 35/35 passed; `sh -n` on all five root
+scripts and `git diff --check` passed. No runtime source changed; scripts/tooling
+are outside runtime coverage percentages per docs/coverage.md. Native systemd,
+installed launchd, live TLS/Keychain/Codex/Linx and remote deployment not run.
+Independent review records follow under docs/reviews/ before merge.
+
+
+Final #141 verification after integrating master `4f0a7f5`: `npm test` 464 total,
+463 passed, 1 existing opt-in native launchd process fixture skipped, 0 failed;
+Agent suite 35/35 passed. Recovery regression proves exact private config edits
+are retained after an unconfirmed activation and explicit rollback. Shell syntax
+and whitespace checks passed. User explicitly waived the two independent review
+requirement on 2026-10-25 and authorized coordinator verification then merge.
+A started independent source review found the recovery snapshot defect; fixed
+with observed red/green regression. No further reviewer gate remains. No formal
+service restart/deploy or live acceptance is claimed. #137 source is now on master
+via #142; #122 integration remains separately tracked from live/adoption evidence.

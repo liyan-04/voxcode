@@ -45,81 +45,37 @@ flowchart TB
 [当前架构](docs/architecture/phone-mac-linx-current.md)；协议见
 [Mac 控制面合同](docs/architecture/mac-agent-control.md)。
 
-## Linux 控制面
+## Linux 控制面与 Mac 执行端
 
-需要 Node.js 22+、专用非 root 服务账户和已核对归属的 HTTPS 监听者。
-从已审阅源码安装锁定依赖，准备私有控制配置、登录/配对状态和严格 CA/TLS；配置结构见
-[`control.json.example`](apps/server/deploy/control.json.example)。
-
-```sh
-npm ci --ignore-scripts --prefix apps/server
-npm ci --ignore-scripts --prefix packages/voice
-VOXCODE_CONTROL_CONFIG=/absolute/private/control.json node apps/server/control-cli.mjs preflight
-VOXCODE_CONTROL_CONFIG=/absolute/private/control.json node apps/server/control-cli.mjs start
-```
-
-`start` 为前台启动，使用 SIGINT/SIGTERM 正常停止。它当前只组合 Mac 控制面；
-`voiceAvailable` 表示已配置，不表示实际识别或工具执行成功。依赖安装不等于服务安装。
-
-对**已经安装且确认归属**的当前 Linux 服务，生命周期命令为：
+两端统一使用根目录的 shell 脚本。在**目标服务主机**的 Git checkout 中执行，
+Linux 由 root 管理专用非 root 控制服务账户，Mac 由当前 GUI 账户管理执行端：
 
 ```sh
-sudo systemctl start voxcode-control.service
-sudo systemctl stop voxcode-control.service
-sudo systemctl restart voxcode-control.service
-sudo systemctl status voxcode-control.service --no-pager
+# 首次按部署说明准备私有配置，将配置路径设置一次。
+export VOXCODE_DEPLOY_CONFIG=/absolute/private/deployment.json
+./install.sh       # 检查环境、安装锁定依赖、注册服务；不启动
+./start.sh         # Linux 启动控制面；Mac 先任务 RPC 就绪，再启动 Agent
+./stop.sh          # Mac 有活动任务时拒绝；先停 Agent，再停任务服务
+./restart.sh       # 停止后按顺序启动
+./deploy.sh        # 拉取 origin/master，发布并启动；失败自动尝试恢复上一版本
 ```
 
-新机器的一键 `install`、受检更新/回滚和数据保留卸载由
-[#122](https://github.com/liyan-04/voxcode/issues/122) 实现，尚不能作为已发布入口。
-现有 unit [模板](apps/server/deploy/voxcode-control.service)需操作者核对账户、路径、配置、
-服务和端口归属后安装；当前没有完整、已验证的自动安装命令。服务器本地执行端的
-组合生命周期是新增需求，不能把历史 `scripts/server/` 当作当前双端安装工具。
+每个入口支持 `--config /absolute/private/deployment.json`、`--dry-run` 和 `--help`，
+可从任意当前目录调用。配置只保存路径及身份参数，凭据留在私有文件或 Keychain。
+`deploy.sh` 在服务主机拉取最新 master 的已提交源码，不切换当前分支、不覆盖本地改动；
+它更新已安装且归属核对通过的服务，不创建 SSH 连接或替换未登记的进程。
+重复部署同一版本会核验并启动该版本，不重复安装依赖。
 
-## Mac 执行端
+Linux 管理 `voxcode-control.service`，需要 Node.js 22+、专用非 root 账户及严格 TLS。
+Mac 管理 `io.voxcode.control-task` 和 `io.voxcode.control-agent`，需要已认证 Codex CLI、
+私有项目注册表/任务目录/socket、配对 Agent 配置、Keychain token 和可信 CA。
+首次准备配置与可信工具、现有安装接管、状态/日志和回滚见
+[部署说明](docs/deployment/control-lifecycle.md)。已安装服务需先显式接管，不能仅凭标签推断归属。
+配置合同见 [控制面](apps/server/deploy/control.json.example)、
+[Mac Agent](apps/mac-agent/README.md) 与 [任务服务](apps/server/README.md)。
 
-需要 Node.js 22+、Git、已认证 Codex CLI、私有项目注册表/任务状态/socket、已配对
-Agent 配置、Keychain token 和可信网关 CA。凭据不放 argv、源码、页面或任务日志。
-配置说明见 [Mac Agent](apps/mac-agent/README.md) 与
-[任务服务](apps/server/README.md)。安装依赖后可分别前台启动：
-
-```sh
-npm ci --ignore-scripts --prefix apps/server
-npm ci --ignore-scripts --prefix apps/mac-agent
-node --env-file=/absolute/private/task.env apps/server/task-cli.mjs start
-```
-
-确认私有任务 RPC 就绪后，在另一终端启动 Agent：
-
-```sh
-NODE_EXTRA_CA_CERTS=/absolute/private/issuer-ca.pem node apps/mac-agent/cli.mjs \
-  --config /absolute/private/agent.json --task-socket /absolute/private/task.sock
-```
-
-对**已经安装并核对 plist、进程及路径归属**的正式 Mac 服务，使用准确标签
-`io.voxcode.control-task` 与 `io.voxcode.control-agent`，不要套用旧模板标签。
-以下占位路径替换为该安装实际的已审阅 plist；先任务服务后 Agent：
-
-```sh
-VOXCODE_LAUNCH_DOMAIN="gui/$(id -u)"
-launchctl bootstrap "$VOXCODE_LAUNCH_DOMAIN" /absolute/owned/io.voxcode.control-task.plist
-# 确认私有任务 RPC 就绪后执行下一行。
-launchctl bootstrap "$VOXCODE_LAUNCH_DOMAIN" /absolute/owned/io.voxcode.control-agent.plist
-launchctl print "$VOXCODE_LAUNCH_DOMAIN/io.voxcode.control-task"
-launchctl print "$VOXCODE_LAUNCH_DOMAIN/io.voxcode.control-agent"
-```
-
-停止按反序；执行前先核对活动任务，停止任务服务可能中断本端执行：
-
-```sh
-launchctl bootout "$VOXCODE_LAUNCH_DOMAIN/io.voxcode.control-agent"
-launchctl bootout "$VOXCODE_LAUNCH_DOMAIN/io.voxcode.control-task"
-```
-
-重启使用上述两条 `bootout`，再依次执行 task/Agent 的 `bootstrap`，中间核对 RPC 就绪。
-这些原生命令不包含安装归属/健康自动判定；已加载的 job 不能再次 bootstrap。
-统一 `install/start/stop/restart/status` 及受检 update/rollback/uninstall 仍由
-[#122](https://github.com/liyan-04/voxcode/issues/122) 交付，此处不把候选脚本当成已发布工具。
+脚本覆盖 Linux 控制面与 Mac 执行端；Linux 独立 Codex 执行账户的首次配置仍由
+[#134](https://github.com/liyan-04/voxcode/issues/134) 跟踪，不自动创建凭据或注册项目。
 
 ## 恢复与验证
 
@@ -128,7 +84,7 @@ voice 源码及各自锁定依赖；私有配置、凭据、配对、注册表�
 回滚需核对精确源码版本、hash、协议/状态兼容及健康，保留上一版；不回滚项目文件，
 不重放未知操作，不删除持久 guard/ledger 强制启动。默认卸载保留配置与业务数据。
 
-本次是文档/规则更新，没有执行上述安装、服务或线上变更。当前服务/设备证据以
+本次脚本验证采用隔离 fixture，没有执行正式安装、服务或线上变更。当前服务/设备证据以
 [状态表](docs/architecture/phone-mac-linx-current.md#能力与证据快照)为准。
 本地策略校验入口为 `npm run test:policy`；运行时验证按对应模块的测试与验证记录执行。
 
