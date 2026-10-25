@@ -115,11 +115,11 @@ test('phone HTTPS and MCP share real WSS Agent and private Mac task RPC without 
  voice.send(Buffer.alloc(640));await waitVoice('stt.final');assert.equal(calls.length,0);assert.equal(runtime.server.listenerCount('upgrade'),1);
  const voiceClosed=once(voice,'close');voice.close();await voiceClosed;assert.equal((await runtime.gateway.listDevices({userId:'owner'}))[0].online,true);
  assert.equal((await http(runtime,f.ca,'/api/projects','GET',null,headers)).body.projects[0].id,'p');
- const input={projectId:'p',prompt:'synthetic draft',requestId:'phone-business-id'};
- assert.equal((await http(runtime,f.ca,'/api/tasks','POST',input,headers)).body.taskId,'task');assert.deepEqual(calls[0],input);
- await http(runtime,f.ca,'/api/tasks','POST',input,headers);assert.equal(calls.length,1);
- assert.equal((await http(runtime,f.ca,'/api/tasks/task/confirm','POST',{requestId:'confirm-business-id',revision:1},headers)).body.status,'running');
- assert.equal(calls[1].requestId,'confirm-business-id');
+ const input={projectId:'p',prompt:'synthetic direct instruction',requestId:'phone-business-id'};
+ const submitted=await http(runtime,f.ca,'/api/tasks','POST',input,headers);
+ assert.equal(submitted.body.taskId,'task');assert.equal(submitted.body.status,'running');assert.deepEqual(calls[0],input);
+ assert.equal(calls[1].revision,1);assert.match(calls[1].requestId,/^[a-f0-9]{64}$/);assert.notEqual(calls[1].requestId,input.requestId);
+ await http(runtime,f.ca,'/api/tasks','POST',input,headers);assert.equal(calls.length,2);
  assert.equal((await http(runtime,f.ca,'/api/tasks/task/cancel','POST',{requestId:'cancel-business-id'},headers)).body.status,'cancelled');
  await runtime.refreshState();assert.equal((await http(runtime,f.ca,'/api/health')).body.codexAvailable,true);
  const mcp=await runtime.dispatch({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'codex_status',arguments:{}}});assert.match(mcp.result.content[0].text,/mac-fixture-cli/);
