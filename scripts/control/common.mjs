@@ -230,7 +230,7 @@ export function createLifecycle(driver,{run=commandRunner}={}){
    const retained=[...record?.retained??[],record?.previous].filter(value=>value&&value.revision!==target.revision&&value.revision!==previous?.revision);
    const next={format:1,platform:driver.platform,root:ctx.root,identity,current:target,previous,retained};
    const before=record?{...record,current:previous}:null;
-   await writeAtomic(pendingPath,JSON.stringify({format:1,before,after:next,wasActive:status.active||activate}));
+   await writeAtomic(pendingPath,JSON.stringify({format:1,before,after:next,wasActive:status.active}));
    try{
     if(record)await driver.stop(ctx);
     await writeTarget(ctx,target,driver);await driver.reload(ctx);

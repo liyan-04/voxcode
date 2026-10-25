@@ -312,3 +312,15 @@ scripts and `git diff --check` passed. No runtime source changed; scripts/toolin
 are outside runtime coverage percentages per docs/coverage.md. Native systemd,
 installed launchd, live TLS/Keychain/Codex/Linx and remote deployment not run.
 Independent review records follow under docs/reviews/ before merge.
+
+
+Final #141 verification after integrating master `4f0a7f5`: `npm test` 464 total,
+463 passed, 1 existing opt-in native launchd process fixture skipped, 0 failed;
+Agent suite 35/35 passed. Recovery regression proves exact private config edits
+are retained after an unconfirmed activation and explicit rollback. Shell syntax
+and whitespace checks passed. User explicitly waived the two independent review
+requirement on 2026-10-25 and authorized coordinator verification then merge.
+A started independent source review found the recovery snapshot defect; fixed
+with observed red/green regression. No further reviewer gate remains. No formal
+service restart/deploy or live acceptance is claimed. #137 source is now on master
+via #142; #122 integration remains separately tracked from live/adoption evidence.
