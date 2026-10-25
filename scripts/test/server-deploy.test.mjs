@@ -144,18 +144,18 @@ test('dual-service replacement verifies both identities and restarts task before
 
 test('health probes use real HTTPS with strict public IP identity and exact release revision', async t => {
   const f = await fixture(t), keyPath = join(f.dir, 'fixture.key'), caPath = join(f.dir, 'fixture.pem');
-  await run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', keyPath, '-out', caPath, '-days', '1', '-subj', '/CN=VoxCode Fixture', '-addext', 'basicConstraints=critical,CA:TRUE', '-addext', 'subjectAltName=IP:100.100.81.209']);
+  await run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', keyPath, '-out', caPath, '-days', '1', '-subj', '/CN=VoxCode Fixture', '-addext', 'basicConstraints=critical,CA:TRUE', '-addext', 'subjectAltName=IP:203.0.113.10']);
   let body = { name: 'VoxCode', revision: revA, codexAvailable:true }, seenHost;
   const server = createServer({ key: await readFile(keyPath), cert: await readFile(caPath) }, (req, res) => { seenHost = req.headers.host; res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise(resolve => server.close(resolve)));
   const port = server.address().port;
-  const config = { port, host: '100.100.81.209', healthOrigin: `https://100.100.81.209:${port}`, healthCaFile: caPath };
+  const config = { port, host: '203.0.113.10', healthOrigin: `https://203.0.113.10:${port}`, healthCaFile: caPath };
   const driver = systemdDriver({ root: f.deploy, config });
-  assert.equal(await driver.healthy(revA), true); assert.equal(seenHost, `100.100.81.209:${port}`);
+  assert.equal(await driver.healthy(revA), true); assert.equal(seenHost, `203.0.113.10:${port}`);
   assert.equal(await driver.healthy(revB), false);
   body = { name: 'Other', revision: revA }; assert.equal(await driver.healthy(revA), false);
   body={name:'VoxCode',revision:revA,codexAvailable:false};assert.equal(await driver.healthy(revA),false);
-  const wrong = systemdDriver({ root: f.deploy, config: { ...config, host: '100.100.81.210' } });
+  const wrong = systemdDriver({ root: f.deploy, config: { ...config, host: '203.0.113.11' } });
   assert.equal(await wrong.healthy(revA), false);
 });
 
@@ -242,7 +242,7 @@ test('before first deployment start/restart refuse; stop is idempotent and does 
 test('Expect password transport performs one synthetic interaction without printing the secret',async t=>{
   const f=await fixture(t),bin=join(f.dir,'bin'),secret=join(f.dir,'password');await mkdir(bin);await writeFile(secret,'SYNTHETIC_TEST_PASSWORD',{mode:0o600});
   await writeFile(join(bin,'ssh'),'#!/bin/sh\nstty -echo\nprintf "password: "\nIFS= read -r answer\nstty echo\nif [ "$answer" = SYNTHETIC_TEST_PASSWORD ]; then printf "\\nfixture-ok\\n"; exit 0; fi\nexit 3\n',{mode:0o700});
-  const args=[join(root,'scripts/server/vm6-password.exp'),secret,'ssh','-o','StrictHostKeyChecking=yes','root@100.100.81.209','true'];
+  const args=[join(root,'scripts/server/vm6-password.exp'),secret,'ssh','-o','StrictHostKeyChecking=yes','root@203.0.113.10','true'];
   const result=await run('expect',args,{env:{...process.env,PATH:bin+':'+process.env.PATH}});
   assert.match(result.stdout,/fixture-ok/);assert.doesNotMatch(result.stdout+result.stderr,/SYNTHETIC_TEST_PASSWORD/);
   // Even an unexpected echoing PTY must not expose the password at EOF.
