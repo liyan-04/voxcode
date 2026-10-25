@@ -273,14 +273,14 @@ $('#query-operation').onclick=async()=>{const key=unknownOperation,item=unknownO
 renderRecovery();
 function voiceOwnsDraft(){return Boolean(voiceClient?.active&&voiceStatus.target?.draftKey===draftKey());}
 function renderVoice(){
- const relevant=!voiceStatus.target||(voiceStatus.target.executionTarget??'mac')===state.executionTarget,mode=relevant?voiceStatus.state:'idle',busy=['permission','connecting','recording','stopping','aborting'].includes(mode),button=$('#voice-button');
+ const relevant=!voiceStatus.target||(voiceStatus.target.executionTarget??'mac')===state.executionTarget,mode=relevant?voiceStatus.state:'idle',busy=['permission','connecting','recording','stopping','processing','speaking','aborting'].includes(mode),button=$('#voice-button');
  const capable=Boolean(voiceClient&&voiceAvailable&&!state.loading&&state.authenticated&&currentProject()&&executionReady());
  $('#send-button').disabled=!state.authenticated||!currentProject()||!canSend()||state.loading||voiceOwnsDraft()||!executionReady();
- const text=mode==='permission'?'麦克风授权中':mode==='connecting'?'正在连接':mode==='recording'?'停止录音':mode==='stopping'?'正在识别':mode==='aborting'?'正在取消':voiceAvailable?'语音输入':'语音未连接';
- $('#voice-button span').textContent=text;$('#voice-button use').setAttribute('href',mode==='recording'?'#i-stop':'#i-mic');button.classList.toggle('recording',mode==='recording');button.disabled=mode==='recording'?false:busy||!capable||Boolean(voiceClient?.active);button.title=mode==='recording'?'停止录音并转写':!voiceAvailable?'语音尚未配置':'语音转写到当前输入';button.setAttribute('aria-pressed',String(mode==='recording'));
+ const text=mode==='permission'?'麦克风授权中':mode==='connecting'?'正在连接':mode==='recording'?'停止录音':mode==='stopping'?'正在识别':mode==='processing'?'等待执行结果':mode==='speaking'?'灵矽播报中':mode==='aborting'?'正在取消':voiceAvailable?'语音输入':'语音未连接';
+ $('#voice-button span').textContent=text;$('#voice-button use').setAttribute('href',mode==='recording'?'#i-stop':'#i-mic');button.classList.toggle('recording',mode==='recording');button.disabled=mode==='recording'?false:busy||!capable||Boolean(voiceClient?.active);button.title=mode==='recording'?'停止录音并处理语音指令':!voiceAvailable?'语音尚未配置':'语音控制当前项目和任务';button.setAttribute('aria-pressed',String(mode==='recording'));
  $('#voice-cancel').hidden=!busy;$('#voice-cancel').disabled=mode==='aborting';
- const messages={microphone_denied:'麦克风权限被拒绝，请在浏览器中允许后重试。',microphone_missing:'未找到可用的麦克风。',format_unavailable:'此浏览器暂不支持当前录音格式。',backpressure:'语音连接拥堵，录音已停止，现有输入保留。',provider_error:'语音服务返回错误，现有输入保留。',recognition_timeout:'识别等待超时，现有输入保留。',connection_timeout:'语音连接超时，请重试。',connection_closed:'语音连接已断开，现有输入保留。',connection_failed:'语音连接失败，请重试。',capture_unavailable:'无法开始录音，请检查麦克风权限和安全连接。',invalid_event:'语音响应无效，录音已停止。',draft_unavailable:'语音未能写入输入，请重新录音。'};
- const labels={permission:'等待麦克风授权',connecting:'正在连接语音',recording:mode==='recording'?'录音中 · '+String(Math.min(29,Math.floor((performance.now()-voiceStartedAt)/1000)))+' / 29 秒':'',stopping:'正在识别',aborting:'正在取消'};
+ const messages={execution_timeout:'语音结果等待超时，请查询原任务状态；不会自动重放指令。',playback_unavailable:'无法播放语音，请查看任务结果。',result_unavailable:'任务结果显示失败，请刷新查询原任务。',microphone_denied:'麦克风权限被拒绝，请在浏览器中允许后重试。',microphone_missing:'未找到可用的麦克风。',format_unavailable:'此浏览器暂不支持当前录音格式。',backpressure:'语音连接拥堵，录音已停止，现有输入保留。',provider_error:'语音服务返回错误，现有输入保留。',recognition_timeout:'识别等待超时，现有输入保留。',connection_timeout:'语音连接超时，请重试。',connection_closed:'语音连接已断开，现有输入保留。',connection_failed:'语音连接失败，请重试。',capture_unavailable:'无法开始录音，请检查麦克风权限和安全连接。',invalid_event:'语音响应无效，录音已停止。',draft_unavailable:'语音未能写入输入，请重新录音。'};
+ const labels={permission:'等待麦克风授权',connecting:'正在连接语音',recording:mode==='recording'?'录音中 · '+String(Math.min(29,Math.floor((performance.now()-voiceStartedAt)/1000)))+' / 29 秒':'',stopping:'正在识别',processing:'等待 MCP 执行结果',speaking:'灵矽播报中',aborting:'正在取消'};
  const box=$('#voice-status');box.hidden=!busy&&mode!=='error';box.classList.toggle('error',mode==='error');$('#voice-state-label').textContent=mode==='error'?(messages[voiceStatus.reason]||'录音已结束，现有输入保留。'):(labels[mode]||'')+(voiceStatus.target?.label?' · '+voiceStatus.target.label:'');$('#voice-preview').hidden=!voicePreview||!busy;$('#voice-preview').textContent=voicePreview;
 }
 function saveVoiceTranscript(text,target){
@@ -289,8 +289,24 @@ function saveVoiceTranscript(text,target){
  if(draftKey()===key)$('#composer-input').value=value;
  if(executionTarget===state.executionTarget)feedback(draftKey()===key?'语音已保存到输入，尚未提交。':'语音已保存到「'+target.label+'」的输入，尚未提交。');
 }
+function voiceExecutionTarget(){return state.executionTarget??state.executionHost??'mac';}
+function receiveVoiceResult(result,target){
+ if(result.status==='outcome_unknown'&&typeof result.operationId==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(result.operationId)){
+  const key=target.executionTarget+':'+result.operationId;
+  unknownOperations.set(key,{id:result.operationId,target:target.executionTarget});persistOperations(target.executionTarget);
+  if(target.executionTarget===state.executionTarget){unknownOperation=key;renderRecovery();$('#operation-message').textContent='操作结果未知';}
+ }
+ const sameTarget=voiceExecutionTarget()===target.executionTarget&&state.projectId===target.projectId&&(draftKey()===target.draftKey||result.taskId&&state.selected===result.taskId);
+ if(!sameTarget){feedback('语音结果已返回「'+target.label+'」，当前视图保持不变。');return;}
+ if(result.taskId&&['draft','queued','running','cancelling','cancelled','completed','failed','interrupted'].includes(result.status)){
+  receiveTask({...result,id:result.taskId},target.projectId);
+  openTarget({projectId:target.projectId,selected:result.taskId},{fetch:false});
+  void loadTask(result.taskId,target.projectId,target.executionTarget).catch(error=>feedback(error.message,true));
+ }
+ feedback(result.status==='outcome_unknown'?'执行结果未知，请查询原任务，勿重复提交。':'语音工具结果已返回；任务状态以实际执行结果为准。');
+}
 void import('/voice-client.mjs').then(({createVoiceClient})=>{
- voiceClient=createVoiceClient({onState:value=>{voiceStatus=value;clearInterval(voiceTimer);if(value.state==='recording'){voiceStartedAt=performance.now();voiceTimer=setInterval(renderVoice,500);}if(['idle','error'].includes(value.state))voicePreview='';renderVoice();},onPartial:(text,target)=>{if((target.executionTarget??'mac')!==state.executionTarget)return;voicePreview=text;renderVoice();},onTranscript:saveVoiceTranscript});renderVoice();
+ voiceClient=createVoiceClient({onState:value=>{voiceStatus=value;clearInterval(voiceTimer);if(value.state==='recording'){voiceStartedAt=performance.now();voiceTimer=setInterval(renderVoice,500);}if(['idle','error'].includes(value.state))voicePreview='';renderVoice();},onPartial:(text,target)=>{if(target.executionTarget!==state.executionTarget)return;voicePreview=text;renderVoice();},onTranscript:saveVoiceTranscript,onResult:receiveVoiceResult,onAssistant:event=>{if(event.text){voicePreview=event.text;renderVoice();}}});renderVoice();
 }).catch(()=>{voiceStatus={state:'error',reason:'capture_unavailable'};renderVoice();});
 $('#voice-button').onclick=async()=>{if(!voiceClient)return;if(voiceClient.state==='recording'){await voiceClient.stop();return;}if(voiceClient.active||state.loading||document.hidden||!voiceAvailable||!state.authenticated||!currentProject()||!executionReady())return;saveDraft();voicePreview='';const target={executionTarget:state.executionTarget,projectId:state.projectId,...(state.selected?{taskId:state.selected}:state.parentTaskId?{parentTaskId:state.parentTaskId}:{}),draftKey:draftKey(),label:((state.executionTarget==='mac'?'Mac':'Server')+' / '+currentProject().name+' / '+(state.selected?(taskById(state.selected)?.title||'当前任务'):state.parentTaskId?'新建子任务':'新建任务')).slice(0,160)};await voiceClient.start(target);};
 $('#voice-cancel').onclick=()=>{void voiceClient?.abort();};

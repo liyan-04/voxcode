@@ -9,6 +9,7 @@ import {createMcpProxyBridge} from './mcp-proxy-bridge.mjs';
 import {attachControlWebSocketRouter} from './device-websocket.mjs';
 import {createVoiceTransport} from './voice-transport.mjs';
 import {createLinxVoiceProvider} from './voice-provider.mjs';
+import {createVoiceTools} from './voice-tools.mjs';
 
 const reads=new Set(['codex_status','codex_list_projects','codex_list_tasks','codex_task_status','codex_task_logs','codex_task_diff','codex_task_checks']);
 export async function startControlRuntime({config,createBridge=createMcpProxyBridge,attachTransport,createVoiceProvider,onStatus=()=>{},shutdownTimeoutMs=5000}={}){
@@ -83,7 +84,9 @@ export async function startControlRuntime({config,createBridge=createMcpProxyBri
    const authorizeVoiceUpgrade=req=>{const session=app.authorizeUpgrade(req);return session?{...session,ownerId:config.userId}:null;};
    voiceTransport=createVoiceTransport({server:app.server,publicOrigin:config.publicOrigin,authorizeUpgrade:authorizeVoiceUpgrade,resolveContext,registerUpgrade:false,maxConnections:1,providerFactory:async options=>{
     voiceProviderState='connecting';
-    const provider=await factory({...options,onEvent:event=>{if(event.type==='error')voiceProviderState='failed';options.onEvent(event);}});
+    const bound=executionTargets.getTarget(options.context.executionTarget);
+    const tools=createVoiceTools({adapter:bound.adapter,context:options.context,voiceSessionId:options.voiceSessionId,captureId:options.captureId,authorize:options.authorizeTool,onStart:()=>options.onEvent({type:'tool.started'}),onResult:result=>options.onEvent({type:'tool.result',result})});
+    const provider=await factory({...options,tools,onEvent:event=>{if(event.type==='error')voiceProviderState='failed';options.onEvent(event);}});
     return {...provider,async connect(){try{const report=await provider.connect();voiceProviderState='ready';return report;}catch{voiceProviderState='failed';throw Error('Voice provider unavailable');}}};
    }});
   }
