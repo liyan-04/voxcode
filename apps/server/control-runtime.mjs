@@ -45,7 +45,7 @@ export async function startControlRuntime({config,createBridge=createMcpProxyBri
   }
   return false;
  };
- const app=createHttpServer({adapter,projectRegistry:adapter,tls:{...config.tls,handshakeTimeout:10000},loginSecret:config.loginSecret,publicOrigin:config.publicOrigin,revision:config.revision,serverInfo:info,healthStatus:()=>cached,apiExtension});
+ const app=createHttpServer({adapter,projectRegistry:adapter,directSubmissions:true,tls:{...config.tls,handshakeTimeout:10000},loginSecret:config.loginSecret,publicOrigin:config.publicOrigin,revision:config.revision,serverInfo:info,healthStatus:()=>cached,apiExtension});
  const sockets=new Set();app.server.maxConnections=128;
  app.server.on('connection',socket=>{sockets.add(socket);socket.once('close',()=>sockets.delete(socket));if(closing)socket.destroy();});
  app.server.headersTimeout=10000;app.server.requestTimeout=25000;app.server.keepAliveTimeout=5000;
