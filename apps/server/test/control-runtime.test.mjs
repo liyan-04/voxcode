@@ -23,6 +23,45 @@ async function fixture(t){
 function http(runtime,ca,path,method='GET',body,headers={}){
  return new Promise((resolve,reject)=>{const req=request({hostname:'127.0.0.1',port:runtime.server.address().port,ca,path,method,headers},res=>{let data='';res.on('data',chunk=>data+=chunk);res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,body:JSON.parse(data)}));});req.on('error',reject);req.end(body?JSON.stringify(body):undefined);});
 }
+test('target inventory and login never wait for an absent Mac or server executor',async t=>{
+ const f=await fixture(t),runtime=await startControlRuntime({config:{...f.config,serverTaskSocket:join(f.root,'absent.sock')},attachTransport:()=>({close:async()=>{}})});t.after(()=>runtime.close());
+ assert.equal((await http(runtime,f.ca,'/api/execution-targets')).status,401);
+ const login=await http(runtime,f.ca,'/api/login','POST',{password:f.config.loginSecret},{origin:f.config.publicOrigin});assert.equal(login.status,200);
+ const headers={origin:f.config.publicOrigin,cookie:login.headers['set-cookie'][0].split(';')[0]};
+ const inventory=await http(runtime,f.ca,'/api/execution-targets','GET',null,headers);
+ assert.equal(inventory.status,200);assert.deepEqual(inventory.body.targets.map(({id,configured,online})=>({id,configured,online})),[{id:'mac',configured:true,online:false},{id:'server',configured:true,online:false}]);
+ assert.equal(JSON.stringify(inventory.body).includes('absent.sock'),false);
+ const unavailable=await http(runtime,f.ca,'/api/projects?executionTarget=server','GET',null,headers);assert.equal(unavailable.status,503);assert.equal(unavailable.body.code,'target_unavailable');
+ await runtime.refreshState();assert.equal((await http(runtime,f.ca,'/api/login','POST',{password:f.config.loginSecret},{origin:f.config.publicOrigin})).status,200);
+});
+
+test('server private RPC readiness is independent of Mac registration',async t=>{
+ const f=await fixture(t),socketPath=join(f.root,'server.sock');
+ const rpc=await createTaskRpcServer({socketPath,adapter:{status:async()=>({available:true,version:'server-fixture'}),listProjects:async()=>[{id:'p',name:'Server project',enabled:true}]}});t.after(()=>rpc.close());
+ const runtime=await startControlRuntime({config:{...f.config,serverTaskSocket:socketPath},attachTransport:()=>({close:async()=>{}})});t.after(()=>runtime.close());
+ await runtime.refreshState();
+ const login=await http(runtime,f.ca,'/api/login','POST',{password:f.config.loginSecret},{origin:f.config.publicOrigin}),headers={origin:f.config.publicOrigin,cookie:login.headers['set-cookie'][0].split(';')[0]};
+ const {targets}= (await http(runtime,f.ca,'/api/execution-targets','GET',null,headers)).body;
+ assert.equal(targets[0].online,false);assert.equal(targets[1].online,true);assert.equal(targets[1].available,true);
+ assert.equal((await http(runtime,f.ca,'/api/projects?executionTarget=server','GET',null,headers)).body.projects[0].name,'Server project');
+ const pairing=await runtime.gateway.startPairing({userId:'owner'});await runtime.gateway.completePairing({code:pairing.code,userId:'owner',deviceId:'mac'});
+ assert.equal((await http(runtime,f.ca,'/api/projects?executionTarget=mac','GET',null,headers)).status,503);
+});
+
+test('server voice capture freezes server membership without requiring the Mac adapter',async t=>{
+ const f=await fixture(t),socketPath=join(f.root,'voice-server.sock'),contexts=[];
+ const rpc=await createTaskRpcServer({socketPath,adapter:{getProject:async id=>({id,enabled:true}),getTask:async id=>({id,projectId:'p'})}});t.after(()=>rpc.close());
+ const runtime=await startControlRuntime({config:{...f.config,serverTaskSocket:socketPath,voice:{synthetic:true}},createVoiceProvider:options=>{contexts.push(options.context);return {async connect(){return {input:{codec:'pcm_s16le',sampleRate:16000,channels:1,frameMs:20}};},start(){},close(){}};}});t.after(()=>runtime.close());
+ const login=await http(runtime,f.ca,'/api/login','POST',{password:f.config.loginSecret},{origin:f.config.publicOrigin}),cookie=login.headers['set-cookie'][0].split(';')[0];
+ const ws=new WebSocket(`wss://127.0.0.1:${runtime.server.address().port}/ws/voice`,{ca:f.ca,headers:{origin:f.config.publicOrigin,cookie}});ws.on('error',()=>{});t.after(()=>ws.terminate());
+ const messages=[];ws.on('message',data=>messages.push(JSON.parse(data)));await once(ws,'open');
+ const wait=async type=>{for(let n=0;n<200;n++){if(messages.some(message=>message.type===type))return;await delay(5);}assert.fail('missing voice event '+type);};
+ ws.send(JSON.stringify({type:'session.start',requestId:'session',context:{executionTarget:'server',projectId:'p',taskId:'t',contextVersion:1}}));await wait('session.ready');
+ ws.send(JSON.stringify({type:'capture.start',requestId:'capture',captureId:'cap',contextVersion:1,format:{codec:'pcm_s16le',sampleRate:16000,channels:1,frameMs:20}}));await wait('capture.ready');
+ assert.deepEqual(contexts,[{executionTarget:'server',projectId:'p',contextVersion:1,taskId:'t',userId:'owner',deviceId:'server'}]);
+ const closed=once(ws,'close');ws.close();await closed;
+});
+
 test('control HTTPS maps authenticated phone to a fixed Mac and public health never dispatches RPC',async t=>{
  const f=await fixture(t),commands=[];let handle,attached=0;
  const runtime=await startControlRuntime({config:f.config,attachTransport:()=>{attached++;return{close:async()=>{}};}});t.after(()=>runtime.close());
@@ -37,6 +76,7 @@ test('control HTTPS maps authenticated phone to a fixed Mac and public health ne
  }});
  const devices=await http(runtime,f.ca,'/api/devices','GET',null,headers);assert.equal(devices.body.devices[0].online,true);assert.equal(JSON.stringify(devices.body).includes(paired.token),false);
  assert.equal((await http(runtime,f.ca,'/api/projects','GET',null,headers)).body.projects[0].id,'p');
+ assert.equal((await http(runtime,f.ca,'/api/projects?executionTarget=server','GET',null,headers)).status,503);
  const count=commands.length;await http(runtime,f.ca,'/api/health');assert.equal(commands.length,count);assert.equal(attached,1);
  const badOrigin=await http(runtime,f.ca,'/api/pairings','POST',{}, {...headers,origin:'https://evil.invalid'});assert.equal(badOrigin.status,403);
  const list=await runtime.dispatch({jsonrpc:'2.0',id:1,method:'tools/list'});assert(!list.result.tools.some(tool=>tool.name==='codex_start_task'));
