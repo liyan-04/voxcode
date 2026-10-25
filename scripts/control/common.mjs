@@ -229,7 +229,8 @@ export function createLifecycle(driver,{run=commandRunner}={}){
    const previous=record?{...record.current,configuration:originalConfiguration}:null;
    const retained=[...record?.retained??[],record?.previous].filter(value=>value&&value.revision!==target.revision&&value.revision!==previous?.revision);
    const next={format:1,platform:driver.platform,root:ctx.root,identity,current:target,previous,retained};
-   await writeAtomic(pendingPath,JSON.stringify({format:1,before:record,after:next,wasActive:status.active||activate}));
+   const before=record?{...record,current:previous}:null;
+   await writeAtomic(pendingPath,JSON.stringify({format:1,before,after:next,wasActive:status.active||activate}));
    try{
     if(record)await driver.stop(ctx);
     await writeTarget(ctx,target,driver);await driver.reload(ctx);
@@ -240,7 +241,7 @@ export function createLifecycle(driver,{run=commandRunner}={}){
     let recovered=false;
     try{
      await driver.stop(ctx);
-     if(record){await writeTarget(ctx,previous,driver);await driver.reload(ctx);if(status.active){await driver.start(ctx);await driver.health(ctx,previous.revision);}}
+     if(record){await writeTarget(ctx,previous,driver);await driver.reload(ctx);if(status.active){await driver.start(ctx);await driver.health(ctx,previous.revision);}await writeAtomic(statePath,JSON.stringify(before));}
      else{await driver.unregister(ctx);for(const path of driver.registrationPaths(ctx))if(await exists(path))await fs.unlink(path);await driver.reload(ctx);await currentLink(ctx.root,null);}
      await fs.unlink(pendingPath);recovered=true;
     }catch{}

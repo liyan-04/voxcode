@@ -148,3 +148,13 @@ test('deploying installed revision starts and checks it without reinstalling dep
  assert.equal(result.unchanged,true);assert.equal((await f.execute('status')).services[0].state,'active');
  assert.equal(f.calls.filter(c=>c.args.includes('ci')).length,installs);
 });
+
+test('pending recovery retains exact private configuration edited since install',async t=>{
+ const f=await fixture(t);await f.execute('install',{bundle:f.bundle});await f.execute('start');
+ const edited={...f.control,deviceId:'mac-edited'};await fs.writeFile(f.controlConfig,JSON.stringify(edited));
+ const older=execFileSync('git',['-C',checkout,'rev-parse','HEAD~1'],{encoding:'utf8'}).trim();const bytes=await createBundle({root:checkout,revision:older});
+ f.setHealthFails(true);await assert.rejects(f.execute('update',{bundle:{bytes,sha256:sha256(bytes)}}),/recovery unconfirmed/u);
+ const journal=JSON.parse(await fs.readFile(join(f.config.root,'pending-activation.json')));
+ assert.equal(JSON.parse(Buffer.from(journal.before.current.configuration[f.controlConfig],'base64')).deviceId,'mac-edited');
+ f.setHealthFails(false);await f.execute('rollback');assert.equal(JSON.parse(await fs.readFile(f.controlConfig)).deviceId,'mac-edited');
+});
