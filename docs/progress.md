@@ -1,5 +1,18 @@
 # Progress and verification
 
+## 2026-10-25: legacy server CLI retirement (Issue #139)
+
+- Removed the obsolete scripts/server/cli.mjs command entry and its active
+  deployment instructions. The historical package subcommand loses its CLI;
+  unpublished #122 tools are not advertised as a replacement.
+- Preserved bundle/package/remote/password helpers, application runtime entries,
+  historical records and all still-valid deployment regression assertions.
+- Two independent reviews pass. Root focused deployment checks: 16/16.
+  Complete serial Node/policy/voice suite on integrated2cdfa1f: exit0, expected
+  opt-in launchd skip. Active reference search and diff checks pass.
+- Source-only cleanup; no service restart, credential/state or live rollback
+  file removal. This milestone does not establish device/provider acceptance.
+
 ## 2026-10-25: owned Mac restart (Issue #137)
 
 - Added fixed-label in-place restart/status commands. Stop waits for job absence
