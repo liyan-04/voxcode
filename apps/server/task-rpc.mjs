@@ -4,7 +4,7 @@ import {dirname,resolve,isAbsolute} from 'node:path';
 import {randomUUID} from 'node:crypto';
 
 const REQUEST_LIMIT=64*1024,RESPONSE_LIMIT=1024*1024;
-const methods=['status','listProjects','getProject','listTasks','getTask','startTask','confirmTask','cancelTask','archiveTask','deleteTask','restoreTask','getLogs','getDiff','getChecks'];
+const methods=['status','listProjects','getProject','listTasks','getTask','startTask','continueTask','confirmTask','cancelTask','archiveTask','deleteTask','restoreTask','getLogs','getDiff','getChecks'];
 const error=(code,message)=>Object.assign(Error(message),{code});
 const object=(x,fields)=>x&&typeof x==='object'&&!Array.isArray(x)&&Object.keys(x).every(k=>fields.includes(k));
 const id=x=>typeof x==='string'&&x.length>0&&x.length<=128;
@@ -14,6 +14,7 @@ function validArgs(method,args){
   if(['getProject','getTask','getLogs','getDiff','getChecks'].includes(method))return args.length===1&&id(args[0]);
   if(method==='listTasks')return args.length===1&&object(args[0],['projectId','includeArchived','includeDeleted'])&&id(args[0].projectId)&&['includeArchived','includeDeleted'].every(k=>args[0][k]===undefined||typeof args[0][k]==='boolean');
   if(method==='startTask')return args.length===1&&object(args[0],['projectId','prompt','title','requestId','parentTaskId'])&&id(args[0].projectId)&&typeof args[0].prompt==='string'&&args[0].prompt.length>0&&args[0].prompt.length<=20000&&(args[0].title===undefined||typeof args[0].title==='string'&&args[0].title.length<=200)&&(args[0].requestId===undefined||id(args[0].requestId))&&(args[0].parentTaskId===undefined||args[0].parentTaskId===null||id(args[0].parentTaskId));
+  if(method==='continueTask')return args.length===2&&id(args[0])&&object(args[1],['prompt','revision','requestId'])&&typeof args[1].prompt==='string'&&args[1].prompt.trim().length>0&&args[1].prompt.length<=20000&&id(args[1].requestId)&&Number.isSafeInteger(args[1].revision)&&args[1].revision>0;
   if(['confirmTask','cancelTask'].includes(method))return args.length>=1&&args.length<=2&&id(args[0])&&(args[1]===undefined||object(args[1],method==='confirmTask'?['revision','requestId']:['requestId'])&&(args[1].requestId===undefined||id(args[1].requestId))&&(args[1].revision===undefined||Number.isSafeInteger(args[1].revision)&&args[1].revision>0));
   if(['archiveTask','deleteTask','restoreTask'].includes(method))return args.length===2&&id(args[0])&&object(args[1],method==='archiveTask'?['requestId','metadataRevision','archived']:['requestId','metadataRevision'])&&Number.isSafeInteger(args[1].metadataRevision)&&args[1].metadataRevision>0&&(args[1].requestId===undefined||id(args[1].requestId))&&(method!=='archiveTask'||typeof args[1].archived==='boolean');
   return false;

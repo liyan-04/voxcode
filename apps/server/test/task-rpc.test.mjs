@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createConnection} from 'node:net';
 import {createTaskRpcServer,createTaskRpcClient} from '../task-rpc.mjs';
+import {createCodexCliAdapter} from '../codex-cli-adapter.mjs';
 
 async function fixture(t,options={}){
   const dir=await realpath(await mkdtemp(join(tmpdir(),'vxrpc-')));await chmod(dir,0o700);
@@ -38,6 +39,33 @@ test('RPC metadata and subtasks forward strict CAS fields and reject arbitrary m
   assert.equal((await f.client.restoreTask('one',{metadataRevision:3})).deletedAt,null);
   await assert.rejects(()=>f.client.deleteTask('one',{revision:1}),e=>e.code==='invalid_argument');
   await assert.rejects(()=>f.client.archiveTask('one',{metadataRevision:1,archived:true,projectRoot:'/tmp'}),e=>e.code==='invalid_argument');
+});
+test('RPC continuation forwards only a prompt and durable revision/request identity',async t=>{
+ let received;const f=await fixture(t,{adapter:{continueTask:async(id,opts)=>{received=[id,opts];return {id,status:'draft',turns:[{prompt:opts.prompt}]};}}});
+ const options={prompt:'fix output',revision:3,requestId:'next'};assert.equal((await f.client.continueTask('one',options)).status,'draft');assert.deepEqual(received,['one',options]);
+ for(const opts of [{...options,sessionId:'other'},{...options,revision:undefined},{...options,requestId:undefined},{...options,prompt:' '}])await assert.rejects(f.client.continueTask('one',opts),{code:'invalid_argument'});
+});
+
+test('real CLI task histories remain individually retrievable while Unix RPC lists bounded summaries',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'vxrpc-history-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const sessionId='12345678-1234-4234-8234-123456789abc',createdAt='2026-10-01T00:00:00.000Z',records=new Map();
+ for(const id of ['history-a','history-b'])records.set(id,{id,title:id,status:'completed',revision:3,createdAt,sessionId,output:'x'.repeat(20000),logs:[],turns:Array.from({length:17},(_,n)=>({id:`${id}-${n}`,kind:n?'continuation':'initial',prompt:'p'.repeat(12000),output:'x'.repeat(20000),logs:[],status:'completed',sessionId,createdAt}))});
+ const adapter=createCodexCliAdapter({projectRoot:root,storeFactory:()=>({list:async()=>[...records.values()].map(task=>structuredClone(task)),put:async task=>records.set(task.id,structuredClone(task))})});
+ const drafts=[];
+ for(const id of records.keys()){
+  const draft=await adapter.continueTask(id,{prompt:'next',revision:3,requestId:`continue-${id}`});drafts.push(draft);
+  assert.ok(Buffer.byteLength(JSON.stringify(draft))>500000);assert.ok(Buffer.byteLength(JSON.stringify(draft))<600000);
+ }
+ const f=await fixture(t,{adapter});
+ const listed=await f.client.listTasks({projectId:'alpha'});
+ assert.deepEqual(listed.map(task=>task.id),['history-a','history-b']);assert.ok(Buffer.byteLength(JSON.stringify(listed))<4096);
+ for(let n=0;n<drafts.length;n++){
+  const task=await f.client.getTask(drafts[n].id);assert.deepEqual(task,drafts[n]);assert.equal(task.turns.length,18);
+  assert.equal(task.turns[0].prompt.length,12000);assert.equal(task.turns[0].output.length,20000);
+  for(const key of ['turns','prompt','output','logs','fingerprint'])assert.equal(listed[n][key],undefined);
+  assert.equal(listed[n].sessionId,sessionId);assert.equal(listed[n].revision,4);
+ }
+ const privateMethod=await raw(f.socketPath,JSON.stringify({id:'private',method:'listTaskRecords',args:[]})+'\n');assert.equal(privateMethod.ok,false);
 });
 
 test('RPC rejects arbitrary methods, arbitrary paths, malformed and oversize requests before mutation',async t=>{

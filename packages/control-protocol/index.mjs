@@ -1,4 +1,4 @@
-export const rpcMethods = Object.freeze(['status', 'listProjects', 'getProject', 'listTasks', 'getTask', 'startTask', 'confirmTask', 'cancelTask', 'archiveTask', 'deleteTask', 'restoreTask', 'getLogs', 'getDiff', 'getChecks']);
+export const rpcMethods = Object.freeze(['status', 'listProjects', 'getProject', 'listTasks', 'getTask', 'startTask', 'continueTask', 'confirmTask', 'cancelTask', 'archiveTask', 'deleteTask', 'restoreTask', 'getLogs', 'getDiff', 'getChecks']);
 export const readMethods = Object.freeze(['status', 'listProjects', 'getProject', 'listTasks', 'getTask', 'getLogs', 'getDiff', 'getChecks']);
 export const MAX_COMMAND_BYTES = 64 * 1024;
 export const MAX_RESULT_BYTES = 1024 * 1024;
@@ -15,6 +15,7 @@ export function validateRpcPayload(payload) {
   if (['getProject', 'getTask', 'getLogs', 'getDiff', 'getChecks'].includes(method)) valid = args.length === 1 && validId(args[0]);
   if (method === 'listTasks') valid = args.length === 1 && object(args[0], ['projectId', 'includeArchived', 'includeDeleted']) && validId(args[0].projectId) && ['includeArchived', 'includeDeleted'].every(k => args[0][k] === undefined || typeof args[0][k] === 'boolean');
   if (method === 'startTask') valid = args.length === 1 && object(args[0], ['projectId', 'prompt', 'title', 'requestId', 'parentTaskId']) && validId(args[0].projectId) && validId(args[0].requestId) && typeof args[0].prompt === 'string' && args[0].prompt.trim().length > 0 && args[0].prompt.length <= 20000 && (args[0].title === undefined || typeof args[0].title === 'string' && args[0].title.length <= 200) && (args[0].parentTaskId === undefined || args[0].parentTaskId === null || validId(args[0].parentTaskId));
+  if (method === 'continueTask') valid = args.length === 2 && validId(args[0]) && object(args[1], ['prompt', 'revision', 'requestId']) && validId(args[1].requestId) && revision(args[1].revision) && typeof args[1].prompt === 'string' && args[1].prompt.trim().length > 0 && args[1].prompt.length <= 20000;
   if (['confirmTask', 'cancelTask'].includes(method)) valid = args.length === 2 && validId(args[0]) && object(args[1], method === 'confirmTask' ? ['revision', 'requestId'] : ['requestId']) && validId(args[1].requestId) && (method !== 'confirmTask' || revision(args[1].revision));
   if (['archiveTask', 'deleteTask', 'restoreTask'].includes(method)) valid = args.length === 2 && validId(args[0]) && object(args[1], method === 'archiveTask' ? ['requestId', 'metadataRevision', 'archived'] : ['requestId', 'metadataRevision']) && validId(args[1].requestId) && revision(args[1].metadataRevision) && (method !== 'archiveTask' || typeof args[1].archived === 'boolean');
   if (!valid) invalid();
