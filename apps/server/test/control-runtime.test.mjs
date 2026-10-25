@@ -14,6 +14,28 @@ import {createTaskRpcServer} from '../task-rpc.mjs';
 import {createMacAgent} from '../../mac-agent/agent.mjs';
 import {createTaskCapability} from '../../mac-agent/task-capability.mjs';
 
+test('authenticated device MCP tools use frozen target direct submissions and return real task output',async t=>{
+ const f=await fixture(t),socketPath=join(f.root,'voice-rpc.sock');let task,providerOptions;
+ const calls=[];const adapter={status:async()=>({available:true}),listProjects:async()=>[{id:'p',enabled:true}],getProject:async()=>({id:'p',enabled:true}),getTask:async()=>task,
+ startTask:async input=>{calls.push(input);task={id:'spoken',projectId:'p',revision:1,status:'draft',turns:[{requestId:input.requestId}]};return {taskId:'spoken'};},
+ confirmTask:async(id,input)=>{calls.push(input);task={...task,revision:2,status:'completed',output:'Fixture execution evidence',sessionId:'fixed-session'};Object.assign(task.turns[0],{revision:2,status:'completed',output:task.output});return task;}};
+ const rpc=await createTaskRpcServer({socketPath,adapter});t.after(()=>rpc.close());
+ const runtime=await startControlRuntime({config:{...f.config,voice:{synthetic:true},serverTaskSocket:socketPath},createVoiceProvider:options=>{providerOptions=options;return {connect:async()=>({input:{codec:'pcm_s16le',sampleRate:16000,channels:1,frameMs:20},writeReady:true}),start(){},stop(){},abort(){},close(){}};}});t.after(()=>runtime.close());
+ const login=await http(runtime,f.ca,'/api/login','POST',{password:f.config.loginSecret},{origin:f.config.publicOrigin});
+ const voice=new WebSocket(`wss://127.0.0.1:${runtime.server.address().port}/ws/voice`,{ca:f.ca,headers:{origin:f.config.publicOrigin,cookie:login.headers['set-cookie'][0].split(';')[0]}}),events=[];
+ voice.on('error',()=>{});voice.on('message',data=>events.push(JSON.parse(data)));await once(voice,'open');
+ const wait=async type=>{for(let i=0;i<300;i++){if(events.some(x=>x.type===type))return;await delay(5);}assert.fail('Missing '+type);};
+ voice.send(JSON.stringify({type:'session.start',requestId:'s',context:{executionTarget:'server',projectId:'p',contextVersion:1}}));await wait('session.ready');
+ voice.send(JSON.stringify({type:'capture.start',requestId:'c',captureId:'cap',contextVersion:1,format:{codec:'pcm_s16le',sampleRate:16000,channels:1,frameMs:20}}));await wait('capture.ready');
+ assert.equal(events.find(x=>x.type==='capture.ready').writeReady,true);
+ const tool=providerOptions.tools[0],result=await tool.invoke({prompt:'edit requested file'});await wait('tool.result');
+ assert.equal(result.executionTarget,'server');assert.equal(result.taskId,'spoken');assert.equal(result.output,'Fixture execution evidence');assert.equal(calls.length,2);
+ assert.equal(events.find(x=>x.type==='tool.result').result.output,result.output);assert(events.some(x=>x.type==='tool.started'));
+ await tool.invoke({prompt:'edit requested file'});assert.equal(calls.length,2);
+ const closing=once(voice,'close');voice.close();await closing;await assert.rejects(tool.invoke({prompt:'edit requested file'}),{code:'voice_context_invalid'});
+ assert.equal((await runtime.dispatch({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'codex_start_task',arguments:{}}})).error.code,-32003);
+});
+
 async function fixture(t){
  const root=await realpath(await mkdtemp(join(tmpdir(),'vox-control-')));t.after(()=>rm(root,{recursive:true,force:true}));
  const key=join(root,'key'),cert=join(root,'cert');

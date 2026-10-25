@@ -51,7 +51,9 @@ export function createVoiceTransport({server,publicOrigin,authorizeUpgrade,resol
         if(!entry.output||!plain(format)||format.codec!=='pcm_s16le'||format.sampleRate!==entry.output.sampleRate||format.channels!==1||!(event.data instanceof Uint8Array)||!event.data.length||event.data.length%2||event.data.length>5760)return fail('voice_audio_invalid');
         return send(event.data,true);
       }
-      if(['stt.partial','stt.final'].includes(event?.type)&&typeof event.text==='string')send({type:event.type,captureId:entry.id,text:event.text.slice(0,4000)});
+      if(event?.type==='tool.started')send({type:'tool.started',captureId:entry.id});
+      else if(event?.type==='tool.result'&&plain(event.result)&&Buffer.byteLength(JSON.stringify(event.result))<=24000)send({type:'tool.result',captureId:entry.id,result:event.result});
+      else if(['stt.partial','stt.final'].includes(event?.type)&&typeof event.text==='string')send({type:event.type,captureId:entry.id,text:event.text.slice(0,4000)});
       else if(event?.type==='assistant.event'&&['start','stop','sentence_start'].includes(event.state))send({type:'assistant.event',captureId:entry.id,state:event.state,...(typeof event.text==='string'?{text:event.text.slice(0,4000)}:{}),...(event.aborted===true?{aborted:true}:{})});
       else if(event?.type==='error')fail('voice_provider_failed',1011);
     }
@@ -75,17 +77,23 @@ export function createVoiceTransport({server,publicOrigin,authorizeUpgrade,resol
         if(!refreshed||JSON.stringify(refreshed)!==JSON.stringify(context))return fail('voice_context_invalid');
         clearTimeout(capture?.timer);closeProvider(capture?.provider);
         const entry={id:message.captureId,state:'connecting',frames:0,output:null};capture=entry;captureIds.add(entry.id);
-        const provider=await bounded(Promise.resolve().then(()=>providerFactory({ownerId:auth.ownerId,voiceSessionId,captureId:entry.id,context,onEvent:event=>forward(entry,event)})).then(value=>{if(closed){closeProvider(value);return null;}return value;}),operationTimeoutMs);
+        const authorizeTool=async()=>{
+          const active=()=>!closed&&capture===entry&&['recording','stopped'].includes(entry.state)&&Date.now()<auth.expiresAt;
+          if(!active())return false;
+          const refreshed=await bounded(Promise.resolve(resolveContext({ownerId:auth.ownerId,context:structuredClone(requestedContext)})),operationTimeoutMs);
+          return active()&&JSON.stringify(refreshed)===JSON.stringify(context);
+        };
+        const provider=await bounded(Promise.resolve().then(()=>providerFactory({ownerId:auth.ownerId,voiceSessionId,captureId:entry.id,context,authorizeTool,onEvent:event=>forward(entry,event)})).then(value=>{if(closed){closeProvider(value);return null;}return value;}),operationTimeoutMs);
         entry.provider=provider;if(closed){closeProvider(provider);return;}
         const report=await bounded(Promise.resolve(provider.connect()),operationTimeoutMs);if(closed){closeProvider(provider);return;}
         if(!sameFormat(report?.input))return fail('voice_format_unsupported');
         if(report.output){if(report.output.codec!=='pcm_s16le'||![16000,24000].includes(report.output.sampleRate)||report.output.channels!==1)return fail('voice_format_unsupported');entry.output={...report.output};}
-        provider.start();entry.state='recording';entry.timer=setTimeout(()=>fail('voice_capture_limit'),maxCaptureMs);
-        response={type:'capture.ready',captureId:entry.id,contextVersion:context.contextVersion,input:INPUT,output:entry.output,writeReady:false,writeBlocker:'cloud_mcp_session_correlation_unverified'};
+        provider.start();entry.state='recording';entry.writeReady=report.writeReady===true;entry.timer=setTimeout(()=>fail('voice_capture_limit'),maxCaptureMs);
+        response={type:'capture.ready',captureId:entry.id,contextVersion:context.contextVersion,input:INPUT,output:entry.output,writeReady:entry.writeReady,...(!entry.writeReady?{writeBlocker:'cloud_mcp_session_correlation_unverified'}:{})};
       }else if(message.type==='capture.stop'||message.type==='capture.abort'){
         if(!capture||capture.id!==message.captureId||!(capture.state==='recording'||message.type==='capture.abort'&&capture.state==='stopped'))return fail('voice_capture_invalid');
         clearTimeout(capture.timer);
-        if(message.type==='capture.abort'){capture.state='aborted';capture.provider.abort();closeProvider(capture.provider);}else{capture.provider.stop();capture.state='stopped';capture.timer=setTimeout(()=>{capture.state='finished';closeProvider(capture.provider);},tailTimeoutMs);}
+        if(message.type==='capture.abort'){capture.state='aborted';capture.provider.abort();closeProvider(capture.provider);}else{capture.provider.stop();capture.state='stopped';capture.timer=setTimeout(()=>{capture.state='finished';closeProvider(capture.provider);},capture.writeReady?Math.max(tailTimeoutMs,180000):tailTimeoutMs);}
         response={type:message.type==='capture.abort'?'capture.aborted':'capture.stopped',captureId:capture.id,lastSeq:capture.frames};
       }else return fail('voice_control_unknown');
       if(!closed){response={...response,requestId:message.requestId};requests.set(message.requestId,{fingerprint,response});send(response);}

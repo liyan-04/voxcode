@@ -44,3 +44,23 @@ test('a pending create disables voice and the click handler cannot start a captu
   const f = await fixture(), submitting = f.submit();f.run('renderVoice()');assert.equal(f.get('#voice-button').disabled, true);
   await f.get('#voice-button').onclick();assert.equal(f.run('voiceStarts'), 0);f.finish();await submitting;
 });
+
+test('voice execution receives actual results on the frozen target without replaying recognition', async () => {
+  const f = await fixture();
+  f.run("state.executionHost='mac';state.macOnline=true;globalThis.voiceTarget=null;voiceClient={active:false,state:'idle',async start(target){voiceTarget=target;}};");
+  await f.get('#voice-button').onclick();assert.equal(f.run('voiceTarget.executionTarget'), 'mac');
+  f.run("receiveVoiceResult({executionTarget:'mac',projectId:'a',taskId:'voice-task',status:'running',revision:1},{executionTarget:'mac',projectId:'a',draftKey:draftKey(),label:'Alpha'});");
+  assert.equal(f.run('state.selected'), 'voice-task');assert.equal(f.run('state.snapshot.status'), 'running');assert.equal(f.writes.length, 0);assert.equal(f.run("storedDraft('a::new:')"), 'saved input');
+});
+test('late voice results do not change a newly selected project or execution target', async () => {
+  for (const switchTo of ["openTarget({projectId:'b'});", "state.executionTarget='server';"]) {
+    const f = await fixture();f.run("const frozen={executionTarget:'mac',projectId:'a',draftKey:draftKey(),label:'Alpha'};" + switchTo + "receiveVoiceResult({executionTarget:'mac',projectId:'a',taskId:'voice-task',status:'completed',revision:1},frozen);");
+    assert.equal(f.run('state.selected'), null);assert.equal(f.writes.length, 0);
+  }
+});
+test('processing and speaking remain cancellable and visibly distinguish execution from transcription', async () => {
+  for (const state of ['processing', 'speaking']) {
+    const f = await fixture();f.run("voiceClient.active=true;voiceStatus={state:'" + state + "',target:{draftKey:draftKey()}};renderVoice();");
+    assert.equal(f.get('#voice-button').disabled, true);assert.equal(f.get('#voice-cancel').hidden, false);assert.equal(f.get('#voice-status').hidden, false);assert.equal(f.get('#send-button').disabled, true);
+  }
+});

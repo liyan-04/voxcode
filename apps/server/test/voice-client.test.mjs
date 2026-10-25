@@ -34,13 +34,13 @@ function fixture(options = {}) {
   const client = createVoiceClient({endpoint: 'ws://127.0.0.1/ws/voice', WebSocketImpl: Socket, AudioContextImpl: Audio, AudioWorkletNodeImpl: Worklet, mediaDevices: {getUserMedia: async () => stream}, onState: value => states.push(value), onTranscript: (text, target) => transcripts.push({text, target}), ...options});
   return {client, track, stream, states, transcripts};
 }
-async function ready(f, target = {projectId: 'project-a', taskId: 'task-a', draftKey: 'project-a::task-a'}) {
+async function ready(f, target = {projectId: 'project-a', taskId: 'task-a', draftKey: 'project-a::task-a'}, report = {}) {
   const starting = f.client.start(target);await tick();await tick();
   const socket = Socket.instances.at(-1);assert(socket);socket.open();
   const session = JSON.parse(socket.sent[0]);
   socket.receive({type: 'session.ready', requestId: session.requestId, voiceSessionId: 'voice-a', contextVersion: session.context.contextVersion, captureId: null, seq: 1});
   const capture = JSON.parse(socket.sent[1]);
-  socket.receive({type: 'capture.ready', requestId: capture.requestId, captureId: capture.captureId, contextVersion: capture.contextVersion, input: capture.format, output: null, seq: 2});
+  socket.receive({type: 'capture.ready', requestId: capture.requestId, captureId: capture.captureId, contextVersion: capture.contextVersion, input: capture.format, output: null, seq: 2, ...report});
   assert.equal(await starting, true);
   return {socket, session, capture, worklet: Worklet.instances.at(-1)};
 }
@@ -253,4 +253,73 @@ test('draft persistence failure reports an error after resource cleanup without 
   const f = fixture({onTranscript: () => {throw Error('private storage failure');}}), wire = await ready(f);await f.client.stop();
   wire.socket.receive({type: 'capture.stopped', captureId: wire.capture.captureId, seq: 3});wire.socket.receive({type: 'stt.final', captureId: wire.capture.captureId, text: 'candidate', seq: 4});
   assert.equal(f.states.at(-1).reason, 'draft_unavailable');assert.equal(f.track.stopped, true);assert.equal(wire.socket.readyState, 3);assert.equal(f.client.active, false);
+});
+
+test('MCP voice keeps the frozen execution target and never commits recognition as a draft', async t => {
+  const results = [], f = fixture({onResult: (result, target) => results.push({result, target})});t.after(() => f.client.close());
+  const wire = await ready(f, {executionTarget: 'server', projectId: 'project-a', taskId: 'task-a', draftKey: 'server::project-a::task-a'}, {writeReady: true, output: {codec: 'pcm_s16le', sampleRate: 24000, channels: 1}});
+  assert.equal(wire.session.context.executionTarget, 'server');await f.client.stop();
+  wire.socket.receive({type: 'capture.stopped', captureId: wire.capture.captureId, seq: 3});
+  wire.socket.receive({type: 'stt.final', captureId: wire.capture.captureId, text: 'fix this', seq: 4});
+  assert.equal(f.client.active, true);assert.equal(f.transcripts.length, 0);assert.equal(Audio.instances.at(-1).closed, false);
+  const result = {executionTarget: 'server', projectId: 'project-a', taskId: 'task-a', status: 'completed'};
+  wire.socket.receive({type: 'tool.result', captureId: wire.capture.captureId, result, seq: 5});
+  assert.deepEqual(results.map(entry => entry.result), [result]);assert.equal(results[0].target.executionTarget, 'server');
+  wire.socket.receive({type: 'assistant.event', captureId: wire.capture.captureId, state: 'stop', seq: 6});await tick();
+  assert.equal(f.client.active, false);assert.equal(f.transcripts.length, 0);assert.equal(Audio.instances.at(-1).closed, true);
+});
+test('MCP voice rejects cross-target and cross-task results without changing a draft', async () => {
+  for (const mismatch of [{executionTarget: 'server'}, {projectId: 'foreign'}, {taskId: 'foreign'}]) {
+    const results = [], f = fixture({onResult: value => results.push(value)}), wire = await ready(f, undefined, {writeReady: true});
+    wire.socket.receive({type: 'tool.result', captureId: wire.capture.captureId, result: {executionTarget: 'mac', projectId: 'project-a', taskId: 'task-a', status: 'completed', ...mismatch}, seq: 3});
+    assert.equal(f.states.at(-1).reason, 'invalid_event');assert.equal(results.length, 0);assert.equal(f.transcripts.length, 0);assert.equal(f.client.active, false);
+  }
+});
+test('MCP voice timeout never replays a submission and instructs result reconciliation', async t => {
+  const f = fixture({executionTimeoutMs: 10}), wire = await ready(f, undefined, {writeReady: true});t.after(() => f.client.close());await f.client.stop();
+  wire.socket.receive({type: 'capture.stopped', captureId: wire.capture.captureId, seq: 3});
+  wire.socket.receive({type: 'stt.final', captureId: wire.capture.captureId, text: 'do something', seq: 4});
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(f.states.at(-1).reason, 'execution_timeout');assert.equal(f.transcripts.length, 0);
+  assert.equal(wire.socket.sent.filter(value => typeof value === 'string' && JSON.parse(value).type === 'capture.start').length, 1);
+});
+test('MCP voice decodes negotiated PCM into ordered bounded browser playback', async t => {
+  class PlaybackAudio extends Audio {
+    constructor() {super();this.currentTime = 0;this.played = [];}
+    createBuffer(channels, length, sampleRate) {return {duration: length / sampleRate, data: new Float32Array(length), getChannelData() {return this.data;}};}
+    createBufferSource() {const audio = this;return {connect() {}, disconnect() {}, stop() {}, start(when) {audio.played.push({when, samples: [...this.buffer.data]});}};}
+  }
+  const f = fixture({AudioContextImpl: PlaybackAudio});t.after(() => f.client.close());const wire = await ready(f, undefined, {writeReady: true, output: {codec: 'pcm_s16le', sampleRate: 16000, channels: 1}});
+  await f.client.stop();wire.socket.onmessage({data: Int16Array.from([-32768, 16384]).buffer});wire.socket.onmessage({data: Int16Array.from([32767, 0]).buffer});
+  const audio = Audio.instances.at(-1);assert.deepEqual(audio.played.map(entry => entry.samples), [[-1, .5], [32767 / 32768, 0]]);assert(audio.played[1].when > audio.played[0].when);
+});
+
+test('MCP spoken completion drains queued audio before closing its output context', async () => {
+  class PlaybackAudio extends Audio {
+    constructor() {super();this.currentTime = 0;}
+    createBuffer(channels, length, sampleRate) {return {duration: .02, getChannelData: () => new Float32Array(length)};}
+    createBufferSource() {return {connect() {}, disconnect() {}, stop() {}, start() {}};}
+  }
+  const f = fixture({AudioContextImpl: PlaybackAudio}), wire = await ready(f, undefined, {writeReady: true, output: {codec: 'pcm_s16le', sampleRate: 16000, channels: 1}});await f.client.stop();
+  wire.socket.receive({type: 'capture.stopped', captureId: wire.capture.captureId, seq: 3});
+  wire.socket.receive({type: 'tool.result', captureId: wire.capture.captureId, result: {executionTarget: 'mac', projectId: 'project-a', taskId: 'task-a', status: 'completed'}, seq: 4});
+  wire.socket.onmessage({data: new ArrayBuffer(640)});wire.socket.receive({type: 'assistant.event', captureId: wire.capture.captureId, state: 'stop', seq: 5});
+  assert.equal(f.client.active, true);assert.equal(Audio.instances.at(-1).closed, false);await new Promise(resolve => setTimeout(resolve, 30));
+  assert.equal(f.client.active, false);assert.equal(Audio.instances.at(-1).closed, true);
+});
+
+test('a conversational spoken answer ends without fabricating a task result or draft', async t => {
+  const results = [], f = fixture({noToolGraceMs: 10,onResult: value => results.push(value)}), wire = await ready(f, undefined, {writeReady: true});t.after(() => f.client.close());await f.client.stop();
+  wire.socket.receive({type: 'capture.stopped', captureId: wire.capture.captureId, seq: 3});
+  wire.socket.receive({type: 'stt.final', captureId: wire.capture.captureId, text: 'hello', seq: 4});
+  wire.socket.receive({type: 'assistant.event', captureId: wire.capture.captureId, state: 'stop', seq: 5});
+  await new Promise(resolve => setTimeout(resolve, 20));assert.equal(f.client.active, false);assert.equal(f.states.at(-1).reason, 'spoken_answer');assert.equal(results.length, 0);assert.equal(f.transcripts.length, 0);
+});
+test('a delayed MCP call after a spoken preamble retains the session for its real result', async t => {
+  const f = fixture({noToolGraceMs: 10});t.after(() => f.client.close());const wire = await ready(f, undefined, {writeReady: true});t.after(() => f.client.close());await f.client.stop();
+  wire.socket.receive({type: 'capture.stopped', captureId: wire.capture.captureId, seq: 3});
+  wire.socket.receive({type: 'stt.final', captureId: wire.capture.captureId, text: 'run tests', seq: 4});
+  wire.socket.receive({type: 'assistant.event', captureId: wire.capture.captureId, state: 'stop', seq: 5});
+  wire.socket.receive({type: 'tool.started', captureId: wire.capture.captureId, seq: 6});
+  await new Promise(resolve => setTimeout(resolve, 20));assert.equal(f.client.active, true);assert.equal(f.transcripts.length, 0);
 });

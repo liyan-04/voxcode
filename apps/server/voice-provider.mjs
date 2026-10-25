@@ -1,10 +1,13 @@
 // Reuse the repository voice SDK through explicit runtime injection. No provider
 // credentials or project-selection authority crosses into browser messages.
-export function createLinxVoiceProvider({config,createSession,createDecoder,onEvent=()=>{}}={}) {
+export function createLinxVoiceProvider({config,createSession,createDecoder,tools=[],onEvent=()=>{}}={}) {
   if(!config||typeof createSession!=='function')throw Error('Voice SDK configuration required');
   let closed=false,failed=false,ready=false,decoder,output=null,metadata;
   const emit=event=>{if(!closed)onEvent(event);};
-  const session=createSession({config,tools:[],onEvent:event=>{
+  const session=createSession({config,tools:tools.map(tool=>({...tool,async invoke(args){
+    if(closed||failed||!ready)throw Error('Voice provider unavailable');
+    return tool.invoke(args);
+  }})),onEvent:event=>{
     if(closed||failed)return;
     if(event.type==='ready')metadata=event.audioParams;
     else if(event.type==='error')emit({type:'error',code:'voice_provider_failed'});
@@ -23,7 +26,7 @@ export function createLinxVoiceProvider({config,createSession,createDecoder,onEv
         try{decoder=createDecoder(metadata);output={codec:'pcm_s16le',sampleRate:metadata.sample_rate,channels:1};}catch{output=null;}
       }
       ready=true;
-      return {input:{codec:'pcm_s16le',sampleRate:16000,channels:1,frameMs:20},output,writeReady:false,writeBlocker:'cloud_mcp_session_correlation_unverified'};
+      return {input:{codec:'pcm_s16le',sampleRate:16000,channels:1,frameMs:20},output,writeReady:tools.length>0,...(!tools.length?{writeBlocker:'cloud_mcp_session_correlation_unverified'}:{})};
     },
     start(){if(!ready||closed)throw Error('Voice provider unavailable');session.startListening();},
     sendAudio(data){if(!ready||closed)throw Error('Voice provider unavailable');session.sendAudio(data);},
