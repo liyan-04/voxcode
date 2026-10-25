@@ -31,6 +31,7 @@ async function fixture(t) {
         if(x.revision!==revision)throw Error('revision conflict');
         await new Promise(r=>setTimeout(r,5));x.status='running';x.revision++;x.confirmRequestId=requestId;executions++;return structuredClone(x);
       },
+      continueTask:async(id,{prompt,revision,requestId})=>{const x=tasks.get(id);if(x.revision!==revision)throw Error('revision conflict');x.status='draft';x.revision++;x.turns??=[];x.turns.push({kind:'continuation',prompt,requestId});return structuredClone(x);},
       cancelTask:async id=>{const x=tasks.get(id);x.status='cancelled';x.revision++;return structuredClone(x);},
       status:async()=>({available:true,version:'fixture-cli',activeTasks:[...tasks.values()].filter(x=>x.status==='running').length}),
       getLogs:async()=>({logs:[]}),getDiff:async()=>({collected:false}),getChecks:async()=>({collected:false}),
@@ -51,6 +52,16 @@ test('explicit project routes survive service reconstruction without exposing pa
   assert.deepEqual((await restored.listTasks({projectId:'beta'})).map(x=>x.id),[b.taskId]);
   await assert.rejects(()=>restored.startTask({prompt:'missing'}),/project/i);
   await assert.rejects(()=>restored.startTask({projectId:'alpha',prompt:'bad',projectRoot:f.root}),/argument/i);
+});
+
+test('project task lists omit full histories and initial metadata prompts while getTask retains them',async t=>{
+ const f=await fixture(t),service=await f.make(),{taskId}=await service.startTask({projectId:'alpha',prompt:'p'.repeat(20000),requestId:'large'});
+ const stored=f.stores.get(f.projects[0].root).get(taskId);stored.output='o'.repeat(20000);stored.logs=[{output:'log evidence'}];stored.turns=[{prompt:'first request',output:'first result'}];stored.lastConversationAt='2026-10-01T00:00:00.000Z';
+ const [summary]=await service.listTasks({projectId:'alpha'});
+ assert.ok(Buffer.byteLength(JSON.stringify(summary))<2048);
+ for(const key of ['initialPrompt','prompt','output','logs','turns','fingerprint','requestId'])assert.equal(summary[key],undefined);
+ assert.equal(summary.projectId,'alpha');assert.equal(summary.metadataRevision,1);assert.equal(summary.archived,false);assert.equal(summary.parentTaskId,null);assert.equal(summary.lastConversationAt,stored.lastConversationAt);
+ const full=await service.getTask(taskId);assert.equal(full.initialPrompt.length,20000);assert.deepEqual(full.turns,stored.turns);assert.equal(full.output.length,20000);assert.deepEqual(full.logs,stored.logs);
 });
 
 test('cross-project request replay conflicts and parallel confirmation uses one global slot',async t=>{
@@ -123,6 +134,7 @@ test('actual CLI store and metadata retain task ownership and dedup across servi
   await s.deleteTask(a.taskId,{metadataRevision:1,requestId:'actual-delete'});
   const restart=await createProjectService(opts),task=await restart.getTask(a.taskId);
   assert.equal(task.projectId,'alpha');assert.equal(task.status,'draft');assert.ok(task.deletedAt);assert.equal(task.initialPrompt,'persistent draft');
+  assert.equal(task.turns[0].prompt,'persistent draft');
   assert.deepEqual(await restart.startTask({projectId:'alpha',prompt:'persistent draft',requestId:'actual-a'}),a);
   await assert.rejects(()=>restart.startTask({projectId:'beta',prompt:'persistent draft',requestId:'actual-a'}),/requestId conflict/);
   await restart.restoreTask(a.taskId,{metadataRevision:2,requestId:'actual-restore'});
@@ -139,6 +151,28 @@ test('failed metadata rename never becomes a successful RAM-only deletion on ret
   const retry=await s.deleteTask(taskId,{metadataRevision:1,requestId:'delete'});
   const restarted=await f.make(),after=await restarted.getTask(taskId),replay=await restarted.deleteTask(taskId,{metadataRevision:1,requestId:'delete'});
   assert.ok(retry.deletedAt);assert.equal(after.deletedAt,retry.deletedAt);assert.equal(replay.deletedAt,retry.deletedAt);assert.equal(after.metadataRevision,2);
+});
+
+test('continuation routes to the original project, persists replay identity and rejects hidden tasks',async t=>{
+ const f=await fixture(t),service=await f.make(),{taskId}=await service.startTask({projectId:'alpha',prompt:'first',requestId:'create'});
+ const stored=f.stores.get(f.projects[0].root).get(taskId);stored.status='completed';stored.revision=3;stored.sessionId='12345678-1234-4234-8234-123456789abc';
+ const opts={prompt:'fix result',revision:3,requestId:'continue'},draft=await service.continueTask(taskId,opts);
+ assert.equal(draft.projectId,'alpha');assert.equal(draft.status,'draft');assert.equal(draft.turns.at(-1).prompt,'fix result');assert.equal(f.executions,0);
+ assert.deepEqual(await service.continueTask(taskId,opts),draft);const restarted=await f.make();assert.deepEqual(await restarted.continueTask(taskId,opts),draft);
+ await assert.rejects(service.continueTask(taskId,{...opts,prompt:'changed'}),/requestId conflict/);
+ await assert.rejects(service.continueTask(taskId,{...opts,requestId:'other',sessionId:'input'}),/argument/);
+ await service.archiveTask(taskId,{metadataRevision:1,archived:true});await assert.rejects(service.continueTask(taskId,{prompt:'next',revision:4,requestId:'hidden'}),/Restore and unarchive/);
+ await service.archiveTask(taskId,{metadataRevision:2,archived:false});await service.deleteTask(taskId,{metadataRevision:3});await assert.rejects(service.continueTask(taskId,{prompt:'next',revision:4,requestId:'deleted'}),/Restore and unarchive/);
+});
+
+test('continuation pending ledger recovers a persisted turn after the final ledger receipt fails',async t=>{
+ const f=await fixture(t),service=await f.make(),{taskId}=await service.startTask({projectId:'alpha',prompt:'first',requestId:'create'});
+ const stored=f.stores.get(f.projects[0].root).get(taskId);stored.status='completed';stored.revision=3;
+ const ledger=join(f.root,'state','request-ledger.json'),opts={prompt:'next',revision:3,requestId:'continuation'};
+ // Seed the on-disk state at the exact crash boundary: turn persisted, ledger pending.
+ stored.status='draft';stored.revision=4;stored.turns=[{kind:'continuation',requestId:opts.requestId,prompt:opts.prompt}];
+ const rows=JSON.parse(await readFile(ledger,'utf8'));rows['id:'+opts.requestId]={fingerprint:JSON.stringify(['continue',taskId,opts.prompt,opts.revision]),state:'pending'};await writeFile(ledger,JSON.stringify(rows));
+ const restart=await f.make(),task=await restart.continueTask(taskId,opts);assert.equal(task.revision,4);assert.equal(task.turns.length,1);assert.equal(f.executions,0);
 });
 
 test('persisted metadata reconciles a failed ledger completion after restart',async t=>{

@@ -3,7 +3,7 @@ import {promisify} from 'node:util';
 import {mkdir,realpath,lstat,readFile,writeFile,rename,unlink} from 'node:fs/promises';
 import {isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {createCodexCliAdapter} from './codex-cli-adapter.mjs';
+import {createCodexCliAdapter,summarizeTask} from './codex-cli-adapter.mjs';
 
 const execute=promisify(execFile),copy=x=>structuredClone(x);
 const inside=(parent,path)=>{const part=relative(parent,path);return !part||part!=='..'&&!part.startsWith(`..${sep}`)&&!isAbsolute(part);};
@@ -51,7 +51,7 @@ export async function createProjectService({projects,dataDir,command='/usr/local
   const enabled=id=>{const p=registry.get(id);if(!p?.enabled)throw fail('Project unavailable','project_unavailable');return p;};
   const all=async()=>{
     const result=[],ids=new Set();
-    for(const [projectId,adapter] of adapters)for(const task of await adapter.listTasks()){
+    for(const [projectId,adapter] of adapters)for(const task of await (adapter.listTaskRecords?.()??adapter.listTasks())){
       if(ids.has(task.id))throw fail('Ambiguous task identity','task_conflict');ids.add(task.id);
       result.push(decorate({...task,projectId}));
     }
@@ -96,7 +96,7 @@ export async function createProjectService({projects,dataDir,command='/usr/local
   return {
     async listProjects(){return [...registry.values()].map(publicProject);},
     async getProject(id){return publicProject(registry.get(id));},
-    async listTasks(input){if(!allowed(input,['projectId','includeArchived','includeDeleted'])||['includeArchived','includeDeleted'].some(k=>input[k]!==undefined&&typeof input[k]!=='boolean'))throw fail('Invalid project arguments');enabled(input.projectId);return (await all()).filter(t=>t.projectId===input.projectId&&(input.includeArchived||!t.archived)&&(input.includeDeleted||!t.deletedAt));},
+    async listTasks(input){if(!allowed(input,['projectId','includeArchived','includeDeleted'])||['includeArchived','includeDeleted'].some(k=>input[k]!==undefined&&typeof input[k]!=='boolean'))throw fail('Invalid project arguments');enabled(input.projectId);return (await all()).filter(t=>t.projectId===input.projectId&&(input.includeArchived||!t.archived)&&(input.includeDeleted||!t.deletedAt)).map(summarizeTask);},
     async getTask(id){return copy(await find(id));},
     async startTask(input){return locked(async()=>{
       if(!allowed(input,['projectId','prompt','title','requestId','parentTaskId']))throw fail('Invalid start arguments');
@@ -112,6 +112,14 @@ export async function createProjectService({projects,dataDir,command='/usr/local
       },async()=>{
         const task=(await all()).find(t=>t.projectId===projectId&&t.requestId===requestId);return task?created({taskId:task.id}):undefined;
       });
+    });},
+    async continueTask(id,opts={}){return locked(async()=>{
+      if(!allowed(opts,['prompt','revision','requestId'])||typeof opts.prompt!=='string'||!opts.prompt.trim()||opts.prompt.length>20000||!Number.isSafeInteger(opts.revision)||opts.revision<1||typeof opts.requestId!=='string'||!opts.requestId||opts.requestId.length>128)throw fail('Invalid continuation arguments');
+      const t=await find(id),fingerprint=JSON.stringify(['continue',id,opts.prompt,opts.revision]);
+      if(t.archived||t.deletedAt)throw fail('Restore and unarchive task before continuation','task_hidden');
+      return mutation(opts.requestId,fingerprint,async()=>decorate({...await adapters.get(t.projectId).continueTask(id,opts),projectId:t.projectId}),async()=>{
+        const task=await find(id);return task.turns?.some(turn=>turn.kind==='continuation'&&turn.requestId===opts.requestId)?task:undefined;
+      },{retryUnapplied:true});
     });},
     async confirmTask(id,opts={}){return locked(async()=>{
       options(opts);const t=await find(id),fingerprint=JSON.stringify(['confirm',id,opts.revision??null]);

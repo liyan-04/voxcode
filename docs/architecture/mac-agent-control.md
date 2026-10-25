@@ -1,119 +1,121 @@
-# Mac Agent 控制面架构合同
+# Mac Agent 控制面合同
 
-日期：2026-10-25。Issue：#93。状态：设计合同，待分阶段实现；本文不宣称 Mac、本机灵犀、TLS、手机或公网链路已经可用。
+更新：2026-10-25。关联 [#93](https://github.com/liyan-04/voxcode/issues/93)、
+[#125](https://github.com/liyan-04/voxcode/issues/125)。最新范围同时支持服务器与 Mac Codex，
+本文定义其中的 Mac 控制分支及跨端隔离；组件图、用户流程和源码/线上状态见
+[手机、Mac 与 Linx 当前架构](phone-mac-linx-current.md)。
 
-用户已明确执行位置：手机通过服务器上的 VoxCode 控制 Mac 上的 Codex；灵犀是通向同一个 Mac Codex 的第二入口。本文取代 PR #94 最初把服务器作为 Codex 执行端的假设。
+## 执行位置与用户行为
 
-## 目标和范围
+手机浏览器只访问服务器 VoxCode，页面选择 `executionTarget`：服务器分支调用服务器
+私有 RPC/TaskService/Codex，Mac 分支由 Mac Agent 主动建立经认证、严格验证证书的 WSS，
+将固定命令转发到 Mac 私有 Unix RPC/TaskService/Codex。同一次任务提交只能路由到
+选定端，不能两端重复执行。Mac 不开放入站控制端口。已有 Codex 桌面聊天、任意终端和窗口自动化不属于
+本合同的任务执行能力；原生能力只能按 Agent 实际公布且已验证的 capability 启用。
 
-服务器部署 VoxCode 页面、登录、设备网关和灵犀接入；Mac 部署 Agent、现有 TaskService/私有 task RPC 和 Codex CLI。手机浏览器和灵犀经同一网关控制同一 Mac 任务，代码、执行会话、任务版本和执行证据留在 Mac。服务器保存设备和操作回执以及有来源/更新时间的任务缓存，不启动第二份 Codex。
+项目包含任务，任务可以包含子任务。「新建项目」支持登记已有目录或新建目录，
+目录范围由该端操作者预先授权；项目行 `+` 创建任务。同任务追问必须续接该端该任务
+持久化的 Codex 会话 UUID，并保留此前各轮提示、结果与执行反馈。
 
-第一版复用 VoxCode 管理的 Mac Codex CLI 任务：查看、创建草稿、确认执行、停止、归档/恢复，以及手机当前任务切换。没有真实适配器的 Codex Desktop 会话接管、暂停/恢复、任意终端进程和窗口自动化不能标记可用。原生聚焦能力按 Agent 实际公布的 capability 启用；不提供任意 Shell、任意路径或任意 AppleScript。
+**提交文字或语音执行指令即开始执行，不再要求额外的草稿/确认操作。** 目前源码的
+`startTask` / `confirmTask` 以及新合入的 `continueTask` 仍是内部两阶段原语，直接提交的
+组合接线尚待交付；不能把内部原语重新变成用户级第二次确认。修订号、请求身份、
+目标归属、重放防护、沙箱和 Codex 自身权限检查继续保留。语音工具不能代答 Codex
+权限批准或用户验收。
 
-## 组件边界
+登录不得依赖 Mac Agent 启动或可达；登录会话、控制服务可达与所选执行端在线是三个
+独立状态。页面、API、请求 ledger、草稿、任务标签、轮次详情和语音回调必须带
+`executionTarget`，切换端不能迁移或复用另一端的项目/任务/请求。当前正式运行时
+仍固定 Mac adapter，双端选择/路由与隔离尚待接线；旧服务器运行时存在不等于双端已交付。
+
+## 组件与数据责任
+
+| 组件 | 部署位置 | 权威数据 / 职责 |
+| --- | --- | --- |
+| [`control-runtime.mjs`](../../apps/server/control-runtime.mjs)、HTTP 页面/API | 服务器 | 手机会话、Origin 校验、界面；当前固定账户/Mac，目标执行端选择与路由待接通 |
+| [`device-gateway.mjs`](../../apps/server/device-gateway.mjs)、[`device-store.mjs`](../../apps/server/device-store.mjs) | 服务器 | 配对、连接归属、持久操作 ledger、回执与缓存 |
+| [`remote-task-adapter.mjs`](../../apps/server/remote-task-adapter.mjs) | 服务器 | Mac 分支把业务 API 转为设备命令，不在此 adapter 执行 Codex |
+| [`apps/mac-agent/`](../../apps/mac-agent/README.md) | Mac | Keychain 设备 token、出站 WSS、重连、命令去重与本地转发 |
+| [`task-rpc.mjs`](../../apps/server/task-rpc.mjs)、[`project-service.mjs`](../../apps/server/project-service.mjs) | 各执行端 | 本端私有 RPC、登记项目与任务归属、版本和执行槽；跨端状态隔离 |
+| [`codex-cli-adapter.mjs`](../../apps/server/codex-cli-adapter.mjs) | 各执行端 | 本端项目 cwd、受控 Codex 启动、会话、任务日志与取消 |
+| [`packages/voice/`](../../packages/voice/README.md) 与 voice provider | 服务器上的软件设备 | Linx 音频与设备侧 MCP；正式 provider 尚未接入执行工具 |
+
+手机不持有 Linx、模型或 Agent token。服务器保存设备 token 摘要；Mac Agent 从
+Keychain 取 token，模型凭据留在实际执行端的私有任务身份下。私有配置、状态和凭据不得进入源码包、页面或日志。
+环境变量过滤不能替代同 UID 文件隔离，任务服务必须使用受控身份与私有状态目录。
+
+## 设备协议与最终校验
+
+当前共享协议位于 [`packages/control-protocol/index.mjs`](../../packages/control-protocol/index.mjs)。
+命令信封使用 `protocolVersion/requestId/operationId/deviceId/type/payload/issuedAt/expiresAt`；
+任务转发为 `type: "task_rpc"`，`payload: {method, params}`，其中 `params` 为固定 RPC 参数数组。
+授权与目标只从已校验的 payload 导出，不另设顶层项目/任务目标。
+
+当前主线 RPC 白名单为：
 
 ```text
-手机浏览器 ── HTTPS/WSS ──┐
-                          ▼
-                 VoxCode 控制服务器
-                 ├─ 现有 HTTP 页面/API
-                 ├─ RemoteTaskAdapter（不执行 Codex）
-                 ├─ Device/Command gateway
-                 ├─ Linx voice adapter（可选）
-                 └─ audit/event store
-                          ▲
-             主动出站 WSS │
-                          │
-                  Mac Agent（launchd）
-                  ├─ 设备注册/心跳/重连
-                  ├─ 固定白名单 task RPC → Mac TaskService → Mac Codex
-                  ├─ AXUIElement/AppleScript 适配器
-                  └─ Keychain 凭据
+status, listProjects, getProject, listTasks, getTask,
+startTask, confirmTask, cancelTask,
+archiveTask, deleteTask, restoreTask,
+getLogs, getDiff, getChecks
 ```
 
-服务器不能通过入站端口直接控制 Mac。Mac Agent 主动建立受认证的 WSS，并在断线后指数退避重连；服务器以 `lastSeen` 和能力快照显示离线状态。手机只访问服务器，不持有灵犀或 Codex 凭据。
+上述白名单对应本文工作区基线 `fe51a88`。`continueTask` 已随 [#114](https://github.com/liyan-04/voxcode/issues/114)
+的 [PR #127](https://github.com/liyan-04/voxcode/pull/127) 合入 `f28553f`，尚不代表部署；
+项目登记属于 [#115](https://github.com/liyan-04/voxcode/issues/115) 待集成模块。
+增加方法必须同步业务服务、私有 RPC、
+共享协议、远程 adapter、HTTP 和调用者，不能只放宽 Agent 白名单。
 
-现有模块复用关系：
+`executionTarget` 是尚待增加的控制层路由/授权合同，不是可随意注入现有 task_rpc
+信封的字段。控制层只接受已授权目标 ID，派发前冻结目标并选择对应 adapter；Mac
+信封仍绑定其认证设备。操作、任务查询和回执也按同一目标匹配，不能只凭相同 taskId
+跨端查询或重放。当前白名单不能据此视为已经支持目标切换。
 
-- `apps/server/project-service.mjs`：在 Mac 上运行，任务和项目的唯一业务服务。
-- `apps/server/task-rpc.mjs`：在 Mac 上运行，只监听私有 Unix socket；不改为公网 API。服务器使用远程 adapter，经 Agent 转发相同方法及参数。
-- `apps/server/http-server.mjs`：登录会话、项目/任务 REST 和现有页面；新增设备/命令路由时保持 Origin、CSRF、body/timeout 限制。
-- `apps/server/mcp-server.mjs`：灵犀意图查询和草稿入口；模型不能直接确认任务、执行 Shell 或跳过授权。
-- `apps/server/mcp-proxy-bridge.mjs`：仅借鉴 WSS 边界、重连和去重实现；Mac Agent 使用独立协议和权限。
+Agent 先发送 `register`，服务器返回绑定当前连接的 `connected` 后才下发 `command`；
+心跳为 `heartbeat/heartbeat_ack`，结果为 `commandResult`。每个设备最多一个活动连接，
+消息内身份不能覆盖认证连接身份，旧连接关闭不能清除新连接。命令上限 64 KiB、结果
+1 MiB、命令有效期最长 60 秒，时间戳为 UTC 毫秒格式。
 
-## 命令合同
+网络写操作携带稳定业务 `requestId`；执行校验 `revision`，元数据变更校验
+`metadataRevision`。外层传输 request ID 与内层业务 requestId 职责不同，重试不能
+重新生成业务身份。Mac TaskService 执行最终项目、任务、版本与权限校验。会话 UUID、
+绝对项目路径、Codex 参数和任意 shell 均不是手机或模型可选择的执行授权。
 
-所有命令使用版本化 JSON 信封。本地任务转发使用 `type: task_rpc` 和 `payload: {method, params}`，`params` 是现有 Task RPC 的参数数组。固定方法为 `status/listProjects/getProject/listTasks/getTask/startTask/confirmTask/cancelTask/archiveTask/deleteTask/restoreTask/getLogs/getDiff/getChecks`。网络写操作必须带原 TaskService 的 `requestId`，确认执行必须带 `revision`，元数据操作必须带 `metadataRevision`。RPC 禁止顶层 `projectId/taskId/expectedRevision`，授权、展示和执行目标只从经过校验的 payload 导出，避免双重目标。读方法不要求任务或版本。Mac 的 TaskService 执行最终项目、版本及权限校验。原生 `open_project` 仅要求已登记项目，不要求先有任务。
+续聊只接受任务已经保存的 UUID，在相同项目 cwd、私有 `CODEX_HOME` 和
+`workspace-write` 沙箱中恢复；禁止 `--last`、模型指定 session 和失败后另起会话的
+静默回退。每任务最多一个活动轮次；当前服务仍保留一个全局活动执行槽。
 
-```json
-{
-  "protocolVersion": 1,
-  "requestId": "req-uuid",
-  "operationId": "op-uuid",
-  "deviceId": "macbook-local",
-  "type": "task_rpc",
-  "payload": { "method": "confirmTask", "params": ["task-uuid", {"revision":12,"requestId":"confirm-uuid"}] },
-  "issuedAt": "2026-10-25T00:00:00.000Z",
-  "expiresAt": "2026-10-25T00:00:30.000Z"
-}
-```
+## Linx 设备侧 MCP 边界
 
-Agent 只接受已配对 WSS 下发的命令，并按 `type` 和 RPC method 白名单校验参数。共享校验位于 `packages/control-protocol/index.mjs`，命令 64 KiB、结果 1 MiB、有效期最长 60 秒。所有改变状态的命令检查 `requestId`、`expiresAt`、`deviceId` 以及原 TaskService 的版本字段。每个设备最多一个活动连接；未知结果先查询对账，不自动重放。客户端重试使用同一个业务 requestId，不能重新生成身份再次执行。
+用户要求的语音链路是 VoxCode 软件设备向 Linx 提供 `tools/list` / `tools/call`，
+工具通过已冻结的执行端路由到服务器本地任务服务或同一已配对 Mac，结构化结果返回 Linx 后继续语音。
+软件设备不等于 Mac Agent，云端 MCP bridge 也不自动代表当前手机会话。
 
-Wire 握手：Agent 发 `{type:"register",protocolVersion:1,deviceId,token,capabilities}`，服务器返回 `{type:"connected",protocolVersion:1,deviceId,connectionId}` 后才接收命令。心跳使用 `heartbeat/heartbeat_ack`。服务器发送 `{type:"command",command:<信封>}`；Agent 返回 `{type:"commandResult",protocolVersion:1,requestId,operationId,deviceId,status,errorCode,snapshot}`。回执绑定已认证连接，不能用消息内身份覆盖连接身份；旧连接关闭不能清除新连接。
+工具注册与调用必须绑定经手机登录授权的 `executionTarget`、账户、执行设备、项目、任务、语音会话及
+`contextVersion`；录音开始冻结目标，执行前再次校验。模型参数不得提升 owner、
+目录、执行端、设备、任务或 session 权限。切换页面/执行端、录音中止和迟到回调不得改变已冻结目标；结果归原端。
+工具回执需区分已受理、运行中、等待权限、完成、失败和未知结果，并提供可查询的
+操作/任务身份；长任务不能把「已受理」当作「已完成」。
 
-时间戳使用 `Date.toISOString()` 的 UTC 毫秒格式（例如 `.000Z`）。响应统一包含：
+当前 SDK 有设备 MCP dispatcher，但正式 [`voice-provider.mjs`](../../apps/server/voice-provider.mjs)
+仍传 `tools: []`，`voice-transport.mjs` 仍返回 `writeReady: false`；另一路云端 MCP
+只开放七个查询工具。需要实现可信设备会话工具绑定和实际执行往返才能解除语音写入
+阻断。ASR、配置就绪、模型产生 tool message 或云 MCP token 都不能替代这项验证。
 
-```json
-{
-  "protocolVersion": 1,
-  "requestId": "req-uuid",
-  "operationId": "op-uuid",
-  "status": "accepted|succeeded|failed|expired|rejected|unknown",
-  "errorCode": null,
-  "agentObservedAt": "2026-10-25T00:00:01Z",
-  "snapshot": { "status": "running", "taskId": "task-uuid" }
-}
-```
+## 反馈、失败与恢复
 
-服务器保存 `serverCached` 与 `agentObserved` 两类状态；页面显示同步时间和状态来源，不把旧缓存伪装成实时状态。取消是异步操作，不代表代码回滚。
+- 页面显示实际任务/轮次状态、返回内容、结构化命令/文件事件及更新时间；列表摘要不能
+  覆盖选中任务的完整详情。未采集的 diff/checks 保持 `collected: false`。
+- 选中端离线时拒绝向该端新派发，保留该端手机输入；Mac 离线不妨碍登录或使用服务器执行端。
+  已经运行的 Mac 任务继续。重连后查询并对账，
+  服务器缓存必须带来源和观察时间。
+- 写入超时显示 `unknown`，先查询/对账原 `operationId`，不重复创建任务或换 requestId
+  重发。服务器/Agent 重启也不自动重跑未对账操作。
+- 取消是异步操作，不回滚文件；清理或进程归属不确定时保持 quarantine。
+- Agent 单写者归属由 [#121](https://github.com/liyan-04/voxcode/issues/121) 的内核锁候选
+  改进；持久 guard 文件存在不等于活跃持锁。**禁止删除 guard/ledger 强制启动。**
+- 服务停止、版本回滚和任务取消是不同操作。更新任务服务前先核对活动任务及会话格式，
+  不能通过删除状态、项目或凭据恢复启动。
 
-## 配对、鉴权和本地安全
-
-MVP 使用一次性配对码/二维码建立设备身份，服务端只保存设备公钥或不可逆 token 摘要；Agent 私钥放入 macOS Keychain，不能写入仓库、任务日志或页面。生产 WSS 使用严格证书校验；开发 fixture 可使用 loopback，但必须显式标记 `fixture`。服务器会话使用现有登录 cookie/Origin 保护，设备命令额外绑定 `userId + deviceId + taskId`。
-
-Mac 本地能力默认拒绝：
-
-- 不执行任意命令行、任意路径、任意脚本字符串。
-- `open_project` 只接受服务器下发的已登记项目 ID，Agent 自己解析本地映射。
-- `focus_window` 只接受已声明的 bundle ID/窗口标识；Accessibility 权限缺失时返回明确错误。
-- 创建、确认、停止、归档等操作必须复用 Mac TaskService 的权限和版本检查；当前未实现的续聊/暂停功能明确不可用。
-- 删除、发布、部署、对外发送等高风险动作必须在手机显式确认后才生成命令；灵犀不能代答确认。
-
-## 灵犀语音边界
-
-灵犀只负责 ASR、意图和可选 TTS；意图转换为同一远程任务 API，最终由 Mac Codex 执行。语音会话冻结 `ownerId/deviceId/projectId/taskId/contextVersion`，模型不能改写目标。首批写操作保留草稿和手机确认；MCP 不得代答 Codex 审批或用户验收。云端 MCP token 仅代表入口认证，不证明属于某位手机用户的语音上下文，未完成可信关联前保持写工具禁用。灵犀凭据只放服务器，真实 WSS/ASR/TTS/MCP 需要单独 `live` 证据。
-
-## 失败和恢复
-
-- 手机断线：任务继续运行，重连后通过快照/事件游标同步。
-- Mac Agent 断线：禁止派发新命令；Mac 上已运行的 Codex 任务继续，页面显示 `lastSeen`，重新连接后对账。
-- 命令发送超时：显示 `unknown`，先查询 `operationId` 再允许重试。
-- Agent 重启：重新注册能力和活动任务快照；不重复执行未确认命令。
-- Accessibility/应用不存在：返回 `capability_unavailable`，Mac 任务的服务器缓存不被伪造为成功。
-- 服务器重启：恢复持久命令 ledger 和设备状态；未对账操作保持未知。
-
-## 分阶段交付和独立 PR
-
-每个阶段都必须有独立测试、独立 review 和独立 PR，验证后即可合并到 `master`；不等待最终全链路完成。
-
-1. **合同与 fixture（本 PR）**：文档冻结设备、命令、配对、Linx 边界；证据 `local`。
-2. **服务器 gateway**：设备注册、持久命令 ledger、认证连接 handle；固定 RPC 白名单经 Agent 转发到 Mac，覆盖去重、TTL、版本、断线和重启；证据 `fixture/local`。
-3. **Mac Agent MVP**：Node 实现，launchd 启动、Keychain、WSS 重连、`task_rpc` 固定方法转发；本机原生聚焦能力按实际适配情况单独公布和验证；证据 `local`，不声称公网可用。
-4. **手机页面控制**：复用现有页面，显示设备连接/同步时间，支持查看任务和切换；页面不直接读 Mac 文件；证据 `fixture/local`。
-5. **灵犀适配器**：先固定口令/fixture 意图，再接真实服务器端 WSS、ASR、MCP、TTS；危险命令确认和会话绑定回归；真实资源证据 `live`。
-6. **组合启动与部署**：服务器组合 HTTP/WSS/RemoteTaskAdapter/Linx；Mac 组合 TaskService/私有RPC/Agent/Codex。严格 TLS、端口归属、回滚和手机网络验证另开验收 Issue。
-
-## 明确未完成项
-
-当前代码树尚无 `apps/mac-agent`、设备 gateway 的生产启动器或可用的真实灵犀配置。现有服务器 fixture 通过不证明 Mac Accessibility、真实 Codex、真实 Linx、手机设备、TLS、公网或户外网络成功。历史 `.worktrees/mac`、`.worktrees/relay`、`.worktrees/integration` 只能作为设计和测试参考，不能直接视为当前主线实现。
+每个独立能力完成测试和两份独立评审后通过单独 PR 进入 `master`；线上、手机、
+麦克风、语音工具执行和最终用户验收分别记录。本次架构 PR 保持打开，由用户审阅。

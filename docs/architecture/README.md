@@ -1,57 +1,46 @@
-# Architecture documentation
+# 架构文档
 
-## Current checkout
+## 当前入口
 
-As of 2026-10-25, the supported implementation in `master` is server-only. The
-executable task entry is `apps/server/task-cli.mjs`; it runs a protected Unix
-socket task service backed by the configured Codex CLI. The HTTP, MCP and WSS
-files under `apps/server/` are composable library modules with fixture coverage,
-not a deployed browser/voice launcher. The old Mac, Relay, iOS and Integration
-paths were removed from the current tree. Documents that still name those paths
-are historical evidence and must not be copied into current setup instructions.
+2026-10-25 最新方向：手机浏览器 → 服务器 VoxCode → 页面所选执行端。
+服务器端调用本地任务 RPC/Codex；Mac 端经主动出站的已配对 Agent 到 Mac RPC/Codex。
+项目、任务、请求和语音按 `executionTarget` 隔离。当前正式控制面仍单 Mac 路由，双端接线待交付。
 
-The implementation boundary and open gates are recorded in [the current
-architecture](current.md), [the server execution plan](server-execution-plan.md)
-and the repository [README](../../README.md). Keep these entry points aligned
-with actual files and commands before describing a capability as available.
+- [手机、Mac 与 Linx 当前架构](phone-mac-linx-current.md)：最新产品合同、组件图、
+  文字追问与设备 MCP 语音时序、源码/线上状态及部署回滚边界。
+- [当前架构入口](current.md)：实际模块入口与当前约束。
+- [Mac Agent 控制面合同](mac-agent-control.md)：协议、鉴权、同会话续聊、语音工具及恢复边界。
+- [Mac 控制运行记录](../verification/mac-control-runtime.md)：已存在的启动方式和当时验证，
+  不是新版项目/续聊/设备 MCP 的完成证明。
+- [仓库 README](../../README.md)：启动入口与文档索引。
 
-## Historical coordination record
+提交文字/语音执行指令直接执行；项目 → 任务 → 子任务，同任务追问复用持久 UUID。
+Linx 交付必须包括设备侧 `tools/list → tools/call → 所选端执行 → 结果 → 继续语音`，
+结果归被冻结的原端。登录不依赖 Mac Agent，登录/控制面可达/执行端在线分别记录。
+源码已存在、候选已评审、已合入、已部署和用户验收必须分开记录，详见总览状态表。
 
-The sections below describe the earlier architect-agent workflow and retained
-review evidence. They do not assign current writable paths or imply that the
-historical Mac, Relay or iOS workers still exist.
+## 历史设计与交付证据
 
-Current decision: [server-hosted Codex and Linx](server-execution.md), with [bounded implementation tasks](server-execution-plan.md), approved for source work after PM/architect assessment and local simple verification. The phone connects only to the server; no company Mac or AirPlay requirement remains for this delivery. Server delivery55, iOS56 and voice57 use independent worktrees; the coordinator owns shared documentation/Git and two independent review gates. Historical worker role names below do not mandate a Mac host. Linux/live/device/outdoor acceptance remains open until actually exercised.
+以下保留原决策时的设计/交接，不再定义当前执行位置、用户交互或可用功能；
+其中 server-only、原生 iOS、Relay、草稿/确认及旧目录引用均按历史上下文阅读。
 
-The user requested a dedicated architect on 2026-10-23 to coordinate the existing three development agents. This is an active engineering role, governed by AGENTS.md, CONTRIBUTING.md and docs/agent-collaboration.md.
-
-## Team and authority
-
-| Role / agent | Responsibility |
+| 历史文档 | 保留用途 |
 | --- | --- |
-| Coordinator (`/root`) | User communication, approved scope, shared contract application, integration, Git/PR and release authority |
-| Architect (`/root/architect`) | Technical plan, interfaces, dependencies, task dispatch, cross-component checks, root/module documentation and build/install/deployment consistency |
-| iOS (`/root/ios_v1`) | SwiftUI client, task/recording identity, trust, native results/acceptance and tests |
-| Mac (`/root/mac_v1`) | Codex sessions, scheduling, recovery, criteria/evidence, HTTP bridge and tests |
-| Relay (`/root/relay_v1`) | Outbound tunnel, fixed-IP TLS, bounded core routes/audio, local certificate helper and tests |
+| [服务器执行架构](server-execution.md) / [实现计划](server-execution-plan.md) | 此前服务器本地 Codex 的方案与任务划分 |
+| [语音工作区合同](voice-code-workspace-contract.md) | 早期工作区/语音字段与门禁设计；新交互以当前合同为准 |
+| [任务状态与历史](task-state-and-history.md) | 早期任务状态模型 |
+| [Phone duplex WSS](phone-duplex-wss.md) / [Phone monitor](phone-monitor.md) | 原生/早期手机传输设计 |
+| [Mac](mac-v1-handoff.md)、[Relay](relay-v1-handoff.md)、[Voice](voice-v1-handoff.md) 交接 | 早期模块交付边界 |
+| [协调记录](coordination-2026-10-23.md)、[检查点](checkpoint-2026-10-24.md)、[整合记录](master-consolidation-2026-10-24.md) | 各时间点源码与交接背景 |
 
-The architect coordinates these existing workers rather than creating replacements. Root-owned voice/integration and benchmark work remains an explicit dependency to schedule with the coordinator. The architect must not silently expand a developer's writable paths or take over its implementation. Read docs/phone-demo-scope.zh-CN.md: interactive generated-site preview, a full Mac workbench and custom AirPlay control are deferred; native/outdoor/Linx/results/multi-task acceptance remains.
+## 工程协作
 
-## Operating cycle
+当前角色与权限由 [`AGENTS.md`](../../AGENTS.md)、[Issue 协作](../issue-collaboration.md)
+和[开发协作](../agent-collaboration.md)确定。架构工作负责接口、边界、文档一致性与
+交付证据，不代替实现的两份独立评审、部署授权或用户验收。协调者分配独占路径，
+统一管理 Git、PR、集成与已安装服务；独立工作者仅修改分配范围。
 
-1. Read the approved phone-demo scope, contract, implementation plan, current status and developer handoffs. Identify the next verifiable slice and its blocking interfaces.
-2. Send each developer a task ID, goal, base/dependencies, exclusive paths, acceptance criteria/checks and exclusions. Developers report their handoffs to the architect and coordinator. Resolve routine technical choices within the approved scope; escalate product changes or unavailable resources to the coordinator.
-3. Record interface decisions and dependency order in `docs/architecture/`. Propose shared contract changes to the coordinator, who applies and verifies them before consumers proceed.
-4. At each checkpoint, inspect actual diffs and relevant test evidence. Check end-to-end field/version/auth/error compatibility and return an integration recommendation. Do not infer that fixture tests prove real-device or live-service behavior.
-5. Check the root README and affected module READMEs against the actual entry points, environment variables, build/package/install/deploy scripts and rollback behavior. Developers update module usage and tests; the architect checks cross-module consistency. Run applicable local/script/package checks and mark unavailable remote/device verification explicitly. Script maintenance does not expand deployment authorization.
-6. Arrange two independent reviews per component through the coordinator. The architect's cross-component check does not replace either review, user acceptance or deployment authority.
-
-Use short coordination rounds: record blockers, assign work, then yield while developers execute. Respect available agent slots; with four total slots, an active architect and coordinator leave room for two active developers. The architect can finish a coordination round to free its slot for the third developer, then resume at a checkpoint. This scheduling limit is unrelated to the app's configurable task execution slots.
-
-## Records and boundaries
-
-The architect may edit only coordinator-allocated paths. Assign documentation/README/build/deploy changes through an Issue and isolated worktree, including module handoff/dependency checks before overlapping files. Reports include current task ownership, dependency matrix, next task briefs, actual evidence, blockers, review status and the next checkpoint. Keep missing checks visible.
-
-The delegated architect does not stage, commit, stash, switch branches, push or merge; the root coordinator retains Git/integration ownership and applies shared contracts. Deployment follows the user’s existing authorization and host/port safety limits; maintaining a script does not authorize changing an external host. Request path ownership through the coordinator. Do not discard existing red tests or unfinished files; use them as resumable work with their original owners.
-
-All agents follow [the Agent work agreement and acceptance standard](agent-work-agreement.md) and [the development practices](development-practices.md): short-lived PR integration into master, acceptance criteria before implementation, shared contracts before parallel consumers, and model-gateway backoff/recovery. Use the practice checklist at assignment and handoff checkpoints. Post-merge branch/worktree cleanup follows [cleanup-policy.md](cleanup-policy.md).
+每个能力使用独立 Issue/工作区，在可验证的范围完成测试与评审后单独 PR；不等待
+全链路才能发布已完成能力。文档始终写清 `fixture/local/live/device/outdoor` 的证据
+环境，保留失败、缺口与历史记录。清理遵循[清理策略](cleanup-policy.md)，不删除
+未合入、脏或仍有依赖的工作。

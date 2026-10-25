@@ -1,5 +1,22 @@
 # Progress and verification
 
+## 2026-10-25: incremental browser control delivery
+
+- PR #133 merged direct task submission into master `9d2402a`: one request
+  creates or continues and executes the original turn. Both independent
+  reviews passed; final helper/HTTP/runtime checks 34/34 and policy 62/62.
+  Scoped baseline coverage passed: changed lines 100%, branches 93.67%, overall
+  lines and branches increased. This is source/local fixture evidence.
+- Issue #121 crash-safe Agent lock: coordinator reran 35/35 Mac Agent tests,
+  matching the frozen implementation hashes reviewed by mac_agent_probe.
+  Kernel ownership survives helper exit and releases after owner death;
+  persistent guards are never removed to force startup. Linux and installed
+  migration remain separate deployment checks.
+- Issue #129 deployment inventory confirmed owned vm6 control listener and
+  strict TLS health, with rollback releases retained. A 15-minute heartbeat
+  checks newly merged master for deployment. Source merge, deployment and
+  physical phone acceptance remain distinct.
+
 ## 2026-10-25: server-only documentation refresh (Issue #91)
 
 - Created `codex/91-docs-refresh` from `origin/master` and aligned the root and

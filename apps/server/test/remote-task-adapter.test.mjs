@@ -33,6 +33,12 @@ test('network facade rejects invalid methods and missing write identities before
   await assert.rejects(adapter.startTask({projectId:'p',prompt:'x'}),{code:'invalid_argument'});
   assert.equal(sent,0);
 });
+test('remote continuation uses a stable business identity and preserves turn history',async()=>{
+ const sent=[],turns=[{prompt:'first',output:'result'},{prompt:'fix',status:'draft'}],gateway={async submitCommand(command){sent.push(command);return {status:'succeeded',snapshot:{id:'t',status:'draft',turns}};}};
+ const adapter=createRemoteTaskAdapter({gateway,userId:'owner',deviceId:'mac'}),opts={prompt:'fix',revision:3,requestId:'followup'};
+ assert.deepEqual((await adapter.continueTask('t',opts)).turns,turns);await adapter.continueTask('t',opts);assert.equal(sent[0].requestId,sent[1].requestId);assert.deepEqual(sent[0].payload,{method:'continueTask',params:['t',opts]});
+ await assert.rejects(adapter.continueTask('t',{...opts,resumeSessionId:'other'}),{code:'invalid_argument'});assert.equal(sent.length,2);
+});
 test('poll failures after acceptance stay unknown and all awaits share one deadline',async()=>{
  const gateway={async submitCommand(){return {status:'accepted',operationId:'op'};},async getOperation(){throw Object.assign(Error('private'),{code:'capacity'});}};
  const adapter=createRemoteTaskAdapter({gateway,userId:'owner',deviceId:'mac',timeoutMs:15,pollMs:1});

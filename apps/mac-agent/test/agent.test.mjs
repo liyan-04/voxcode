@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {mkdtemp, readFile, stat,realpath,writeFile} from 'node:fs/promises';
+import {mkdtemp, readFile, stat,realpath,writeFile,unlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -92,6 +92,11 @@ test('ledger lock rejects concurrent and stale instances, close releases ownersh
  await f.agent.close();const next=await createMacAgent(options);await next.close();
  await writeFile(`${options.stateFile}.lock`,JSON.stringify({pid:2147483647}),{mode:0o600});
  await assert.rejects(()=>createMacAgent(options),/ledger lock/);
+});
+test('replaced kernel guard fails closed before dispatching or writing a command receipt',async t=>{
+ let calls=0,stateError=false;const f=await fixture(t,{onCommand:async()=>{calls++;return {};},onStatus:value=>{if(value==='state_error')stateError=true;}});f.connect();
+ const guard=join(f.dir,'ledger.json.lock.guard');await unlink(guard);await writeFile(guard,'',{mode:0o600});
+ f.ws.receive({type:'command',command:command()});await until(()=>stateError);assert.equal(calls,0);assert.equal(f.ws.readyState,3);assert.deepEqual(JSON.parse(await readFile(join(f.dir,'ledger.json'),'utf8')).entries,{});
 });
 test('heartbeat acknowledgments require current device and connection identity',async t=>{
  for(const patch of [{deviceId:'other'},{connectionId:'old'},{protocolVersion:2}]){
