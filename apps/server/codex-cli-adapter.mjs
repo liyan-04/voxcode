@@ -83,7 +83,8 @@ export function createCodexCliAdapter({command='codex',projectRoot,dataDir,spawn
         let cleanupConfirmed=true;
         try{
           if(entry.child?.pid&&groupExists(entry.child.pid)){
-            entry.stop();await delay(killGraceMs);signal('SIGKILL');
+            // Cleaning up descendants after exit does not imply cancellation.
+            signal('SIGTERM');await delay(killGraceMs);signal('SIGKILL');
             for(let n=0;n<100&&groupExists(entry.child.pid);n++)await delay(20);
             if(groupExists(entry.child.pid)){cleanupConfirmed=false;t.quarantined=true;t.error='Process group cleanup unconfirmed';}
           }
