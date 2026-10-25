@@ -16,6 +16,20 @@ function fixture(){
 }
 const input={projectId:'project-1',prompt:'Make the requested change',requestId:'request-1'};
 
+test('invalid submission fields cannot reach the task adapter',async()=>{
+ const f=fixture();
+ assert.throws(()=>createTaskSubmission(),{code:'configuration'});
+ assert.throws(()=>createTaskSubmission({adapter:f.adapter,executionTarget:'bad target'}),{code:'configuration'});
+ for(const value of [null,[],{...input,sessionId:'chosen'},{...input,projectId:''},{...input,requestId:''},{...input,prompt:' '},{...input,prompt:'x'.repeat(20001)},{...input,title:42},{...input,title:'x'.repeat(201)},{...input,parentTaskId:'bad parent'}])await assert.rejects(f.submission.start(value),{code:'invalid_argument'});
+ for(const [id,value] of [['',{...input,revision:1}],['task-1',{...input,revision:0}],['task-1',{...input,revision:1.5}]])await assert.rejects(f.submission.continue(id,value),{code:'invalid_argument'});
+ assert.deepEqual(f.calls,[]);
+});
+test('missing task identities and changed ownership cannot execute or expose a foreign result',async()=>{
+ const missing=fixture();missing.adapter.startTask=async()=>({});await assert.rejects(missing.submission.start(input),{code:'outcome_unknown'});assert.deepEqual(missing.calls,[]);
+ const foreign=fixture();foreign.adapter.getTask=async()=>({id:'task-1',projectId:'other'});await assert.rejects(foreign.submission.start(input),{code:'project_unavailable'});assert.equal(foreign.calls.filter(call=>call[0]==='execute').length,0);
+ const changed=fixture(),get=changed.adapter.getTask;let reads=0;changed.adapter.getTask=async()=>++reads===2?{id:'task-1',projectId:'other'}:get();await assert.rejects(changed.submission.start(input),{code:'outcome_unknown'});
+});
+
 test('a new submission starts the task without a separate user confirmation',async()=>{
  const f=fixture(),result=await f.submission.start(input);
  assert.equal(result.taskId,'task-1');assert.equal(result.status,'running');assert.equal(f.calls.filter(x=>x[0]==='execute').length,1);assert.equal(f.calls.at(-1)[2].revision,1);
