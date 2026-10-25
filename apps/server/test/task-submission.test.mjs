@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {createTaskSubmission} from '../task-submission.mjs';
 import {createHttpServer} from '../http-server.mjs';
 import {once} from 'node:events';
+import {mkdtemp,realpath,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createTaskRpcServer,createTaskRpcClient} from '../task-rpc.mjs';
 
 function fixture(){
  const calls=[],receipts=new Map();let task;
@@ -92,4 +96,100 @@ test('authenticated direct HTTP submissions execute while authentication itself 
  f.task={...f.task,status:'completed',revision:3};response=await post('/api/tasks/task-1/continue',{projectId:'project-1',prompt:'Follow up',revision:3,requestId:'http-followup'});
  assert.equal(response.status,200);const continued=await response.json();assert.equal(continued.status,'running');assert.equal(continued.turns.length,2);
  const count=f.calls.length;response=await post('/api/tasks/task-1/continue',{projectId:'other',prompt:'No',revision:3,requestId:'cross-project'});assert.equal(response.status,404);assert.equal(f.calls.length,count);
+});
+
+for(const stage of ['startTask','continueTask','confirmTask'])test(`HTTP preserves submission identity when ${stage} commits before the real RPC response deadline`,async t=>{
+ const root=await realpath(await mkdtemp(join(tmpdir(),'submission-lost-')));t.after(()=>rm(root,{recursive:true,force:true}));
+ let task=stage==='continueTask'?{id:'task',projectId:'project-1',status:'completed',revision:3}:null,release,delayed=false;
+ const counts={startTask:0,continueTask:0,confirmTask:0},commits={startTask:0,continueTask:0,confirmTask:0},receipts=new Map();
+ const result=async(method,key,apply)=>{
+  counts[method]++;if(receipts.has(key))return structuredClone(receipts.get(key));
+  const value=apply();commits[method]++;receipts.set(key,structuredClone(value));
+  if(method===stage&&!delayed){delayed=true;await new Promise(resolve=>release=resolve);}
+  return structuredClone(value);
+ };
+ const service={
+  getTask:async()=>structuredClone(task),
+  startTask:async request=>result('startTask',request.requestId,()=>{task={id:'task',projectId:request.projectId,status:'draft',revision:1};return {taskId:'task'};}),
+  continueTask:async(id,request)=>result('continueTask',request.requestId,()=>{assert.equal(task.revision,request.revision);task={...task,status:'draft',revision:request.revision+1};return task;}),
+  confirmTask:async(id,request)=>result('confirmTask',request.requestId,()=>{assert.equal(task.revision,request.revision);task={...task,status:'running',revision:request.revision+1};return task;}),
+ };
+ const rpc=await createTaskRpcServer({socketPath:join(root,'task.sock'),adapter:service,timeoutMs:100});t.after(()=>rpc.close());
+ const adapter=createTaskRpcClient({socketPath:rpc.address,timeoutMs:1000}),origin='https://vox.example';
+ const app=createHttpServer({adapter,directSubmissions:true,legacyProjectId:'project-1',publicOrigin:origin,loginSecret:'a-long-login-password'});
+ app.server.listen(0,'127.0.0.1');await once(app.server,'listening');t.after(()=>app.server.close());t.after(()=>release?.());
+ const base=`http://127.0.0.1:${app.server.address().port}`,login=await fetch(base+'/api/login',{method:'POST',headers:{origin},body:JSON.stringify({password:'a-long-login-password'})});
+ const headers={origin,cookie:login.headers.get('set-cookie').split(';')[0]},path=stage==='continueTask'?'/api/tasks/task/continue':'/api/tasks',payload=stage==='continueTask'?{...input,revision:3}:input;
+ const post=()=>fetch(base+path,{method:'POST',headers,body:JSON.stringify(payload)});
+ const response=await post(),unknown=await response.json();
+ assert.equal(response.status,409);assert.equal(unknown.code,'outcome_unknown');assert.equal(unknown.submissionRequestId,'request-1');
+ assert.equal(unknown.taskId,stage==='startTask'?undefined:'task');assert.equal(commits[stage],1);assert.equal(counts[stage],1);
+ assert.equal(commits.confirmTask,stage==='confirmTask'?1:0);
+ release();
+ const retry=await post();assert.equal(retry.status,stage==='continueTask'?200:201);assert.equal((await retry.json()).status,'running');
+ assert.equal(commits[stage],1);assert.equal(commits.confirmTask,1);assert.equal(task.id,'task');
+});
+
+test('ambiguous confirmation transport failures retain the original submission without automatic replay',async()=>{
+ for(const code of ['deadline_exceeded','response_too_large','invalid_response','unavailable','task_failed','unrecognized_transport_failure']){
+  const f=fixture(),confirm=f.adapter.confirmTask;
+  f.adapter.confirmTask=async(...args)=>{await confirm(...args);throw Object.assign(Error('lost response after admission'),{code});};
+  await assert.rejects(f.submission.start(input),error=>error.code==='outcome_unknown'&&error.taskId==='task-1'&&error.submissionRequestId==='request-1');
+  assert.equal(f.task.status,'running');assert.equal(f.calls.filter(call=>call[0]==='execute').length,1);
+ }
+});
+
+test('ambiguous create and continuation failures retain identities even without a create task ID',async()=>{
+ const start=fixture();start.adapter.startTask=async()=>{throw 'lost create response';};
+ await assert.rejects(start.submission.start(input),error=>error.code==='outcome_unknown'&&error.submissionRequestId==='request-1'&&error.taskId===undefined);
+ const missing=fixture();missing.adapter.startTask=async()=>({});
+ await assert.rejects(missing.submission.start(input),error=>error.code==='outcome_unknown'&&error.submissionRequestId==='request-1');
+ const continuation=fixture();continuation.task={id:'task-1',projectId:'project-1',status:'completed',revision:3};
+ continuation.adapter.continueTask=async()=>{throw Object.assign(Error('closed after mutation'),{code:'unavailable'});};
+ await assert.rejects(continuation.submission.continue('task-1',{...input,revision:3}),error=>error.code==='outcome_unknown'&&error.taskId==='task-1'&&error.submissionRequestId==='request-1');
+ assert.equal(continuation.calls.length,0);
+});
+
+test('explicit business rejections retain their classifications at every mutation boundary',async()=>{
+ for(const method of ['startTask','continueTask','confirmTask'])for(const code of ['busy','revision_conflict','project_unavailable','invalid_argument','request_conflict','not_found','task_hidden','task_deleted','quarantined','invalid_parent','ledger_full','capacity','expired','offline','task_conflict']){
+  const f=fixture();if(method==='continueTask')f.task={id:'task-1',projectId:'project-1',status:'completed',revision:3};
+  f.adapter[method]=async()=>{throw Object.assign(Error('explicit rejection'),{code});};
+  const operation=method==='continueTask'?f.submission.continue('task-1',{...input,revision:3}):f.submission.start(input);
+  await assert.rejects(operation,error=>error.code===code&&error.submissionRequestId==='request-1');
+ }
+});
+
+for(const kind of ['start','continue'])for(const code of ['deadline_exceeded',undefined])test(`HTTP retains the ${kind} identity after its committed mutation and a ${code??'raw'} detail-read failure`,async t=>{
+ const tasks=new Map(),receipts=new Map();let failRead=false,failed=false,confirmations=0;
+ if(kind==='continue')tasks.set('task-1',{id:'task-1',projectId:'project-1',status:'completed',revision:3,turns:[{prompt:'Previous turn'}]});
+ const adapter={
+  async startTask(request){
+   if(receipts.has(request.requestId))return receipts.get(request.requestId);
+   const id=`task-${tasks.size+1}`;tasks.set(id,{id,projectId:request.projectId,status:'draft',revision:1,turns:[{prompt:request.prompt}]});
+   const result={taskId:id};receipts.set(request.requestId,result);failRead=true;return result;
+  },
+  async continueTask(id,request){
+   if(receipts.has(request.requestId))return receipts.get(request.requestId);
+   const task=tasks.get(id);assert.equal(request.revision,task.revision);
+   const result={...task,status:'draft',revision:request.revision+1,turns:[...task.turns,{prompt:request.prompt}]};
+   tasks.set(id,result);receipts.set(request.requestId,result);failRead=true;return result;
+  },
+  async getTask(id){if(failRead&&!failed){failed=true;throw Object.assign(Error('detail read failed'),code?{code}:{});}return structuredClone(tasks.get(id));},
+  async confirmTask(id,request){const task=tasks.get(id);assert.equal(request.revision,task.revision);confirmations++;tasks.set(id,{...task,status:'running',revision:task.revision+1});},
+ };
+ const origin='https://vox.example',app=createHttpServer({adapter,directSubmissions:true,legacyProjectId:'project-1',publicOrigin:origin,loginSecret:'a-long-login-password'});
+ app.server.listen(0,'127.0.0.1');await once(app.server,'listening');t.after(()=>app.server.close());
+ const base=`http://127.0.0.1:${app.server.address().port}`,login=await fetch(base+'/api/login',{method:'POST',headers:{origin},body:JSON.stringify({password:'a-long-login-password'})});
+ const headers={origin,cookie:login.headers.get('set-cookie').split(';')[0]},path=kind==='start'?'/api/tasks':'/api/tasks/task-1/continue',payload=kind==='start'?input:{...input,revision:3};
+ const post=request=>fetch(base+path,{method:'POST',headers,body:JSON.stringify(request)});
+ const response=await post(payload),unknown=await response.json();
+ assert.equal(response.status,409);assert.deepEqual(unknown,{error:'request failed',code:'outcome_unknown',taskId:'task-1',submissionRequestId:'request-1'});
+ assert.equal(tasks.size,1);assert.equal(tasks.get('task-1').turns.length,kind==='start'?1:2);assert.equal(confirmations,0);
+ const retry=await post({...payload,requestId:unknown.submissionRequestId});assert.equal(retry.status,kind==='start'?201:200);assert.equal((await retry.json()).status,'running');
+ assert.equal(tasks.size,1);assert.equal(tasks.get('task-1').turns.length,kind==='start'?1:2);assert.equal(confirmations,1);
+});
+
+test('a read failure before continuation preserves its classification without mutation effects',async()=>{
+ const continuation=fixture();continuation.adapter.getTask=async()=>{throw Object.assign(Error('read unavailable'),{code:'unavailable'});};
+ await assert.rejects(continuation.submission.continue('task-1',{...input,revision:3}),{code:'unavailable'});assert.equal(continuation.calls.length,0);
 });
