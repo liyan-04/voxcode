@@ -43,8 +43,9 @@ test('entry rejects unsupported platform/operator and unknown arguments before w
  }
 });
 test('all shell entry points work from arbitrary cwd and support help without service access',()=>{
- for(const command of ['install','start','stop','restart','deploy']){
+ for(const command of ['install','start','stop','restart','deploy','publish']){
   const path=fileURLToPath(new URL(`../../${command}.sh`,import.meta.url));
-  assert.match(execFileSync('/bin/sh',[path,'--help'],{cwd:'/private/tmp',encoding:'utf8'}),/VOXCODE_DEPLOY_CONFIG/);
+  const output=execFileSync('/bin/sh',[path,'--help'],{cwd:'/private/tmp',encoding:'utf8'});
+  assert.match(output,command==='publish'?/QUP_BIN|upload-master/u:/VOXCODE_DEPLOY_CONFIG/);
  }
 });

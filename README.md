@@ -58,10 +58,13 @@ export VOXCODE_DEPLOY_CONFIG=/absolute/private/deployment.json
 ./stop.sh          # Mac 有活动任务时拒绝；先停 Agent，再停任务服务
 ./restart.sh       # 停止后按顺序启动
 ./deploy.sh        # 拉取 origin/master，发布并启动；失败自动尝试恢复上一版本
+./publish.sh --help # 工作站拉取精确 master、打包并通过 QUP 上传；只转移包，不改服务
 ```
 
-每个入口支持 `--config /absolute/private/deployment.json`、`--dry-run` 和 `--help`，
-可从任意当前目录调用。配置只保存路径及身份参数，凭据留在私有文件或 Keychain。
+生命周期入口支持 `--config /absolute/private/deployment.json`、`--dry-run` 和
+`--help`，可从任意当前目录调用；`publish.sh` 只支持 `--help`、`--output` 和
+`--qup`，从工作站生成并上传包。配置只保存路径及身份参数，凭据留在私有文件或
+Keychain。
 `deploy.sh` 在服务主机拉取最新 master 的已提交源码，不切换当前分支、不覆盖本地改动；
 它更新已安装且归属核对通过的服务，不创建 SSH 连接或替换未登记的进程。
 重复部署同一版本会核验并启动该版本，不重复安装依赖。
