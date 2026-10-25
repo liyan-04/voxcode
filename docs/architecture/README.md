@@ -21,17 +21,11 @@ Linx 交付必须包括设备侧 `tools/list → tools/call → 所选端执行 
 
 ## 历史设计与交付证据
 
-以下保留原决策时的设计/交接，不再定义当前执行位置、用户交互或可用功能；
-其中 server-only、原生 iOS、Relay、草稿/确认及旧目录引用均按历史上下文阅读。
-
-| 历史文档 | 保留用途 |
-| --- | --- |
-| [服务器执行架构](server-execution.md) / [实现计划](server-execution-plan.md) | 此前服务器本地 Codex 的方案与任务划分 |
-| [语音工作区合同](voice-code-workspace-contract.md) | 早期工作区/语音字段与门禁设计；新交互以当前合同为准 |
-| [任务状态与历史](task-state-and-history.md) | 早期任务状态模型 |
-| [Phone duplex WSS](phone-duplex-wss.md) / [Phone monitor](phone-monitor.md) | 原生/早期手机传输设计 |
-| [Mac](mac-v1-handoff.md)、[Relay](relay-v1-handoff.md)、[Voice](voice-v1-handoff.md) 交接 | 早期模块交付边界 |
-| [协调记录](coordination-2026-10-23.md)、[检查点](checkpoint-2026-10-24.md)、[整合记录](master-consolidation-2026-10-24.md) | 各时间点源码与交接背景 |
+仍有参考价值的历史合同、任务状态和交付台账保留在本目录，并明确标注其
+证据/目标状态；它们不能覆盖 `phone-mac-linx-current.md` 的当前边界。
+旧 server-only、原生 iOS、Relay 双工、phone-monitor、模块 handoff、协调
+checkpoint 和分支整合记录已从当前入口移除。`docs/reviews/` 中的日期化评审
+仍可引用这些快照，作为审计记录而不是当前实现说明。
 
 ## 工程协作
 

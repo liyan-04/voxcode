@@ -104,7 +104,7 @@
 ## 2026-10-24: phone duplex WSS design checkpoint (Issue62)
 - User requires actual simultaneous phone↔server WSS. Architect and PM recommend authenticated `/api/stream` through a fixed same-host Relay→Bridge proxy, with HTTPS retained for pairing, durable mutations and full evidence. Existing machine Connector and provider Linx WSS are separate connections.
 - Design freezes pre-upgrade authorization/revocation, JSON/binary framing, audio credits and bounded queues, ACK-before-events, real task subscriptions/replay/gaps, immutable recording targets and no old audio on reconnect. iOS must change record-only audio/session behavior as well as transport.
-- Disposable loopback WS proxy probe passed header auth, backend-before-frontend upgrade, text-before-stop and binary echo after dependency-path correction. It is not product code or TLS/native/provider evidence. Implementation/live/signing gates remain open; [design](architecture/phone-duplex-wss.md) is the next bounded work basis.
+- Disposable loopback WS proxy probe is historical evidence only; it is not product code or TLS/provider evidence. Current voice and target routing work follows [phone/mac/Linx current architecture](architecture/phone-mac-linx-current.md) and [Mac Agent control](architecture/mac-agent-control.md).
 
 ## 2026-10-24: dedicated server entry and source bundle (Issue55)
 - Added non-root, redacted preflight/start entry that reuses the existing runtime, canonical verified project/data, explicit TTY-only pairing code and owned shutdown. Relay remains separate; no service/account/dependency automation or unrelated listener mutation.
@@ -153,14 +153,14 @@
 - Package module closure is audited with server monitoring Issue #29; its new runtime module must be included and imported from the extracted installation package. No remote deployment, signed build or live Linx pass is claimed by these documentation changes.
 
 ## 2026-10-24: phone monitoring contract (Issue #25)
-- User accepts native phone monitoring instead of a required Grafana deployment. Frozen [contract/design](architecture/phone-monitor.md) forwards the existing paired aggregate monitor, adds bounded Relay transport metrics only after Mac authorization, and separates configuration from live voice success.
+- Historical phone-monitoring design is retired. Current monitoring boundaries follow [phone/mac/Linx current architecture](architecture/phone-mac-linx-current.md) and must distinguish configuration, fixture, server-live and phone-live evidence.
 - Server #29 and iOS #30 use independent worktrees/owned paths. Phone monitoring refresh does not control task execution or alter task connection state; failed/old samples remain visibly stale.
 - Independent design review found ambiguous request/success/error counter relationships; fixed to requestsTotal = responsesTotal(<400) + errorsTotal(>=400), including public, denied and offline finished requests. No runtime/device/live pass claimed by this contract PR.
 
 ## 2026-10-24: master consolidation and branch retirement
 - User made `master` the final integration branch and authorized merging remaining content through PRs, then deleting merged remote branches. PR [#22](https://github.com/liyan-04/voxcode/pull/22) merged the phone loop into `master` at `33d0daf`; its tested head `cbcf71f` has an identical tree.
 - Local promotion validation: `npm test` 161/161; `npm run test:policy` 29/29; whitespace checks passed. Existing component reviews remain in `docs/reviews/`; this promotion does not certify native signing, live Linx or outdoor access.
-- Full remote head inventory, transitive PR integration evidence and retained local resources are in [the master consolidation audit](architecture/master-consolidation-2026-10-24.md). All 15 audited old remote refs were deleted after current-head/protection/dependency checks. PR #14 was closed as superseded by #19/#22; dirty local worktrees remain preserved. Issue #21 merged through PR #23 at `3b851f1`; its local worktree is still retained.
+- Full remote head inventory, transitive PR integration evidence and retained local resources remain in dated review/PR records. The retired master-consolidation architecture note was removed from current entry points. All 15 audited old remote refs were deleted after current-head/protection/dependency checks. PR #14 was closed as superseded by #19/#22; dirty local worktrees remain preserved. Issue #21 merged through PR #23 at `3b851f1`; its local worktree is still retained.
 - Updated the current-base instructions to `master`; retired `codex/mvp`/`codex/phone-demo` must not be targets for new development PRs. Master remains protected against deletion, force push and direct updates.
 
 ## 2026-10-24: Issue collaboration policy (Issue #21)
@@ -243,7 +243,7 @@
 
 ## 2026-10-23: implementation release and visible milestones
 
-- User authorized the architect and developers to start the approved phone-demo engineering work. Created codex/phone-demo from cd81e20 without discarding retained changes. The architect released MAC-002/003 and RELAY-002, prepared IOS-002/003 and yielded its slot; the coordinator then resumed the existing iOS worker. Task ownership, interface checks and review rotation are in docs/architecture/execution-2026-10-23.md.
+- User authorized the architect and developers to start the historical phone-demo engineering work. That execution ledger was retired with the old Mac/Relay/iOS design; current task ownership and architecture follow `AGENTS.md`, `docs/issue-collaboration.md` and `docs/architecture/phone-mac-linx-current.md`.
 - Applied PCM output and authenticated loopback-only MonitorSnapshot interfaces before their consumers. Preview/workbench remain deferred. No deployment was attempted.
 - User requires a PR at every verifiable milestone. docs/milestones.md now defines per-agent task attribution, prompt Draft PR publication after relevant checks, explicit pending reviews and named stack dependencies. The coordinator retains Git authority; no separate agent Git identity is fabricated. Review and native/live/outdoor gates remain distinct.
 - User further requested independent developer worktrees. The iOS developer paused at a resumable point; Mac and Relay sources are quiescent while they review other components. The coordinator is migrating each retained component snapshot to its own branch/worktree and using a separate integration checkout. Original shared files remain intact; future fixes occur in the assigned worktrees.
@@ -283,7 +283,7 @@
 
 ## 2026-10-24: server execution scope and current Linx protocol
 
-- User explicitly chose native iPhone→server; server integrates Linx AI and locally runs Codex, with no AirPlay protocol constraint. Architect and PM reviewed the scope before implementation. Current decision and bounded tasks are docs/architecture/server-execution.md and server-execution-plan.md. Historical company-Mac execution requirements are superseded; signed installation, strict TLS, real services and same-build outdoor acceptance remain mandatory.
+- User's current direction is phone browser → server VoxCode → selected server or paired Mac execution target. Current decision and boundaries are [phone/mac/Linx current architecture](architecture/phone-mac-linx-current.md) and [Mac Agent control](architecture/mac-agent-control.md). Historical native-phone, old Relay and server-only requirements are superseded; device MCP, real services and phone-live acceptance remain open.
 - Architecture source3828d32:49/49 targeted local tests passed on macOSarm64/Node26. Coordinator independently reran the disposable composed check:8/8 passed across actual loopback Relay/Connector/Bridge, actual voice adapter+Opus and owned stdio/worktree fixtures, covering explicit draft confirmation, no automatic execution, replay and same-thread follow-up. Provider and executor were controlled; no Linux/live/device claim. Issue57 will make this reproducible in the repository.
 - User-provided vm6 preflight: Linuxx86_64, Node22.23.4/npm10.9.9/Git2.43/Codex0.162.1,32GBRAM,241GBfree,9899Node listener/8787free. Codexconfig exists, checkedauth/Linxenv absent. This does not determine all possible auth methods or prove a model call. Coordinator SSH attempt was not executed because automatic approval returned401/model not allowed; no bypass.
 - Independent tasks:55server delivery/preflight/source bundle;56iOS endpoint/trust/server copy;57latest Linx docs and session/protocol/headless regression. Each has an independent worktree and explicit paths, two reviewer requirement and PR-onlymaster integration. Existing Issue48/PR51 endpoint work stays Draft pending scope reconciliation; no worktree reset/overwrite.
