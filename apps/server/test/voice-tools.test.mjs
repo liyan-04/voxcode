@@ -1,15 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createVoiceTools} from '../voice-tools.mjs';
-function fixture({taskId}={}){
- let task=taskId?{id:taskId,projectId:'p',status:'completed',revision:3,sessionId:'original'}:undefined,valid=true;const calls=[],events=[];
+function fixture({taskId,running=false}={}){
+ let task=taskId?{id:taskId,projectId:'p',status:'completed',revision:3,sessionId:'original'}:undefined,valid=true;const calls=[],events=[],progress=[];
  const adapter={getTask:async id=>task&&id===task.id?structuredClone(task):null,getLogs:async()=>({logs:[]}),
  startTask:async input=>{calls.push(['start',input]);task={id:'created',projectId:input.projectId,status:'draft',revision:1,turns:[{requestId:input.requestId}]};return {taskId:task.id};},
  continueTask:async(id,input)=>{calls.push(['continue',id,input]);task.status='draft';task.revision++;task.turns=[{requestId:input.requestId}];},
- confirmTask:async(id,input)=>{calls.push(['confirm',id,input]);task.status='completed';task.revision++;task.output='Real adapter reply';Object.assign(task.turns.at(-1),{status:task.status,revision:task.revision,output:task.output});}};
- const tools=createVoiceTools({adapter,context:{executionTarget:'mac',projectId:'p',...(taskId?{taskId}:{}),contextVersion:1},voiceSessionId:'session',captureId:'capture',authorize:async()=>valid,onResult:result=>events.push(result),waitMs:5,pollMs:1});
- return {tools,calls,events,get task(){return task;},invalidate(){valid=false;}};
+ confirmTask:async(id,input)=>{calls.push(['confirm',id,input]);task.status=running?'running':'completed';task.revision++;task.output='Real adapter reply';Object.assign(task.turns.at(-1),{status:task.status,revision:task.revision,output:task.output});}};
+ const tools=createVoiceTools({adapter,context:{executionTarget:'mac',projectId:'p',...(taskId?{taskId}:{}),contextVersion:1},voiceSessionId:'session',captureId:'capture',authorize:async()=>valid,onResult:result=>events.push(result),onProgress:result=>progress.push(result),waitMs:running?100:5,pollMs:1});
+ return {tools,calls,events,progress,get task(){return task;},invalidate(){valid=false;}};
 }
+test('authoritative admission reaches progress before the result wait and replay does not readmit',async()=>{
+ for(const taskId of [undefined,'old']){
+  const f=fixture({taskId,running:true});let finished=false;
+  const pending=f.tools[0].invoke({prompt:'slow change'}).then(value=>{finished=true;return value;});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(finished,false);assert.equal(f.events.length,0);assert.equal(f.progress.length,1);
+  assert.deepEqual(f.progress[0],{executionTarget:'mac',projectId:'p',taskId:taskId??'created',requestId:f.calls[0].at(-1).requestId,status:'running',revision:taskId?5:2});
+  const replay=f.tools[0].invoke({prompt:'slow change'});
+  f.task.status='completed';Object.assign(f.task.turns.at(-1),{status:'completed',output:'Finished current turn'});
+  await new Promise(resolve=>setTimeout(resolve,5));const result=await pending;assert.deepEqual(await replay,result);assert.equal(result.output,'Finished current turn');assert.equal(f.progress.at(-1).status,'running');
+  assert.equal(f.calls.filter(call=>call[0]==='confirm').length,1);
+ }
+});
+test('result queries report authoritative progress but rejected and unknown submissions do not invent admission',async()=>{
+ const f=fixture({taskId:'old'});f.task.status='running';await f.tools[1].invoke({});assert.equal(f.progress[0].taskId,'old');assert.equal(f.progress[0].status,'running');
+ for(const code of ['busy','revision_conflict','outcome_unknown']){
+  const progress=[];let attempts=0;
+  const tools=createVoiceTools({adapter:{startTask:async()=>{attempts++;throw Object.assign(Error('private'),{code,operationId:'op'});}},context:{executionTarget:'mac',projectId:'p'},voiceSessionId:'s',captureId:'c',authorize:async()=>true,onProgress:value=>progress.push(value),waitMs:1,pollMs:1});
+  const value=await tools[0].invoke({prompt:'x'});await tools[0].invoke({prompt:'x'});assert.equal(value.status,code);assert.equal(attempts,1);assert.deepEqual(progress,[]);
+ }
+});
 test('capture execution is bound and replayed once; changed prompt cannot mutate again',async()=>{
  const f=fixture(),execute=f.tools.find(x=>x.name==='codex_execute_task');assert(execute);
  const [a,b]=await Promise.all([execute.invoke({prompt:'change file'}),execute.invoke({prompt:'change file'})]);

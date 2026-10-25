@@ -105,7 +105,7 @@ function openTarget({projectId,selected=null,parentTaskId=null},options={}){deta
 function olderSnapshot(candidate,current){return current&&((Number.isSafeInteger(current.revision)&&(!Number.isSafeInteger(candidate.revision)||candidate.revision<current.revision))||(Number.isSafeInteger(current.metadataRevision)&&(!Number.isSafeInteger(candidate.metadataRevision)||candidate.metadataRevision<current.metadataRevision)));}
 function receiveTask(data,projectId,target=state.executionTarget){
  const id=taskId(data);if(!id||data.projectId&&data.projectId!==projectId)return;
- const workspace=workspaceFor(target),task={...data,projectId},previous=taskById(id,target);if(olderSnapshot(task,previous))return;
+ const workspace=workspaceFor(target),previous=taskById(id,target),task={...previous,...data,projectId};if(olderSnapshot(task,previous))return;
  const index=workspace.tasks.findIndex(t=>taskId(t)===id);if(index>=0)workspace.tasks[index]=task;else workspace.tasks.push(task);
  if(workspace.selected===id&&workspace.projectId===projectId&&!olderSnapshot(task,workspace.snapshot))workspace.snapshot=task;
 }
@@ -305,8 +305,17 @@ function receiveVoiceResult(result,target){
  }
  feedback(result.status==='outcome_unknown'?'执行结果未知，请查询原任务，勿重复提交。':'语音工具结果已返回；任务状态以实际执行结果为准。');
 }
+function receiveVoiceProgress(result,target){
+ const sameTarget=voiceExecutionTarget()===target.executionTarget&&state.projectId===target.projectId&&(draftKey()===target.draftKey||state.selected===result.taskId);
+ if(!sameTarget){feedback('语音任务已在「'+target.label+'」开始执行，当前视图保持不变。');return;}
+ if(!result.taskId||!['draft','queued','running','cancelling'].includes(result.status))return;
+ receiveTask({...result,id:result.taskId},target.projectId,target.executionTarget);
+ openTarget({projectId:target.projectId,selected:result.taskId},{fetch:false});
+ void loadTask(result.taskId,target.projectId).catch(error=>feedback(error.message,true));
+ feedback(result.status==='running'?'语音任务已开始执行。':'语音任务已受理，正在执行。');
+}
 void import('/voice-client.mjs').then(({createVoiceClient})=>{
- voiceClient=createVoiceClient({onState:value=>{voiceStatus=value;clearInterval(voiceTimer);if(value.state==='recording'){voiceStartedAt=performance.now();voiceTimer=setInterval(renderVoice,500);}if(['idle','error'].includes(value.state))voicePreview='';renderVoice();},onPartial:(text,target)=>{if(target.executionTarget!==state.executionTarget)return;voicePreview=text;renderVoice();},onTranscript:saveVoiceTranscript,onResult:receiveVoiceResult,onAssistant:event=>{if(event.text){voicePreview=event.text;renderVoice();}}});renderVoice();
+ voiceClient=createVoiceClient({onState:value=>{voiceStatus=value;clearInterval(voiceTimer);if(value.state==='recording'){voiceStartedAt=performance.now();voiceTimer=setInterval(renderVoice,500);}if(['idle','error'].includes(value.state))voicePreview='';renderVoice();},onPartial:(text,target)=>{if(target.executionTarget!==state.executionTarget)return;voicePreview=text;renderVoice();},onTranscript:saveVoiceTranscript,onProgress:receiveVoiceProgress,onResult:receiveVoiceResult,onAssistant:event=>{if(event.text){voicePreview=event.text;renderVoice();}}});renderVoice();
 }).catch(()=>{voiceStatus={state:'error',reason:'capture_unavailable'};renderVoice();});
 $('#voice-button').onclick=async()=>{if(!voiceClient)return;if(voiceClient.state==='recording'){await voiceClient.stop();return;}if(voiceClient.active||state.loading||document.hidden||!voiceAvailable||!state.authenticated||!currentProject()||!executionReady())return;saveDraft();voicePreview='';const target={executionTarget:state.executionTarget,projectId:state.projectId,...(state.selected?{taskId:state.selected}:state.parentTaskId?{parentTaskId:state.parentTaskId}:{}),draftKey:draftKey(),label:((state.executionTarget==='mac'?'Mac':'Server')+' / '+currentProject().name+' / '+(state.selected?(taskById(state.selected)?.title||'当前任务'):state.parentTaskId?'新建子任务':'新建任务')).slice(0,160)};await voiceClient.start(target);};
 $('#voice-cancel').onclick=()=>{void voiceClient?.abort();};
