@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Incrementally connect the existing VoxCode server task workspace to a paired Mac Agent and a Linx voice intent adapter through independently verifiable pull requests.
+**Goal:** Incrementally connect server-hosted VoxCode to Mac-local Codex through a paired Mac Agent and a Linx voice intent adapter, using independently verifiable pull requests.
 
-**Architecture:** Keep `TaskService` as the only server task authority. Add a bounded device/command gateway for a Mac Agent that connects outbound over WSS; expose the same command contract to the phone page and server-side Linx adapter.
+**Architecture:** Run the existing TaskService/private task RPC and Codex on the Mac. The server hosts VoxCode HTTP/WSS, device/operation state and a RemoteTaskAdapter forwarding the fixed task methods through the paired outbound Mac Agent. The phone page and server-side Linx adapter address the same Mac tasks.
 
 **Tech Stack:** Node.js 22+, existing ESM server modules, JSON over WSS, HTTPS session cookies, macOS Keychain/launchd for the Agent, existing Node test runner.
 
@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- The server remains the only Codex task authority; the Agent cannot execute arbitrary shell or paths.
+- The Mac TaskService remains the only Codex execution authority; the server forwards fixed methods and the Agent cannot execute arbitrary shell or paths.
 - Every mutation carries `requestId`, `operationId`, target identity, revision/TTL checks and an auditable result.
 - Credentials remain server-side or in macOS Keychain; no secrets, private keys or recordings enter Git.
 - Fixture/local evidence cannot be reported as live Linx, device, TLS, public network or outdoor success.
@@ -29,7 +29,7 @@
 
 **Interfaces:**
 - `createDeviceStore({root, clock, random})` stores paired devices, non-secret token digests, last-seen and capability snapshots.
-- `createDeviceGateway({deviceStore, taskService, clock, limits})` accepts `register`, `heartbeat`, `command`, `commandResult`, and `reconcile` messages; returns bounded protocol responses.
+- `createDeviceGateway({deviceStore, clock, limits})` manages authenticated connection handles, `heartbeat`, `commandResult`, and operation reconciliation. The shared protocol validates `task_rpc` payloads; task versions are checked by the Mac TaskService.
 - HTTP routes expose authenticated device list, pairing start/complete, command submission and operation lookup; they never expose the Unix socket or arbitrary paths.
 
 - [ ] Write tests for pairing expiry, duplicate request IDs, conflicting payloads, expired commands, revision conflicts, unknown operation reconciliation and offline state.
@@ -49,7 +49,7 @@
 
 **Interfaces:**
 - `createMacAgent({transport, keychain, capabilities, clock})` registers, heartbeats, reconnects with backoff, deduplicates commands, and emits bounded results.
-- `createLocalCapabilities({projectMap, appAllowlist, platform})` implements only `switch_task`, `focus_window`, and `open_project`; unsupported operations return `capability_unavailable`.
+- A local task adapter forwards only `rpcMethods` from `packages/control-protocol/index.mjs` into `createTaskRpcClient({socketPath})`. Unimplemented native focus capabilities return `capability_unavailable`.
 
 - [ ] Write transport-fixture tests for register/heartbeat/reconnect, command TTL, duplicate IDs, unknown result handling and capability denial.
 - [ ] Implement a fixture transport first; add macOS Keychain and launchd instructions without checking secrets into the repo.
@@ -83,7 +83,7 @@
 
 **Interfaces:**
 - `createLinxIntentAdapter({taskService, deviceGateway, sessionStore, clock})` maps validated intents to read-only queries, safe commands or explicit confirmation cards.
-- Session context includes `userId`, `deviceId`, `projectId`, `taskId`, and `contextVersion`; model output cannot replace these fields.
+- Session context includes `ownerId`, `deviceId`, `projectId`, `taskId`, and `contextVersion`; model output cannot replace these fields.
 
 - [ ] Write tests for safe query execution, dangerous-command confirmation, owner mismatch, stale context, replay and provider failure.
 - [ ] Implement a provider-neutral intent mapper; keep live credentials outside the repository.
@@ -94,16 +94,19 @@
 
 **Files:**
 - Create: `apps/server/gateway-cli.mjs`
+- Create: `apps/server/remote-task-adapter.mjs` (coordinator-owned HTTP/MCP to gateway adapter)
+- Create: `apps/server/test/remote-task-adapter.test.mjs`
 - Modify: `apps/server/README.md`
 - Modify: `README.md`
 - Modify: `docs/progress.md`
 - Test: `apps/server/test/gateway-cli.test.mjs`
 
 **Interfaces:**
-- `gateway-cli.mjs start` composes private Task RPC, HTTP handler, device gateway and optional Linx adapter under a dedicated non-root account.
+- The server control entry composes RemoteTaskAdapter, HTTP handler, device gateway and optional Linx adapter under a non-root account. Mac task RPC runs locally and is never exposed as a TCP listener.
 - Startup refuses unsafe paths, missing TLS/pairing config and ambiguous listener ownership.
 
 - [ ] Write startup/shutdown, health, duplicate-process and rollback tests using local fixtures.
+- [ ] Verify RemoteTaskAdapter forwards the exact fourteen allowed Task RPC methods to the configured paired Mac, preserves business requestId/revision, propagates offline/unknown errors, and returns raw RPC snapshots without executing Codex on the server.
 - [ ] Implement composition without changing `task-cli.mjs`'s private Unix-socket boundary.
 - [ ] Run the full targeted server suite, `npm run test:policy`, `git diff --check`, and a local phone-browser smoke.
 - [ ] Record missing real Mac/Linx/TLS/device gates explicitly and open a separate deployment/acceptance PR or Issue.
