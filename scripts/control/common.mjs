@@ -57,7 +57,7 @@ export function redactLogs(text,lines){
  return String(text).slice(-64*1024).trimEnd().split(/\r?\n/u).slice(-lines).map(line=>line.replace(/((?:token|secret|password|authorization|api[_-]?key)\s*[=:]\s*)[^\s,;]+/giu,'$1[redacted]').replace(/(https?:\/\/|wss?:\/\/)([^\s?#]+)[?#][^\s]+/giu,'$1$2?[redacted]')).join('\n');
 }
 export function runner(run=commandRunner){return async(command,args,options={})=>{
- try{return await run(command,args,{timeout:30000,maxBuffer:256*1024,env:{PATH:'/usr/bin:/bin'},...options});}
+ try{return await run(command,args,{timeout:30000,maxBuffer:256*1024,env:{PATH:'/usr/sbin:/usr/bin:/sbin:/bin'},...options});}
  catch{throw Error(`Command failed: ${command.split('/').at(-1)}`);}
 };}
 async function currentLink(root,target){

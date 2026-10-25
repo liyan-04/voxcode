@@ -170,6 +170,12 @@ configuration are retained. A previously running service is started and checked
 over verified HTTPS against its exact revision; a stopped installation stays
 stopped. Rollback validates the previous release before stopping anything.
 
+Lifecycle subprocesses use a clean default environment with the fixed system
+PATH `/usr/sbin:/usr/bin:/sbin:/bin`. This includes Linux `runuser` for the
+service-account preflight without inheriting the operator's PATH or credentials.
+Commands with an explicit environment, including isolated npm installs and the
+service-account application process, retain their separately bounded settings.
+
 Activation records its before/after state in private `pending-activation.json`.
 On failure it attempts to restore the prior source, configuration and running
 state. When recovery is unconfirmed, other actions refuse; `rollback` validates
