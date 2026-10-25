@@ -1,5 +1,19 @@
 # Progress and verification
 
+## 2026-10-25: owned Mac restart (Issue #137)
+
+- Added fixed-label in-place restart/status commands. Stop waits for job absence
+  and the original PID identity to exit; task RPC must be ready before Agent
+  startup. Bounded error-5 retry requires an owned completed stop.
+- Separate kernel guard, source/plist/config pinning, active-task refusal and
+  explicit rollback protect the installed services. No runtime guard is deleted.
+- Two independent reviews pass. Root focused tests: 15 passed, one opt-in skip;
+  final complete serial Node/policy/voice suite exit 0 on integrated5e01b5d.
+  Author real isolated launchd fixture: 16/16; no installed restart inferred.
+- This tool restarts an unchanged installation. Source deployment/activation
+  integration belongs to #122; installed repeated restart requires a fresh idle
+  gate after source merge. The old temporary129 script is not a supported tool.
+
 ## 2026-10-25: execution target selector (Issue #131)
 
 - Added visible Mac/Server selection with independent project/task navigation,
