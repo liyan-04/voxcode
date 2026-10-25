@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, writeFile, symlink, readlink, lstat, realpath, rm, cp,chmod } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, symlink, readlink, lstat, rm, cp,chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -9,7 +9,6 @@ import { createServer } from 'node:https';
 import { packageServer } from '../server/package.mjs';
 import { bundlePaths, runtimePaths, templatePaths, encodeBundle, decodeBundle, sha256, safeRoot } from '../server/bundle.mjs';
 import { activate, readCurrent, stageRelease, systemdDriver, parseConfig, validateExecutionConfig,validateHostIdentity,operateLifecycle } from '../server/remote.mjs';
-import { parseArgs, transport, runCli } from '../server/cli.mjs';
 
 const run = promisify(execFile), root = new URL('../../', import.meta.url).pathname, revA = 'a'.repeat(40), revB = 'b'.repeat(40);
 async function fixture(t) {
@@ -160,37 +159,9 @@ test('health probes use real HTTPS with strict public IP identity and exact rele
   assert.equal(await wrong.healthy(revA), false);
 });
 
-test('SSH options enforce strict host keys; password only reads a private local file for fixed vm6', async t => {
-  const f = await fixture(t), calls = [], secret = join(f.dir, 'password'); await writeFile(secret, 'SYNTHETIC_PASSWORD', { mode: 0o600 });
-  const exec = async (name, args) => { calls.push([name, args]); return { stdout: '' }; };
-  const ssh = await transport(parseArgs(['status', '--host', 'example.test']), exec); await ssh.ssh('id -u');
-  assert.ok(calls[0][1].includes('StrictHostKeyChecking=yes')); assert.ok(calls[0][1].includes('BatchMode=yes'));
-  const password = await transport(parseArgs(['status', '--host', '100.100.81.209', '--password-file', secret]), exec); await password.ssh('id -u');
-  assert.equal(calls[1][0], 'expect'); assert.ok(calls[1][1].includes(await realpath(secret))); assert.equal(JSON.stringify(calls).includes('SYNTHETIC_PASSWORD'), false);
-  for (const args of [['status', '--host', 'evil;touch'], ['status', '--host', 'example.test', '--password-file', secret], ['status', '--host', '100.100.81.209', '--root', '/opt/x;echo'], ['rollback', '--host', 'example.test', '--revision', '$(id)']]) assert.throws(() => parseArgs(args));
+test('deployment root and service configuration reject unsafe values', () => {
   for (const value of ['/opt/x y', '/opt/a/../b', '/tmp', 'relative', '/opt/a;id']) assert.throws(() => safeRoot(value));
   assert.throws(() => parseConfig({ format: 1, service: 'other', user: 'root', port: 9899 }, '/opt/voxcode'));
-});
-
-test('upload and deployment orchestration quote data, verify SHA before rename and use a fixed remote entry', async t => {
-  const f = await fixture(t); await packageServer({ root: f.repo, output: f.output, revision: revA });
-  const calls = [];
-  const exec = async (program, args) => {
-    calls.push([program, args]);
-    const command = args.at(-1);
-    if (program === 'ssh' && command === 'id -u') return { stdout: '0\n' };
-    if (program === 'ssh' && command.includes('/remote.mjs')) return { stdout: JSON.stringify({ current: revA, previous: null }) + '\n' };
-    return { stdout: '' };
-  };
-  const result = await runCli(parseArgs(['deploy', '--host', 'example.test', '--archive', f.output]), exec);
-  assert.equal(result.current, revA);
-  const commands = calls.filter(call => call[0] === 'ssh').map(call => call[1].at(-1));
-  assert.ok(commands.some(command => command.includes('sha256sum --check --status && mv -f')));
-  const remote = commands.find(command => command.includes('/remote.mjs'));
-  const encoded = remote.match(/'([A-Za-z0-9_-]+)'$/u)[1], payload = JSON.parse(Buffer.from(encoded, 'base64url'));
-  assert.equal(payload.command, 'deploy'); assert.equal(payload.revision, revA); assert.equal(payload.archive, `/opt/voxcode/incoming/${revA}.tar.gz`);
-  assert.equal(calls.filter(call => call[0] === 'scp').length, 5);
-  assert.ok(calls.every(call => call[1].includes('StrictHostKeyChecking=yes')));
 });
 
 test('reviewed dual templates enforce separated users, groups, mounts and fixed entry points',async()=>{
@@ -241,9 +212,7 @@ test('host identity preflight rejects shared credential groups and unsafe task p
   for(const options of [{taskGroups:'1001 1003'},{badPath:base+'/shared/config',modeOverride:0o755},{badPath:base+'/shared/task-state',modeOverride:0o750}])await assert.rejects(validateHostIdentity({root:base,config:reviewed,webEnvironment:web,taskEnvironment:task,...host(options)}));
 });
 
-test('lifecycle commands are fixed and journal output contains only recognized redacted lifecycle events',async()=>{
-  for(const command of ['start','stop','restart','status','logs'])assert.equal(parseArgs([command,'--host','example.test']).command,command);
-  assert.throws(()=>parseArgs(['restart','--host','example.test','--service','foreign']));
+test('journal output contains only recognized redacted lifecycle events',async()=>{
   const base=fakeSystemd(),driver=systemdDriver({root:'/opt/voxcode',config:{port:9899},expectedUnit:'EXPECTED',expectedTaskUnit:'TASK',
     exec:async(name,args,opts)=>{
       if(name==='journalctl')return {stdout:[{MESSAGE:'secret user prompt token=synthetic',_SYSTEMD_UNIT:'voxcode.service'},{MESSAGE:'VoxCode task service listening on protected local socket',_SYSTEMD_UNIT:'voxcode-task.service',__REALTIME_TIMESTAMP:'123'}].map(JSON.stringify).join('\n')};

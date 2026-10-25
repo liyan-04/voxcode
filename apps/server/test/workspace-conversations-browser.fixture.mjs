@@ -22,6 +22,8 @@ const server=createServer(async(req,res)=>{
  if(url.pathname==='/api/login')return json(res,200,{ok:true},{'set-cookie':'fixture=workspace; HttpOnly; SameSite=Strict; Path=/'});
  if(!String(req.headers.cookie).includes('fixture=workspace'))return json(res,401,{});
  if(url.pathname==='/api/devices')return json(res,200,{deviceId:'fixture-mac',devices:[{deviceId:'fixture-mac',online:true}]});
+ if(url.pathname==='/api/execution-targets')return json(res,200,{targets:[{id:'mac',name:'Mac Codex',configured:true,online:true,available:true},{id:'server',name:'Server Codex',configured:false,online:false,available:false}]});
+ if(/^\/api\/(projects|tasks)([/?]|$)/u.test(url.pathname))assert.deepEqual(url.searchParams.getAll('executionTarget'),['mac']);
  if(url.pathname==='/api/projects')return json(res,200,{projects});
  if(url.pathname==='/api/tasks'&&req.method!=='POST')return json(res,200,{tasks:tasks.filter(task=>task.projectId===url.searchParams.get('projectId')).map(({turns,prompt,output,logs,...task})=>task)});
  const task=tasks.find(task=>url.pathname==='/api/tasks/'+task.id||url.pathname.startsWith('/api/tasks/'+task.id+'/'));
@@ -66,7 +68,7 @@ async function run(name,viewport){
  await page.waitForFunction(()=>document.querySelector('#messages').textContent.includes('Actual synthetic command output'));const text=await page.locator('#messages').textContent();for(const value of ['Original request','Original result','Adjust the original result','Live fixture result','src/','退出码 0'])assert(text.includes(value),value);
  assert.equal(await page.locator('#messages button').filter({hasText:'停止任务'}).count(),1);await layout(page,name+' running');await page.screenshot({path:output+'-'+name+'-running.png'});
  tasks[0].status='completed';tasks[0].revision++;tasks[0].output='Completed fixture result';await page.waitForFunction(()=>document.querySelector('#messages').textContent.includes('Completed fixture result'));assert.equal(await page.locator('#send-button').isDisabled(),false);
- await page.route('**/api/tasks/one/continue',async route=>{await route.fetch();await route.abort('failed');},{times:1});
+ await page.route(url=>url.pathname==='/api/tasks/one/continue'&&url.searchParams.get('executionTarget')==='mac',async route=>{await route.fetch();await route.abort('failed');},{times:1});
  failNext=true;await page.locator('#composer-input').fill('Retry safely');await page.locator('#send-button').click();await page.waitForFunction(()=>document.querySelector('#feedback').textContent.includes('网络连接中断'));const failed=requests.at(-1);assert.equal(await page.locator('#composer-input').inputValue(),'Retry safely');
  await page.waitForFunction(()=>document.querySelector('#messages').textContent.includes('Committed before lost acknowledgement'));assert.equal(tasks[0].turns.length,3);assert(tasks[0].revision>failed.payload.revision);
  await page.locator('#composer-input').fill('Later edited turn');const beforeRecovery=requests.length;await page.locator('#send-button').click();await page.waitForFunction(()=>document.querySelector('#feedback').textContent.includes('核对上次发送'));assert.equal(requests.length,beforeRecovery);assert.equal(await page.locator('#retry-submission').isVisible(),true);await layout(page,name+' recovery');await page.screenshot({path:output+'-'+name+'-recovery.png'});

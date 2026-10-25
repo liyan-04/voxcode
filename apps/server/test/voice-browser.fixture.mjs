@@ -21,6 +21,8 @@ const server = createServer(async (req, res) => {
   if (url.pathname === '/api/login') return json(res, 200, {ok: true}, {'set-cookie': 'fixture=synthetic; HttpOnly; SameSite=Strict; Path=/'});
   if (!String(req.headers.cookie).includes('fixture=synthetic')) return json(res, 401, {});
   if (url.pathname === '/api/devices') return json(res, 200, {deviceId: 'fixture-mac', devices: [{deviceId: 'fixture-mac', online: true}]});
+  if (url.pathname === '/api/execution-targets') return json(res, 200, {targets: [{id: 'mac', name: 'Mac Codex', configured: true, online: true, available: true}, {id: 'server', name: 'Server Codex', configured: false, online: false, available: false}]});
+  if (/^\/api\/(projects|tasks)([/?]|$)/u.test(url.pathname)) assert.deepEqual(url.searchParams.getAll('executionTarget'), ['mac']);
   if (url.pathname === '/api/projects') return json(res, 200, {projects});
   if (req.method === 'POST' && url.pathname.startsWith('/api/tasks')) {writes.push(url.pathname);return json(res, 500, {});}
   if (url.pathname === '/api/tasks') return json(res, 200, {tasks: tasks.filter(task => task.projectId === url.searchParams.get('projectId'))});
@@ -75,14 +77,14 @@ async function run(name, viewport) {
   await layout(page, name + ' recording');await page.screenshot({path: output + '-' + name + '-recording.png'});
   await project(page, 'Fixture Beta', mobile);await page.locator('#composer-input').fill('Keep Beta draft');await page.locator('#voice-button').click();
   await page.waitForFunction(() => document.querySelector('#feedback').textContent.includes('尚未提交'));
-  assert.equal(await page.locator('#composer-input').inputValue(), 'Keep Beta draft');assert.equal(await page.evaluate(() => sessionStorage.getItem('voxcode:draft:alpha::new:')), 'Existing Alpha draft\n' + capture.text);assert.equal(capture.context.projectId, 'alpha');assert(capture.frames > 0);await resourcesStopped(page);
+  assert.equal(await page.locator('#composer-input').inputValue(), 'Keep Beta draft');assert.equal(await page.evaluate(() => sessionStorage.getItem('voxcode:draft:mac::alpha::new:')), 'Existing Alpha draft\n' + capture.text);assert.equal(capture.context.projectId, 'alpha');assert.equal(capture.context.executionTarget, 'mac');assert(capture.frames > 0);await resourcesStopped(page);
   await project(page, 'Fixture Alpha', mobile);assert.equal(await page.locator('#composer-input').inputValue(), 'Existing Alpha draft\n' + capture.text);
   await tree(page, mobile);await page.locator('.task-label').filter({hasText: 'Fixture task A'}).click();if (mobile) await page.waitForFunction(() => document.querySelector('.sidebar').getBoundingClientRect().right <= 1);
   await page.locator('#composer-input').fill('Task A saved input');const taskCapture = await record(page);
   await tree(page, mobile);await page.locator('.task-label').filter({hasText: 'Fixture task B'}).click();if (mobile) await page.waitForFunction(() => document.querySelector('.sidebar').getBoundingClientRect().right <= 1);
   await page.locator('#composer-input').fill('Task B saved input');await page.locator('#voice-button').click();
   await page.waitForFunction(() => document.querySelector('#voice-button').getAttribute('aria-pressed') === 'false' && document.querySelector('#voice-cancel').hidden);
-  assert.equal(await page.locator('#composer-input').inputValue(), 'Task B saved input');assert.equal(await page.evaluate(() => sessionStorage.getItem('voxcode:draft:alpha::task-a')), 'Task A saved input\n' + taskCapture.text);assert.equal(taskCapture.context.taskId, 'task-a');await resourcesStopped(page);
+  assert.equal(await page.locator('#composer-input').inputValue(), 'Task B saved input');assert.equal(await page.evaluate(() => sessionStorage.getItem('voxcode:draft:mac::alpha::task-a')), 'Task A saved input\n' + taskCapture.text);assert.equal(taskCapture.context.taskId, 'task-a');assert.equal(taskCapture.context.executionTarget, 'mac');await resourcesStopped(page);
   await record(page);await page.locator('#voice-cancel').click();await resourcesStopped(page);assert.equal(await page.locator('#composer-input').inputValue(), 'Task B saved input');
   await record(page);await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', {configurable: true, get: () => true});Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => 'hidden'});

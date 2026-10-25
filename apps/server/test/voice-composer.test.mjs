@@ -16,18 +16,18 @@ async function fixture() {
   const nodes = new Map(), storage = new Map(), writes = [], get = selector => {if (!nodes.has(selector)) nodes.set(selector, new Node());return nodes.get(selector);};
   let finish;
   const task = {id: 'created', projectId: 'a', title: 'Fixture', status: 'draft', revision: 1};
-  const context = vm.createContext({console, structuredClone, setInterval() {}, clearInterval() {}, setTimeout, clearTimeout, Date, Math, performance, crypto: {randomUUID: () => 'fixture-id'},
+  const context = vm.createContext({console, structuredClone, URLSearchParams, setInterval() {}, clearInterval() {}, setTimeout, clearTimeout, Date, Math, performance, crypto: {randomUUID: () => 'fixture-id'},
     document: {querySelector: get, querySelectorAll: () => [], createElement: () => new Node(), createElementNS: () => new Node(), addEventListener() {}, body: new Node(), hidden: false}, window: {addEventListener() {}, innerWidth: 1000, innerHeight: 800},
     sessionStorage: {getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, String(value)), removeItem: key => storage.delete(key)},
     fetch: async (path, options = {}) => {
-      if (path === '/api/tasks' && options.method === 'POST') {writes.push(path);return new Promise(resolve => {finish = () => resolve({ok: true, status: 201, json: async () => ({taskId: 'created'})});});}
+      if (new URL(path,'http://fixture.invalid').pathname === '/api/tasks' && options.method === 'POST') {writes.push(path);return new Promise(resolve => {finish = () => resolve({ok: true, status: 201, json: async () => ({taskId: 'created'})});});}
       if (path.startsWith('/api/tasks?')) return {ok: true, status: 200, json: async () => ({tasks: [task]})};
       if (path.startsWith('/api/tasks/')) return {ok: true, status: 200, json: async () => task};
       return new Promise(() => {});
     }});
   const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');vm.runInContext(html.split('<script>')[1].split('</script>')[0], context);
   const run = code => vm.runInContext(code, context);
-  run("state.authenticated=true;state.projects=[{id:'a',name:'Alpha',enabled:true},{id:'b',name:'Beta',enabled:true}];state.projectId='a';$('#composer-input').value='saved input';saveDraft();globalThis.voiceStarts=0;voiceAvailable=true;voiceClient={active:false,state:'idle',async start(){voiceStarts++;}};");
+  run("state.authenticated=true;state.inventoryKnown=true;state.targets=[{id:'mac',configured:true,online:true,available:true}];state.projects=[{id:'a',name:'Alpha',enabled:true},{id:'b',name:'Beta',enabled:true}];state.projectId='a';$('#composer-input').value='saved input';saveDraft();globalThis.voiceStarts=0;voiceAvailable=true;voiceClient={active:false,state:'idle',async start(){voiceStarts++;}};");
   return {run, writes, get, finish: () => finish?.(), submit: () => get('#composer-form').onsubmit({preventDefault() {}})};
 }
 

@@ -17,7 +17,7 @@ async function fixture({task=initial(),post,read}={}){
  const nodes=new Map(),session=new Map(),writes=[],reads=[],get=selector=>{if(!nodes.has(selector))nodes.set(selector,new Node());return nodes.get(selector);};
  const storage={getItem:key=>session.get(key)??null,setItem:(key,value)=>session.set(key,String(value)),removeItem:key=>session.delete(key)};
  let current=structuredClone(task),sequence=0;
- const context=vm.createContext({console,structuredClone,Date,Math,performance,setTimeout,clearTimeout,setInterval(){},clearInterval(){},crypto:{randomUUID:()=>`fixture-${++sequence}`},sessionStorage:storage,
+ const context=vm.createContext({console,structuredClone,Date,Math,performance,URLSearchParams,setTimeout,clearTimeout,setInterval(){},clearInterval(){},crypto:{randomUUID:()=>`fixture-${++sequence}`},sessionStorage:storage,
   document:{querySelector:get,querySelectorAll:()=>[],createElement:()=>new Node(),createElementNS:()=>new Node(),addEventListener(){},body:new Node(),visibilityState:'visible'},window:{addEventListener(){},innerWidth:1440,innerHeight:900},
   fetch:async(path,options={})=>{
    if(options.method==='POST'){const call={path,payload:JSON.parse(options.body)};writes.push(call);return post?post(call,()=>current,value=>current=structuredClone(value)):response(current);}
@@ -28,7 +28,7 @@ async function fixture({task=initial(),post,read}={}){
   }});
  const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');vm.runInContext(html.split('<script>')[1].split('</script>')[0],context);
  const run=source=>vm.runInContext(source,context);context.fixtureTask=structuredClone(task);
- run("state.authenticated=true;state.projects=[{id:'a',name:'Alpha',enabled:true},{id:'b',name:'Beta',enabled:true}];state.tasks=[fixtureTask];state.projectId='a';state.selected='one';state.snapshot=fixtureTask;render();");
+ run("state.authenticated=true;state.inventoryKnown=true;state.targets=[{id:'mac',configured:true,online:true,available:true}];state.projects=[{id:'a',name:'Alpha',enabled:true},{id:'b',name:'Beta',enabled:true}];state.tasks=[fixtureTask];state.projectId='a';state.selected='one';state.snapshot=fixtureTask;render();");
  const text=node=>[node.textContent,...node.children.map(text)].join('\n');
  return {run,get,writes,reads,session,text:()=>text(get('#messages')),setTask:value=>{current=structuredClone(value);},submit:()=>get('#composer-form').onsubmit({preventDefault(){}}),input:value=>{get('#composer-input').value=value;run('saveDraft()');},snapshot:()=>JSON.parse(run('JSON.stringify(state.snapshot)'))};
 }
@@ -39,7 +39,7 @@ function running(task,prompt='fix spacing'){
 test('list refresh retains full history and polls the selected task for equal-revision feedback',async()=>{
  const f=await fixture(),next=running(initial());f.run('state.snapshot.status="running";state.snapshot.revision=5');f.setTask({...next,output:'live result',logs:[{type:'item.completed',itemType:'command_execution',command:'npm test',exitCode:0,output:'actual command result',at:'2026-10-25T00:01:00.000Z'}]});
  await f.run('refresh()');await flush();
- assert.equal(f.snapshot().turns.length,2);assert.equal(f.snapshot().output,'live result');assert.ok(f.reads.some(path=>path==='/api/tasks/one?projectId=a'));
+ assert.equal(f.snapshot().turns.length,2);assert.equal(f.snapshot().output,'live result');assert.ok(f.reads.some(path=>path==='/api/tasks/one?projectId=a&executionTarget=mac'));
  assert.match(f.text(),/first request/);assert.match(f.text(),/first result/);assert.match(f.text(),/fix spacing/);assert.match(f.text(),/actual command result/);
 });
 test('every retained turn renders literal prompts, results, command evidence and file paths',async()=>{
@@ -49,12 +49,12 @@ test('every retained turn renders literal prompts, results, command evidence and
 test('terminal task send continues the same saved session using one endpoint without a JS confirm chain',async()=>{
  const f=await fixture({post:async(call,get,set)=>{const next=running(get(),call.payload.prompt);set(next);return response(next);}});f.input('fix spacing');
  assert.equal(f.get('#send-button').disabled,false);await f.submit();await flush();
- assert.equal(f.writes.length,1);assert.equal(f.writes[0].path,'/api/tasks/one/continue');assert.deepEqual(f.writes[0].payload,{projectId:'a',prompt:'fix spacing',revision:3,requestId:'fixture-1'});
+ assert.equal(f.writes.length,1);assert.equal(f.writes[0].path,'/api/tasks/one/continue?executionTarget=mac');assert.deepEqual(f.writes[0].payload,{projectId:'a',prompt:'fix spacing',revision:3,requestId:'fixture-1'});
  assert.equal(f.snapshot().id,'one');assert.equal(f.snapshot().sessionId,SESSION);assert.equal(f.snapshot().status,'running');assert.equal(f.snapshot().turns.length,2);assert.equal(f.get('#composer-input').value,'');assert.equal(f.get('#send-button').disabled,true);
 });
 test('new task send creates and executes through one backend request',async()=>{
  const f=await fixture({post:async(call,get,set)=>{const next={...running(get(),call.payload.prompt),id:'created'};set(next);return response(next,201);}});f.run("openTarget({projectId:'a'})");f.input('new request');await f.submit();await flush();
- assert.equal(f.writes.length,1);assert.equal(f.writes[0].path,'/api/tasks');assert.equal(f.writes[0].payload.prompt,'new request');assert.equal(f.run('state.selected'),'created');assert.equal(f.snapshot().status,'running');
+ assert.equal(f.writes.length,1);assert.equal(f.writes[0].path,'/api/tasks?executionTarget=mac');assert.equal(f.writes[0].payload.prompt,'new request');assert.equal(f.run('state.selected'),'created');assert.equal(f.snapshot().status,'running');
 });
 test('busy hidden quarantined missing-session and stale identity tasks cannot send continuation',async()=>{
  for(const extra of [{status:'running'},{status:'cancelling'},{status:'draft'},{status:'interrupted'},{quarantined:true},{archived:true},{deletedAt:'now'},{sessionId:null},{sessionId:'not-a-uuid'},{revision:null},{id:'foreign'},{projectId:'b'}]){
@@ -63,13 +63,13 @@ test('busy hidden quarantined missing-session and stale identity tasks cannot se
 });
 test('legacy saved draft executes only on explicit action and preserves new input',async()=>{
  const f=await fixture({task:{...initial(),status:'draft',revision:1},post:async(call,get,set)=>{const next={...get(),status:'running',revision:2};set(next);return response(next);}});f.input('later follow-up');assert.equal(f.writes.length,0);
- const button=f.get('#detail-controls').children.find(node=>node.textContent==='执行任务');assert.ok(button);await button.onclick();await flush();assert.equal(f.writes.length,1);assert.equal(f.writes[0].path,'/api/tasks/one/confirm');assert.equal(f.writes[0].payload.revision,1);assert.equal(f.get('#composer-input').value,'later follow-up');
+ const button=f.get('#detail-controls').children.find(node=>node.textContent==='执行任务');assert.ok(button);await button.onclick();await flush();assert.equal(f.writes.length,1);assert.equal(f.writes[0].path,'/api/tasks/one/confirm?executionTarget=mac');assert.equal(f.writes[0].payload.revision,1);assert.equal(f.get('#composer-input').value,'later follow-up');
 });
 test('delayed continuation keeps edited source text and the current target',async()=>{
  for(const switchTarget of [false,true]){
   const gate=deferred(),f=await fixture({post:async(call,get,set)=>{await gate.promise;const next=running(get());set(next);return response(next);}});f.input('fix spacing');const request=f.submit();assert.equal(f.writes.length,1);await f.submit();assert.equal(f.writes.length,1);
   f.input('revised source');if(switchTarget){f.run("openTarget({projectId:'b'})");f.input('beta input');}gate.resolve();await request;await flush();
-  assert.equal(f.session.get('voxcode:draft:a::one'),'revised source');assert.equal(f.get('#composer-input').value,switchTarget?'beta input':'revised source');assert.equal(f.run('state.projectId'),switchTarget?'b':'a');assert.equal(f.run('state.selected'),switchTarget?null:'one');
+  assert.equal(f.session.get('voxcode:draft:mac::a::one'),'revised source');assert.equal(f.get('#composer-input').value,switchTarget?'beta input':'revised source');assert.equal(f.run('state.projectId'),switchTarget?'b':'a');assert.equal(f.run('state.selected'),switchTarget?null:'one');
  }
 });
 test('uncertain continuation retries preserve the exact request after switching targets',async()=>{
@@ -108,7 +108,7 @@ test('overlapping selected-task polls share a read instead of starving slow feed
 });
 test('frozen voice callbacks preserve task drafts and only block their original target',async()=>{
  const f=await fixture();f.input('task input');f.run("voiceClient={active:true};voiceStatus={state:'recording',target:{draftKey:draftKey()}};renderVoice()");assert.equal(f.get('#send-button').disabled,true);await f.submit();assert.equal(f.writes.length,0);
- f.run("openTarget({projectId:'b'});$('#composer-input').value='beta';saveDraft();saveVoiceTranscript('recognized',{draftKey:'a::one',label:'Alpha / One'});renderVoice()");assert.equal(f.get('#send-button').disabled,false);assert.equal(f.get('#composer-input').value,'beta');assert.equal(f.session.get('voxcode:draft:a::one'),'task input\nrecognized');
+ f.run("openTarget({projectId:'b'});$('#composer-input').value='beta';saveDraft();saveVoiceTranscript('recognized',{executionTarget:'mac',draftKey:'mac::a::one',label:'Alpha / One'});renderVoice()");assert.equal(f.get('#send-button').disabled,false);assert.equal(f.get('#composer-input').value,'beta');assert.equal(f.session.get('voxcode:draft:mac::a::one'),'task input\nrecognized');
 });
 test('pending explicit legacy execution cannot dispatch twice',async()=>{
  const gate=deferred(),f=await fixture({task:{...initial(),status:'draft'},post:async(call,get)=>{await gate.promise;return response({...get(),status:'running',revision:4});}}),task=f.snapshot();

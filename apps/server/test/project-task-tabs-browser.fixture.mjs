@@ -22,6 +22,8 @@ const server = createServer((req, res) => {
   if (!String(req.headers.cookie).includes('fixture=tabs-synthetic')) return json(res, 401, {});
   if (req.method === 'POST') {writes.push(url.pathname);return json(res, 500, {});}
   if (url.pathname === '/api/devices') return json(res, 200, {deviceId: 'fixture-mac', devices: [{deviceId: 'fixture-mac', online: true}]});
+  if (url.pathname === '/api/execution-targets') return json(res, 200, {targets: [{id: 'mac', name: 'Mac Codex', configured: true, online: true, available: true}, {id: 'server', name: 'Server Codex', configured: false, online: false, available: false}]});
+  if (/^\/api\/(projects|tasks)([/?]|$)/u.test(url.pathname)) assert.deepEqual(url.searchParams.getAll('executionTarget'), ['mac']);
   if (url.pathname === '/api/projects') return json(res, 200, {projects});
   if (url.pathname === '/api/tasks') return json(res, 200, {tasks: tasks.filter(task => task.projectId === url.searchParams.get('projectId'))});
   return json(res, 200, tasks.find(task => '/api/tasks/' + task.id === url.pathname) ?? {});
@@ -91,7 +93,7 @@ async function run(name, viewport) {
   await page.locator('#composer-input').scrollIntoViewIfNeeded();await page.locator('#composer-input').fill('Frozen Alpha new draft');await page.locator('#voice-button').click();await page.waitForFunction(() => document.querySelector('#voice-button').getAttribute('aria-pressed') === 'true');
   await choose(page, 'alpha', false, mobile);await tree(page, mobile);await page.locator('.project-name').filter({hasText: 'Fixture Beta'}).click();if (mobile) await page.waitForFunction(() => !document.body.classList.contains('tree-open'));
   await page.locator('#composer-input').scrollIntoViewIfNeeded();await page.locator('#composer-input').fill('Keep Beta new draft');await page.locator('#voice-button').click();await page.waitForFunction(() => document.querySelector('#feedback').textContent.includes('尚未提交'));
-  assert.equal(await page.locator('#composer-input').inputValue(), 'Keep Beta new draft');assert.equal(await page.evaluate(() => sessionStorage.getItem('voxcode:draft:alpha::new:')), 'Frozen Alpha new draft\nSynthetic frozen project voice');
+  assert.equal(await page.locator('#composer-input').inputValue(), 'Keep Beta new draft');assert.equal(await page.evaluate(() => sessionStorage.getItem('voxcode:draft:mac::alpha::new:')), 'Frozen Alpha new draft\nSynthetic frozen project voice');
   assert.equal(await page.locator('[data-tab-project="alpha"]').isChecked(), false);await layout(page, name + ' final');await page.screenshot({path: output + '-' + name + '-final.png'});
   results.push({name, tasksReachedWithArrows: reached, allSelectedTasks: true, emptySelectionPersists: true, openingDoesNotSelect: true, recencyRefresh: true, visibilityClasses: true, draftsAndVoicePreserved: true});await context.close();
 }
