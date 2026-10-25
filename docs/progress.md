@@ -1,5 +1,32 @@
 # Progress and verification
 
+## 2026-10-25: legacy server CLI retirement (Issue #139)
+
+- Removed the obsolete scripts/server/cli.mjs command entry and its active
+  deployment instructions. The historical package subcommand loses its CLI;
+  unpublished #122 tools are not advertised as a replacement.
+- Preserved bundle/package/remote/password helpers, application runtime entries,
+  historical records and all still-valid deployment regression assertions.
+- Two independent reviews pass. Root focused deployment checks: 16/16.
+  Complete serial Node/policy/voice suite on integrated2cdfa1f: exit0, expected
+  opt-in launchd skip. Active reference search and diff checks pass.
+- Source-only cleanup; no service restart, credential/state or live rollback
+  file removal. This milestone does not establish device/provider acceptance.
+
+## 2026-10-25: owned Mac restart (Issue #137)
+
+- Added fixed-label in-place restart/status commands. Stop waits for job absence
+  and the original PID identity to exit; task RPC must be ready before Agent
+  startup. Bounded error-5 retry requires an owned completed stop.
+- Separate kernel guard, source/plist/config pinning, active-task refusal and
+  explicit rollback protect the installed services. No runtime guard is deleted.
+- Two independent reviews pass. Root focused tests: 15 passed, one opt-in skip;
+  final complete serial Node/policy/voice suite exit 0 on integrated5e01b5d.
+  Author real isolated launchd fixture: 16/16; no installed restart inferred.
+- This tool restarts an unchanged installation. Source deployment/activation
+  integration belongs to #122; installed repeated restart requires a fresh idle
+  gate after source merge. The old temporary129 script is not a supported tool.
+
 ## 2026-10-25: execution target selector (Issue #131)
 
 - Added visible Mac/Server selection with independent project/task navigation,
