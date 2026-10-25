@@ -11,7 +11,7 @@
     "marked": "18.1.1"
   },
   "scripts": {
-    "test": "node --test scripts/test/*.test.mjs apps/server/test/*.test.mjs",
+    "test": "node --test scripts/test/*.test.mjs apps/server/test/*.test.mjs packages/voice/test/*.test.js",
     "test:policy": "node --test scripts/test/*.test.mjs",
     "test:coverage:node": "node scripts/coverage.mjs collect-node --output coverage/node",
     "test:coverage:swift": "node scripts/coverage.mjs collect-swift --output coverage/swift",

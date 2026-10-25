@@ -1,5 +1,39 @@
 # Server task runtime
 
+## Formal Mac control and browser voice
+
+The current phone-to-paired-Mac entry is `control-cli.mjs`, not the historical
+server-local task deployment described below. Its optional private `voiceFile`
+enables authenticated `/ws/voice` PCM transcription alongside `/agent` on the
+same HTTPS listener. Install both pinned dependency sets:
+
+```sh
+npm ci --ignore-scripts --prefix apps/server
+npm ci --ignore-scripts --prefix packages/voice
+```
+
+`voiceFile` references a private canonical JSON file containing exactly
+`url`, `token`, `deviceId`, and `clientId`; its URL must be
+`wss://xrobo-io.qiniuapi.com/v1/ws/`. Reuse the control configuration's checked
+file ownership/mode rules. Do not embed this tuple in source, browser assets,
+Mac task configuration or deployment archives. Use a dedicated formal Linx
+assistant with no cloud MCP tools: the software-device `tools:[]` registry does
+not disable tools configured separately on a cloud assistant.
+
+Health `voiceAvailable:true` and `voiceState:"configured"` mean configured
+capability, not successful ASR. `voiceProviderState` reports the last provider
+connection state (`idle`, `connecting`, `ready`, `failed` or `disabled`); public
+health does not open provider connections or dispatch Mac RPCs. Transcription
+never creates or confirms a task; normal phone draft/confirmation is retained.
+One fixed configured account owns the voice admission slot across login cookies.
+
+The backend serves only the exact `/voice-client.mjs` and `/voice-worklet.js`
+module URLs; the browser UI component supplies their bytes. Protocol, limits,
+checks and deployment gates are recorded in
+[backend verification](../../docs/verification/browser-voice-backend-2026-10-25.md).
+
+The remaining sections retain the server-local task runtime reference.
+
 `apps/server` 是当前 VoxCode 主线中的服务器运行时。它把已登记的 Git 项目映射到任务服务，由专用非 root 用户通过 Codex CLI 执行任务；`server-cli.mjs` 负责 HTTPS 页面、MCP dispatcher 和出站 WSS bridge 的组合启动，`task-cli.mjs` 负责独立任务账户和 Unix RPC。
 
 ## 支持的入口

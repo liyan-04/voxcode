@@ -5,9 +5,9 @@ import {MAX_RESULT_BYTES} from '../../packages/control-protocol/index.mjs';
 const fail = message => Error(message);
 const bounded = (value, maximum) => Number.isSafeInteger(value) && value > 0 && value <= maximum;
 
-export function attachDeviceWebSocket({server, gateway, path = '/agent', publicOrigin, limits = {}} = {}) {
+export function attachDeviceWebSocket({server, gateway, path = '/agent', publicOrigin, limits = {}, registerUpgrade = true} = {}) {
   if (!(server instanceof HttpsServer)) throw fail('HTTPS listener required');
-  if (server.listenerCount('upgrade')) throw fail('Exclusive HTTPS upgrade listener required');
+  if (registerUpgrade && server.listenerCount('upgrade')) throw fail('Exclusive HTTPS upgrade listener required');
   if (typeof gateway?.connect !== 'function' || !/^\/[a-zA-Z0-9/_-]+$/u.test(path)) throw fail('Gateway and exact upgrade path required');
   let origin;
   try {origin = new URL(publicOrigin);} catch {throw fail('Canonical HTTPS publicOrigin required');}
@@ -124,7 +124,7 @@ export function attachDeviceWebSocket({server, gateway, path = '/agent', publicO
     } catch {drop(entry); socket.destroy();}
   }
   const onServerClose = () => {void close();};
-  server.on('upgrade', upgrade);
+  if (registerUpgrade) server.on('upgrade', upgrade);
   server.once('close', onServerClose);
   function close() {
     if (closing) return closing;
@@ -146,5 +146,19 @@ export function attachDeviceWebSocket({server, gateway, path = '/agent', publicO
     })();
     return closing;
   }
-  return {close};
+  return {close,handleUpgrade:upgrade};
+}
+
+export function attachControlWebSocketRouter({server,deviceTransport,voiceTransport}={}) {
+  if (!(server instanceof HttpsServer) || server.listenerCount('upgrade') || typeof deviceTransport?.handleUpgrade!=='function') throw fail('Exclusive HTTPS upgrade router required');
+  let closing=false;
+  const upgrade=(request,socket,head)=>{
+    const target=!closing&&request.url==='/agent'?deviceTransport:!closing&&request.url==='/ws/voice'?voiceTransport:null;
+    if(target)return target.handleUpgrade(request,socket,head);
+    socket.on('error',()=>{});
+    socket.end('HTTP/1.1 '+(closing?'503 Service Unavailable':'404 Not Found')+'\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+    const timer=setTimeout(()=>socket.destroy(),1000);timer.unref();socket.once('close',()=>clearTimeout(timer));
+  };
+  server.on('upgrade',upgrade);
+  return {close(){closing=true;server.off('upgrade',upgrade);}};
 }

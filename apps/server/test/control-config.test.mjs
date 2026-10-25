@@ -25,4 +25,14 @@ test('control config validates TLS and private files without requiring server Co
  await assert.rejects(loadControlConfiguration({path}),error=>!JSON.stringify(error).includes('private-token')&&!error.message.includes('private-token'));
  await writeFile(endpoint,'wss://xrobo.qiniu.com/v1/mcpproxy/connect?token=long-private-token%00');
  await assert.rejects(loadControlConfiguration({path}));
+ const voiceFile=join(root,'voice.json'),voice={url:'wss://xrobo-io.qiniuapi.com/v1/ws/',token:'synthetic-private-voice-token',deviceId:'aa:bb:cc:dd:ee:ff',clientId:'12345678-1234-4234-8234-123456789abc'};
+ await writeFile(voiceFile,JSON.stringify(voice),{mode:0o600});
+ await writeFile(path,JSON.stringify({...config,voiceFile}));
+ assert.deepEqual((await loadControlConfiguration({path})).voice,voice);
+ for(const invalid of [{...voice,url:'wss://evil.invalid/v1/ws/'},{...voice,url:voice.url+'?token=secret'},{...voice,token:'bad\nsecret'},{...voice,deviceId:'bad'},{...voice,clientId:'bad'},{...voice,extra:'secret'}]){
+  await writeFile(voiceFile,JSON.stringify(invalid));
+  await assert.rejects(loadControlConfiguration({path}),error=>error.message==='Invalid private control configuration');
+ }
+ await writeFile(voiceFile,JSON.stringify(voice));await chmod(voiceFile,0o644);
+ await assert.rejects(loadControlConfiguration({path}));
 });

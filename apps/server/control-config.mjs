@@ -28,7 +28,7 @@ export async function loadControlConfiguration({path,uid=process.getuid?.(),node
  try{
  if(!Number.isInteger(uid)||uid<=0||Number(nodeVersion.split('.')[0])<22||process.env.NODE_TLS_REJECT_UNAUTHORIZED==='0')invalid();
  const config=JSON.parse(await readControlFile(path,{uid}));
- const fields=['host','port','publicOrigin','revision','deviceId','userId','deviceRoot','tlsKeyFile','tlsCertFile','loginSecretFile','mcpEndpointFile'];
+ const fields=['host','port','publicOrigin','revision','deviceId','userId','deviceRoot','tlsKeyFile','tlsCertFile','loginSecretFile','mcpEndpointFile','voiceFile'];
  if(!config||typeof config!=='object'||Array.isArray(config)||Object.keys(config).some(key=>!fields.includes(key))||!validId(config.deviceId)||!validId(config.userId)||!validId(config.revision)||!isAbsolute(config.deviceRoot??'')||resolve(config.deviceRoot)!==config.deviceRoot)invalid();
  const origin=new URL(config.publicOrigin);
  if(origin.protocol!=='https:'||origin.origin!==config.publicOrigin||origin.username||origin.password||!isIP(config.host)||!Number.isSafeInteger(config.port)||config.port<1024||config.port>65535||Number(origin.port||443)!==config.port)invalid();
@@ -43,6 +43,11 @@ export async function loadControlConfiguration({path,uid=process.getuid?.(),node
   if(endpoint.protocol!=='wss:'||endpoint.hostname!=='xrobo.qiniu.com'||endpoint.port||endpoint.pathname!=='/v1/mcpproxy/connect'||endpoint.username||endpoint.password||endpoint.hash||endpoint.searchParams.getAll('token').length!==1||[...endpoint.searchParams.keys()].some(k=>k!=='token')||!/^\S{16,512}$/u.test(endpoint.searchParams.get('token')??'')||/[\x00-\x1f\x7f]/u.test(endpoint.searchParams.get('token')??''))invalid();
   mcpEndpoint=endpoint.href;
  }
- return {...config,loginSecret,tls:{key,cert},mcpEndpoint};
+ let voice=null;
+ if(config.voiceFile!==undefined){
+  voice=JSON.parse(await readControlFile(config.voiceFile,{uid}));
+  if(!voice||typeof voice!=='object'||Array.isArray(voice)||Object.keys(voice).length!==4||Object.keys(voice).some(key=>!['url','token','deviceId','clientId'].includes(key))||voice.url!=='wss://xrobo-io.qiniuapi.com/v1/ws/'||typeof voice.token!=='string'||voice.token.length<1||voice.token.length>4096||/[\s\x00-\x1f\x7f]/u.test(voice.token)||!/^([\da-f]{2}:){5}[\da-f]{2}$/iu.test(voice.deviceId??'')||!/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu.test(voice.clientId??''))invalid();
+ }
+ return {...config,loginSecret,tls:{key,cert},mcpEndpoint,voice};
  }catch{invalid();}
 }

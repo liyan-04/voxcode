@@ -4,15 +4,19 @@ import {createDeviceGateway} from './device-gateway.mjs';
 import {createRemoteTaskAdapter} from './remote-task-adapter.mjs';
 import {createMcpDispatcher} from './mcp-server.mjs';
 import {createMcpProxyBridge} from './mcp-proxy-bridge.mjs';
+import {attachControlWebSocketRouter} from './device-websocket.mjs';
+import {createVoiceTransport} from './voice-transport.mjs';
+import {createLinxVoiceProvider} from './voice-provider.mjs';
+import {validId} from '../../packages/control-protocol/index.mjs';
 
 const reads=new Set(['codex_status','codex_list_projects','codex_list_tasks','codex_task_status','codex_task_logs','codex_task_diff','codex_task_checks']);
-export async function startControlRuntime({config,createBridge=createMcpProxyBridge,attachTransport,onStatus=()=>{},shutdownTimeoutMs=5000}={}){
+export async function startControlRuntime({config,createBridge=createMcpProxyBridge,attachTransport,createVoiceProvider,onStatus=()=>{},shutdownTimeoutMs=5000}={}){
  if(!config?.tls?.key||!config.tls.cert||!config.publicOrigin?.startsWith('https://')||!Number.isSafeInteger(shutdownTimeoutMs)||shutdownTimeoutMs<10||shutdownTimeoutMs>20000)throw Error('Checked HTTPS control configuration required');
  const store=await createDeviceStore({root:config.deviceRoot});
  const gateway=createDeviceGateway({deviceStore:store});
  const adapter=createRemoteTaskAdapter({gateway,userId:config.userId,deviceId:config.deviceId});
  const {dispatch:baseDispatch,tools}=createMcpDispatcher({adapter,projectRegistry:adapter,authorizeWrite:()=>false});
- let proxyState=config.mcpEndpoint?'connecting':'disabled',bridge,transport,closing,timer;
+ let proxyState=config.mcpEndpoint?'connecting':'disabled',bridge,transport,voiceTransport,upgradeRouter,closing,timer,voiceProviderState=config.voice?'idle':'disabled';
  let cached={online:false,available:false,observedAt:null},refreshing;
  const refreshState=()=>refreshing??=Promise.resolve().then(async()=>{
   try{
@@ -27,7 +31,7 @@ export async function startControlRuntime({config,createBridge=createMcpProxyBri
   if(message?.method==='tools/list'&&result?.result?.tools)result.result.tools=result.result.tools.filter(tool=>reads.has(tool.name));
   return result;
  };
- const info={name:'VoxCode',version:'0.1.0',simulation:false,executionHost:'mac',voiceAvailable:false,voiceState:'disabled',voiceBlocker:'cloud_mcp_session_correlation_unverified',mcpMutationsEnabled:false,get deviceOnline(){return cached.online;},get deviceObservedAt(){return cached.observedAt;},get mcpProxyState(){return proxyState;}};
+ const info={name:'VoxCode',version:'0.1.0',simulation:false,executionHost:'mac',voiceAvailable:Boolean(config.voice),voiceState:config.voice?'configured':'disabled',voiceBlocker:config.voice?null:'voice_not_configured',get voiceProviderState(){return voiceProviderState;},mcpMutationsEnabled:false,get deviceOnline(){return cached.online;},get deviceObservedAt(){return cached.observedAt;},get mcpProxyState(){return proxyState;}};
  // A successful phone session controls only the operator-configured account/Mac.
  // Client and model input never choose another owner or execution device.
  const apiExtension=async({req,res,url,json,body})=>{
@@ -51,7 +55,7 @@ export async function startControlRuntime({config,createBridge=createMcpProxyBri
    const listener=()=>!app.server.listening?Promise.resolve():new Promise((resolve,reject)=>{app.server.close(error=>error?reject(error):resolve());app.server.closeIdleConnections();});
    try{
     const results=await Promise.race([
-     Promise.allSettled([Promise.resolve().then(()=>bridge?.close()),Promise.resolve().then(()=>transport?.close()),Promise.resolve().then(listener)]),
+     Promise.allSettled([Promise.resolve().then(()=>bridge?.close()),Promise.resolve().then(()=>upgradeRouter?.close()),Promise.resolve().then(()=>voiceTransport?.close()),Promise.resolve().then(()=>transport?.close()),Promise.resolve().then(listener)]),
      new Promise((_,reject)=>{deadline=setTimeout(()=>{app.server.closeAllConnections();reject(Error('Control shutdown deadline reached'));},shutdownTimeoutMs);}),
     ]);
     if(results.some(result=>result.status==='rejected'))throw Error('Control resource cleanup failed');
@@ -60,7 +64,30 @@ export async function startControlRuntime({config,createBridge=createMcpProxyBri
  };
  try{
   const attach=attachTransport??(await import('./device-websocket.mjs')).attachDeviceWebSocket;
-  transport=attach({server:app.server,gateway,publicOrigin:config.publicOrigin});
+  transport=attach({server:app.server,gateway,publicOrigin:config.publicOrigin,registerUpgrade:false});
+  if(config.voice){
+   let factory=createVoiceProvider;
+   if(!factory){
+    const [{createLinxSession},{createOutputDecoder}]=await Promise.all([import('../../packages/voice/src/index.js'),import('../../packages/voice/src/audio.js')]);
+    factory=options=>createLinxVoiceProvider({...options,config:config.voice,createSession:createLinxSession,createDecoder:createOutputDecoder});
+   }
+   const resolveContext=async({context})=>{
+    if(!context||typeof context!=='object'||Array.isArray(context)||Object.keys(context).some(key=>!['projectId','contextVersion','taskId','parentTaskId'].includes(key))||!validId(context.projectId)||!Number.isSafeInteger(context.contextVersion)||context.contextVersion<1||context.taskId!==undefined&&!validId(context.taskId)||context.parentTaskId!==undefined&&!validId(context.parentTaskId)||context.taskId!==undefined&&context.parentTaskId!==undefined)return null;
+    const project=await adapter.getProject(context.projectId);
+    if(!project||project.id!==context.projectId||project.enabled!==true)return null;
+    const selected=context.taskId??context.parentTaskId;
+    if(selected){const task=await adapter.getTask(selected);if(!task||task.projectId!==context.projectId||task.deletedAt||task.archived)return null;}
+    return {projectId:context.projectId,contextVersion:context.contextVersion,...(context.taskId?{taskId:context.taskId}:{}),...(context.parentTaskId?{parentTaskId:context.parentTaskId}:{}),userId:config.userId,deviceId:config.deviceId};
+   };
+   const authorizeVoiceUpgrade=req=>{const session=app.authorizeUpgrade(req);return session?{...session,ownerId:config.userId}:null;};
+   voiceTransport=createVoiceTransport({server:app.server,publicOrigin:config.publicOrigin,authorizeUpgrade:authorizeVoiceUpgrade,resolveContext,registerUpgrade:false,maxConnections:1,providerFactory:async options=>{
+    voiceProviderState='connecting';
+    const provider=await factory({...options,onEvent:event=>{if(event.type==='error')voiceProviderState='failed';options.onEvent(event);}});
+    return {...provider,async connect(){try{const report=await provider.connect();voiceProviderState='ready';return report;}catch{voiceProviderState='failed';throw Error('Voice provider unavailable');}}};
+   }});
+  }
+  if(typeof transport?.handleUpgrade==='function')upgradeRouter=attachControlWebSocketRouter({server:app.server,deviceTransport:transport,voiceTransport});
+  else if(config.voice)throw Error('Shared upgrade transport required');
   await new Promise((resolve,reject)=>{app.server.once('error',reject);app.server.listen(config.port,config.host,()=>{app.server.off('error',reject);resolve();});});
   if(config.mcpEndpoint){bridge=createBridge({endpoint:config.mcpEndpoint,dispatch,onStatus:status=>{proxyState=status;try{onStatus(status);}catch{}}});bridge.start();}
   timer=setInterval(()=>{void refreshState();},10000);timer.unref();
