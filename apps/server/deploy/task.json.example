@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "revision": "REPLACE_WITH_40_CHAR_SOURCE_REVISION",
+  "root": "/opt/voxcode",
+  "service": "voxcode-task.service",
+  "serviceUser": "voxcode-task",
+  "serviceUid": 1002,
+  "serviceGroup": "voxcode-rpc",
+  "serviceGid": 1003,
+  "toolSource": "/usr/local/bin/codex-reviewed",
+  "toolPath": "/opt/voxcode/shared/task-tools/codex",
+  "projectsFile": "/opt/voxcode/shared/task-config/projects.json",
+  "dataDirectory": "/opt/voxcode/shared/task-state",
+  "socketPath": "/run/voxcode-task/rpc.sock",
+  "envFile": "/opt/voxcode/shared/task-config/task.env",
+  "modelConfigSource": "/etc/voxcode-task/model-config.toml",
+  "modelConfigPath": "/var/lib/voxcode-task/.codex/config.toml",
+  "stateFile": "/opt/voxcode/shared/task-config/lifecycle-state.json"
+}
