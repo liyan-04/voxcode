@@ -1,9 +1,10 @@
 # 手机、Mac 与 Linx 当前架构
 
-更新：2026-10-25，关联 [#125](https://github.com/liyan-04/voxcode/issues/125)。
-本文描述最新产品合同，并分别标记源码与部署证据；文档工作区基线为 `fe51a88`，
-另已核对续聊核心 [PR #127](https://github.com/liyan-04/voxcode/pull/127) 合入 `f28553f`。已记录的
-正式线上探针为 `de10f5b`，两者不是同一个版本。最新双执行端范围覆盖此前的
+更新：2026-10-25，关联 [#154](https://github.com/liyan-04/voxcode/issues/154)。
+本文描述最新产品合同，并分别标记源码、部署和未合入工作证据；当前 `origin/master`
+为 `1cbe77f`，正式控制面应用已部署 `b8535e65489c1a84d948d1b3ae73ed8948f54f80`
+（PR #147），生命周期控制器为 `8f0f42e6dcd485a3b99d5b0394a096ecd03b745a`（PR #151）。
+最新双执行端范围覆盖此前的
 Mac-only 限制；历史原生 iOS/Relay 和额外草稿确认不能覆盖此处约定。
 
 ## 产品与执行模型
@@ -32,8 +33,10 @@ Mac 时保留该端输入并显示不可派发，不能自动改投服务器。
 
 ## 组件与信任边界
 
-下图是双端目标架构。当前正式控制面仅接通 Mac 分支；执行端路由与设备 MCP 执行
-工具为待接线部分，均用虚线标记。Mac Agent 是主动出站连接方。
+下图是双端目标架构。当前正式控制面线上仍只接通 Mac 分支；服务器执行端、原生
+Codex 桌面同步和连续双工语音仍是独立实施线，均用虚线标记。PR #147 已把设备侧
+MCP 工具注册与真实任务适配接入源码，但线上真实 capture 尚未观察到 `tools/call`。
+Mac Agent 是主动出站连接方。
 
 ```mermaid
 flowchart TB
@@ -202,15 +205,17 @@ requestId 再执行。工具不接受任意路径、shell、owner、执行端或
 
 | 能力 | 源码 / 候选状态 | 已有真实证据与剩余关口 |
 | --- | --- | --- |
-| 双执行端与登录独立性 | 最新用户要求；当前 `control-runtime.mjs` 仍固定 Mac RemoteTaskAdapter，旧服务器执行模块可复用 | 页面选端、目标授权/隔离、按端目录/任务/草稿/请求/标签缓存、登录脱离 Agent 依赖均需接线与专项验收；不宣称已上线 |
+| 双执行端与登录独立性 | PR #138/#140 已合入；登录不依赖 Mac Agent，服务器目标仍明确返回不可用 | Mac 端页面路由和独立登录已部署并验证；服务器 Codex 仍待 #134 的非 root 执行器与 socket 接线，不能宣称双端可用 |
 | 服务器到 Mac 执行 | 主线已有 gateway、Agent、RemoteTaskAdapter 与私有 RPC | 正式 `de10f5b` 探针：严格 CA HTTPS/WSS、Mac 在线、`executionHost: mac`、`simulation: false`，Mac Codex 实际写入与回答通过；该探针使用旧创建/确认流程 |
 | 任务标签筛选/排序 | [PR #123](https://github.com/liyan-04/voxcode/pull/123) 已合入 `fe51a88`，支持勾选项目与创建时间回退 | 已有本地浏览器 fixture；正式线上探针版本早于该合并，未据此证明部署 |
-| 同任务 UUID 续聊与轮次历史 | [#114](https://github.com/liyan-04/voxcode/issues/114) 核心经 [PR #127](https://github.com/liyan-04/voxcode/pull/127) 合入 `f28553f`，两份独立评审 PASS、78 项聚焦测试 | 已记录真实已安装 CLI 的同 UUID 记忆与项目外写入拒绝；页面候选尚未部署，完整 gateway/页面/线上续聊仍待验证 |
-| 完整对话与执行反馈页面 | [#124](https://github.com/liyan-04/voxcode/issues/124) 进行中，需独立保留选中任务详情并轮询 | 已部署页面仍缺续聊，不能把候选核心视为可用页面 |
+| 同任务 UUID 续聊与轮次历史 | PR #127/#132 已合入，任务服务保留轮次和 saved session UUID | 源码和 Mac 真实 CLI 探针通过；正式网页/手机续聊和长任务反馈仍需 #144/#108 的同端对账 |
+| Mac Codex 原生项目/任务同步 | #144 第一里程碑为未合入的只读适配器，保留 native projectId、thread/session、空项目和分页历史 | 12 项本地 fixture 通过；当前页面尚未接入原生 inventory/history，不能声称与桌面实时一致 |
+| 完整对话与执行反馈页面 | PR #132 已合入任务详情/轮次反馈；#153 正在补语音 admission/progress 回执 | 页面可读已保存任务详情；新语音任务仍需早期 taskId、连续进度和真实长任务验收 |
 | 项目登记与主命令 | [#115](https://github.com/liyan-04/voxcode/issues/115) 独立 registry 候选冻结，尚待评审和 RPC/HTTP/配置集成；[#124](https://github.com/liyan-04/voxcode/issues/124) 承接页面，双端隔离为新增要求 | 已部署页面主命令仍不符合「新建项目」；所选端已有/新建目录两种真实流程均待集成验收 |
 | 提交即执行 | 最新用户合同；现有任务/续聊仍有两阶段原语 | 直接提交的页面/API/语音组合接线待完成；旧显式确认探针不能证明新交互 |
-| 语音传输与 ASR | 主线有 `/ws/voice`、会话/录音目标冻结与 Linx provider | 正式线上合成 PCM 的 ASR 匹配且 Mac 写入验证通过，但没有自动创建任务；未验证真实 iPhone 麦克风或手机 TTS |
-| 设备 MCP 执行与继续语音 | [`packages/voice`](../../packages/voice/src/index.js) 支持 `tools/list` / `tools/call`；正式 [`voice-provider.mjs`](../../apps/server/voice-provider.mjs) 仍为 `tools: []`、`writeReady: false`，云 MCP 查询与设备工具分离 | 未交付工具列表→执行调用→冻结端实际动作→结构化结果→继续语音的真实链路；双端绑定也是待实现要求，ASR 成功不能关闭此关口 |
+| 语音传输与 ASR | 主线有 `/ws/voice`、会话/录音目标冻结与 Linx provider；正式应用 revision 为 b8535e6 | 真实合成 PCM 的 STT/TTS 通过；真实 capture 记录了 14 个事件但没有 `tool.started`/`tool.result`，未验证 iPhone 麦克风或手机扬声器 |
+| 设备 MCP 执行与继续语音 | PR #147 已接入认证 capture 的工具列表、调用和任务适配；#153 正在补早期 progress 与连续双工 | 源码 fixture 通过，真实 Linx 工具发现/调用仍未证明；不能把“现在开始执行”播报当作 Codex 证据 |
+| 服务器 Codex 执行端 | #134 未合入；只读盘点确认无独立 task service、账号、socket，root Codex 配置也不足以证明认证 | 正在实现非 root、私有 Unix RPC 和独立部署；服务器目标继续保持 503，不回退 Mac |
 | 崩溃恢复与统一生命周期 | [#121](https://github.com/liyan-04/voxcode/issues/121) 内核归属候选已评审待发布；[#122](https://github.com/liyan-04/voxcode/issues/122) 实现 Linux/Mac 生命周期与受检更新/回滚 | 候选脚本/进程测试不等于正式服务更新、Mac launchd 或重启恢复验收 |
 
 可复查的已合入证据见 [Mac 控制运行记录](../verification/mac-control-runtime.md)、
