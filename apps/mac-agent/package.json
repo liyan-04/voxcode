@@ -1,0 +1,9 @@
+{
+  "name": "@voxcode/mac-agent",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {"node": ">=22"},
+  "dependencies": {"ws": "8.22.0"},
+  "scripts": {"start": "node cli.mjs", "test": "node --test test/*.test.mjs"}
+}
