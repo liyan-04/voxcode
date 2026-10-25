@@ -1,10 +1,12 @@
 # VoxCode
 
-VoxCode 当前是一个运行在服务器上的语音 Code Agent。服务器保存项目注册表、任务状态和请求去重记录，通过受保护的 Unix socket 调度 Codex CLI；手机浏览器访问 VoxCode HTTPS 管理端，灵矽通过服务器出站 MCP 代理调用只读工具，写操作仍受可信语音上下文门禁保护。
+VoxCode 当前支持手机浏览器通过服务器 HTTPS 控制 Mac 上的 Codex CLI。服务器托管页面、设备网关和灵矽 MCP 接入；Mac Agent 通过出站 WSS 转发到 Mac 私有任务服务，模型凭据和执行保留在 Mac。新的启动与部署步骤见 [Mac 控制运行手册](docs/verification/mac-control-runtime.md)，协议见 [Mac 执行架构](docs/architecture/mac-agent-control.md)。
 
-## 当前实现（2026-10-25）
+`apps/server/control-cli.mjs` 是 Mac 执行模式的服务器入口，`apps/mac-agent/cli.mjs` 是 Mac 连接入口。灵矽 MCP 当前只开放查询，真实语音和手机验收状态以独立验证记录为准。任务属于 VoxCode 的本地 Codex CLI 服务，不是已有 Codex 桌面聊天。
 
-当前 `master` 已经是 server-only 代码树：
+## 保留的服务器执行模式（2026-10-25）
+
+原有服务器执行入口继续保留，新部署应按上面的 Mac 控制运行手册选择入口：
 
 - `apps/server/task-cli.mjs` 是目前唯一可以独立启动的服务入口。
 - `project-service.mjs` 管理已配置的 Git 项目、任务元数据、归档/恢复和软删除。

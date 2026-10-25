@@ -1,0 +1,29 @@
+[Unit]
+Description=VoxCode phone and Linx gateway for Mac Codex
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=voxcode-control
+Group=voxcode-control
+WorkingDirectory=/srv/voxcode-control/current
+Environment=HOME=/var/lib/voxcode-control
+Environment=VOXCODE_CONTROL_CONFIG=/srv/voxcode-control/shared/config/control.json
+ExecStart=/usr/bin/node /srv/voxcode-control/current/apps/server/control-cli.mjs start
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+KillMode=control-group
+UMask=0077
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/voxcode-control/shared/state /var/lib/voxcode-control
+ReadOnlyPaths=/srv/voxcode-control/shared/config
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target
