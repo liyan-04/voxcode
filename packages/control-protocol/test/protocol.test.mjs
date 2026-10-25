@@ -5,9 +5,14 @@ import {rpcMethods, validateRpcPayload, validateCommandEnvelope, stableJson} fro
 const base = {protocolVersion: 1, requestId: 'req-1', operationId: 'op-1', deviceId: 'mac-1', type: 'task_rpc', payload: {method: 'listProjects', params: []}, issuedAt: '2026-10-25T00:00:00.000Z', expiresAt: '2026-10-25T00:00:30.000Z'};
 const now = Date.parse(base.issuedAt);
 test('task RPC exposes fixed operations and preserves argument arrays', () => {
-  assert.equal(rpcMethods.length, 14);
+  assert.equal(rpcMethods.length, 15);
   assert.deepEqual(validateRpcPayload({method: 'getTask', params: ['task-1']}), {method: 'getTask', params: ['task-1']});
   for (const payload of [{method: 'exec', params: ['rm -rf']}, {method: 'getTask', params: ['/tmp', {}]}, {method: 'startTask', params: [{projectId: 'p', prompt: 'hello', requestId: 'r', cwd: '/'}]}]) assert.throws(() => validateRpcPayload(payload), {code: 'invalid_argument'});
+});
+test('continuation is additive and cannot select a session or omit its mutation identity',()=>{
+ const params=['task',{prompt:'follow up',revision:3,requestId:'continue'}];
+ assert.deepEqual(validateRpcPayload({method:'continueTask',params}),{method:'continueTask',params});
+ for(const change of [{sessionId:'other'},{resumeSessionId:'other'},{revision:undefined},{requestId:undefined},{prompt:' '}])assert.throws(()=>validateRpcPayload({method:'continueTask',params:['task',{...params[1],...change}]}),{code:'invalid_argument'});
 });
 test('network mutations require their durable request and revision identities', () => {
   for (const payload of [{method: 'startTask', params: [{projectId: 'p', prompt: 'hello'}]}, {method: 'confirmTask', params: ['t', {requestId: 'r'}]}, {method: 'cancelTask', params: ['t']}]) assert.throws(() => validateRpcPayload(payload));

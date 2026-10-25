@@ -38,11 +38,17 @@ export function createHttpServer({adapter,mcp,projectRegistry,legacyProjectId,tl
      if(b.parentTaskId!==undefined&&b.parentTaskId!==null){if(typeof b.parentTaskId!=='string'||!b.parentTaskId||b.parentTaskId.length>128)return json(res,400,{error:'invalid parent task'});let parent;try{parent=await adapter.getTask(b.parentTaskId);}catch{}if(!parent||taskProject(parent)!==b.projectId||parent.deletedAt)return json(res,400,{error:'parent task unavailable'});}
      return json(res,201,await adapter.startTask({projectId:b.projectId,prompt:b.prompt,title:b.title,requestId:b.requestId,...(b.parentTaskId!==undefined?{parentTaskId:b.parentTaskId}:{})}));
    }
-   const m=url.pathname.match(/^\/api\/tasks\/([^/]+)(?:\/(confirm|cancel|archive|delete|restore))?$/);if(m){
+   const m=url.pathname.match(/^\/api\/tasks\/([^/]+)(?:\/(continue|confirm|cancel|archive|delete|restore))?$/);if(m){
      const id=decodeURIComponent(m[1]);const task=await adapter.getTask(id);if(!task||!await project(taskProject(task)))return json(res,404,{error:'task unavailable'});const requested=url.searchParams.get('projectId');if(requested&&requested!==taskProject(task))return json(res,404,{error:'task unavailable'});
      if(req.method==='GET'&&!m[2])return json(res,200,{...task,projectId:taskProject(task),parentTaskId:task.parentTaskId??null,metadataRevision:task.metadataRevision??1,archived:task.archived===true,deletedAt:task.deletedAt??null});
      if(req.method==='POST'&&m[2]){
        const b=await body(req);if(b.projectId&&b.projectId!==taskProject(task))return json(res,404,{error:'task unavailable'});
+       if(m[2]==='continue'){
+         if(!b||typeof b!=='object'||Array.isArray(b)||Object.keys(b).some(key=>!['projectId','prompt','revision','requestId'].includes(key))||!validRequestId(b.requestId)||!Number.isSafeInteger(b.revision)||b.revision<1||typeof b.prompt!=='string'||!b.prompt.trim()||b.prompt.length>20000)return json(res,400,{error:'invalid continuation mutation'});
+         if(task.archived||task.deletedAt||task.quarantined)return json(res,409,{error:'restore and reconcile task first'});
+         if(typeof adapter.continueTask!=='function')return json(res,501,{error:'continuation unavailable'});
+         return json(res,200,await adapter.continueTask(id,{prompt:b.prompt,revision:b.revision,requestId:b.requestId}));
+       }
        if(m[2]==='confirm'){if(!validRequestId(b.requestId)||!Number.isSafeInteger(b.revision)||b.revision<1)return json(res,400,{error:'invalid execution mutation'});if(typeof adapter.confirmTask!=='function')return json(res,501,{error:'confirmation unavailable'});return json(res,200,await adapter.confirmTask(id,{revision:b.revision,requestId:b.requestId}));}
        if(m[2]==='cancel'){if(!validRequestId(b.requestId))return json(res,400,{error:'invalid requestId'});if(typeof adapter.cancelTask!=='function')return json(res,501,{error:'cancellation unavailable'});return json(res,200,await adapter.cancelTask(id,{requestId:b.requestId}));}
        if(typeof adapter[m[2]+'Task']!=='function')return json(res,501,{error:'task visibility unavailable'});
