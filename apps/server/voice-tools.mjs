@@ -5,10 +5,11 @@ import {validId} from '../../packages/control-protocol/index.mjs';
 
 const fail=code=>Object.assign(Error('Voice task operation unavailable'),{code});
 const terminal=new Set(['completed','failed','cancelled','interrupted','waiting_approval','quarantined']);
+const progressStatuses=new Set(['draft','queued','running','cancelling']);
 const safeCodes=new Set(['busy','revision_conflict','offline','project_unavailable','task_hidden','task_deleted','invalid_parent','quarantined','capacity','expired','request_conflict','outcome_unknown']);
 // These tools exist only inside one authenticated device voice socket. The
 // model supplies a prompt, never an owner, target, path, task or request identity.
-export function createVoiceTools({adapter,context,voiceSessionId,captureId,authorize,onResult=()=>{},onStart=()=>{},waitMs=60000,pollMs=500}={}){
+export function createVoiceTools({adapter,context,voiceSessionId,captureId,authorize,onResult=()=>{},onProgress=()=>{},onStart=()=>{},waitMs=60000,pollMs=500}={}){
  if(!adapter||!validId(context?.projectId)||!validId(context?.executionTarget)||!validId(voiceSessionId)||!validId(captureId)||typeof authorize!=='function'||!Number.isSafeInteger(waitMs)||waitMs<1||waitMs>90000||!Number.isSafeInteger(pollMs)||pollMs<1)throw fail('configuration');
  const target=Object.freeze(structuredClone(context));
  const requestId=createHash('sha256').update(JSON.stringify(['voice-v1',voiceSessionId,captureId])).digest('hex');
@@ -18,6 +19,17 @@ export function createVoiceTools({adapter,context,voiceSessionId,captureId,autho
  for(const method of ['startTask','continueTask','confirmTask'])guarded[method]=async(...args)=>{await check();return adapter[method](...args);};
  const submission=createTaskSubmission({adapter:guarded,executionTarget:target.executionTarget});
  const emit=result=>{onResult(result);return result;};
+ let lastProgress;
+ const progress=result=>{
+  if(!result?.taskId||!result.requestId||!progressStatuses.has(result.status))return;
+  const key=JSON.stringify([result.taskId,result.requestId,result.status,result.revision]);
+  if(key===lastProgress)return;
+  lastProgress=key;
+  const snapshot={executionTarget:result.executionTarget,projectId:result.projectId,taskId:result.taskId,requestId:result.requestId,status:result.status,revision:result.revision};
+  for(const [field,limit] of [['title',200],['error',500]])if(typeof result[field]==='string')snapshot[field]=result[field].slice(0,limit);
+  if(Number.isSafeInteger(result.exitCode))snapshot.exitCode=result.exitCode;
+  onProgress(snapshot);
+ };
  const identity=()=>({executionTarget:target.executionTarget,projectId:target.projectId,...(taskId?{taskId}:{}),requestId});
  async function read(current=false){
   await check();if(!taskId)return {...identity(),status:uncertain?'outcome_unknown':'no_task',...(uncertain??{})};
@@ -37,8 +49,8 @@ export function createVoiceTools({adapter,context,voiceSessionId,captureId,autho
   return result;
  }
  async function result(){
-  const deadline=Date.now()+waitMs;let value=await read();
-  while(taskId&&!terminal.has(value.status)&&!safeCodes.has(value.status)&&Date.now()<deadline){await delay(Math.min(pollMs,deadline-Date.now()));value=await read();}
+  const deadline=Date.now()+waitMs;let value=await read();progress(value);
+  while(taskId&&!terminal.has(value.status)&&!safeCodes.has(value.status)&&Date.now()<deadline){await delay(Math.min(pollMs,deadline-Date.now()));value=await read();progress(value);}
   return emit(value);
  }
  const execute=async args=>{
@@ -58,7 +70,12 @@ export function createVoiceTools({adapter,context,voiceSessionId,captureId,autho
     }else{
      await check();task=await submission.start({...input,...(target.parentTaskId?{parentTaskId:target.parentTaskId}:{})});
     }
-    taskId=task.taskId??task.id;return await result();
+    taskId=task.taskId??task.id;
+    // The submission adapter has completed admission and returned an
+    // authoritative task snapshot. Publish that identity before waiting for a
+    // long-running turn to reach a terminal state.
+    progress(await read());
+    return await result();
    }catch(error){
     if(error?.code==='voice_context_invalid')throw error;
     if(validId(error?.taskId))taskId=error.taskId;

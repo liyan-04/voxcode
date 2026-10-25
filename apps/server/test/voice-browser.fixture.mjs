@@ -9,7 +9,7 @@ const {chromium} = await import(process.env.VOXCODE_PLAYWRIGHT_MODULE);
 const output = process.env.VOXCODE_VOICE_FIXTURE_OUTPUT ?? '/private/tmp/voice-ui-112';
 const files = new Map(await Promise.all(['index.html', 'voice-client.mjs', 'voice-worklet.js'].map(async name => ['/' + name, await readFile(new URL('../public/' + name, import.meta.url))])));
 const projects = [{id: 'alpha', name: 'Fixture Alpha', enabled: true}, {id: 'beta', name: 'Fixture Beta', enabled: true}];
-const tasks = [{id: 'task-a', projectId: 'alpha', title: 'Fixture task A', status: 'draft', revision: 1}, {id: 'task-b', projectId: 'alpha', title: 'Fixture task B', status: 'draft', revision: 1}];
+const tasks = [{id: 'task-a', projectId: 'alpha', title: 'Fixture task A', status: 'draft', revision: 1}, {id: 'task-b', projectId: 'alpha', title: 'Fixture task B', status: 'draft', revision: 1}, {id: 'task-progress', projectId: 'alpha', title: 'Fixture progress task', status: 'draft', revision: 1}];
 const captures = [], writes = [], errors = [], results = [], sockets = new Set();
 let browser;
 const json = (res, status, body, headers = {}) => {res.writeHead(status, {'content-type': 'application/json', ...headers});res.end(JSON.stringify(body));};
@@ -38,12 +38,13 @@ wss.on('connection', ws => {
     if (binary) {
       assert(capture);assert.equal(data.length, 640);capture.frames++;
       if (capture.frames === 1) {send({type: 'stt.partial', captureId: capture.id, text: 'Synthetic partial'});send({type: 'stt.final', captureId: capture.id, text: 'Earlier synthetic candidate'});}
+      if (capture.writeReady) {ws.send(Buffer.from([1, 0]), {binary: true});capture.audioFrames++;}
       return;
     }
     const message = JSON.parse(data.toString());
-    if (message.type === 'session.start') {capture = {context: message.context, frames: 0, closed: false};captures.push(capture);send({type: 'session.ready', requestId: message.requestId, voiceSessionId: 'fixture-session', contextVersion: message.context.contextVersion, captureId: null, writeReady: false});}
-    if (message.type === 'capture.start') {capture.id = message.captureId;capture.text = 'Synthetic final transcript ' + captures.length;send({type: 'capture.ready', requestId: message.requestId, captureId: message.captureId, contextVersion: message.contextVersion, input: message.format, output: null, writeReady: false});}
-    if (message.type === 'capture.stop') {capture.stopped = true;send({type: 'capture.stopped', captureId: capture.id, lastSeq: capture.frames});setTimeout(() => send({type: 'stt.final', captureId: capture.id, text: capture.text}), 40);}
+    if (message.type === 'session.start') {capture = {context: message.context, frames: 0, audioFrames: 0, closed: false, writeReady: false};captures.push(capture);send({type: 'session.ready', requestId: message.requestId, voiceSessionId: 'fixture-session', contextVersion: message.context.contextVersion, captureId: null, writeReady: false});}
+    if (message.type === 'capture.start') {capture.id = message.captureId;capture.text = 'Synthetic final transcript ' + captures.length;capture.writeReady = capture.context.taskId === 'task-progress';send({type: 'capture.ready', requestId: message.requestId, captureId: message.captureId, contextVersion: message.contextVersion, input: message.format, output: capture.writeReady ? {codec: 'pcm_s16le', sampleRate: 16000, channels: 1} : null, writeReady: capture.writeReady});}
+    if (message.type === 'capture.stop') {capture.stopped = true;send({type: 'capture.stopped', captureId: capture.id, lastSeq: capture.frames});setTimeout(() => send({type: 'stt.final', captureId: capture.id, text: capture.text}), 40);if(capture.writeReady){setTimeout(()=>send({type:'task.progress',captureId:capture.id,result:{executionTarget:'mac',projectId:'alpha',taskId:'task-progress',requestId:'fixture-request',status:'running',revision:2}}),50);setTimeout(()=>send({type:'tool.result',captureId:capture.id,result:{executionTarget:'mac',projectId:'alpha',taskId:'task-progress',requestId:'fixture-request',status:'completed',revision:2}}),5000);setTimeout(()=>send({type:'assistant.event',captureId:capture.id,state:'stop'}),5010);}}
     if (message.type === 'capture.abort') {capture.aborted = true;send({type: 'stt.final', captureId: capture.id, text: 'Late aborted transcript'});}
   });
   ws.on('close', () => {if (capture) capture.closed = true;});
@@ -85,6 +86,10 @@ async function run(name, viewport) {
   await page.locator('#composer-input').fill('Task B saved input');await page.locator('#voice-button').click();
   await page.waitForFunction(() => document.querySelector('#voice-button').getAttribute('aria-pressed') === 'false' && document.querySelector('#voice-cancel').hidden);
   assert.equal(await page.locator('#composer-input').inputValue(), 'Task B saved input');assert.equal(await page.evaluate(() => sessionStorage.getItem('voxcode:draft:mac::alpha::task-a')), 'Task A saved input\n' + taskCapture.text);assert.equal(taskCapture.context.taskId, 'task-a');assert.equal(taskCapture.context.executionTarget, 'mac');await resourcesStopped(page);
+  await tree(page, mobile);await page.locator('.task-label').filter({hasText: 'Fixture progress task'}).click();if (mobile) await page.waitForFunction(() => document.querySelector('.sidebar').getBoundingClientRect().right <= 1);
+  const progressCapture=await record(page);await page.locator('#voice-button').click();await page.waitForFunction(() => document.querySelector('.task-row.selected .task-label')?.textContent.includes('Fixture progress task') && document.querySelector('#detail-status')?.textContent.includes('执行中'));
+  assert.equal(progressCapture.context.taskId,'task-progress');assert.equal(progressCapture.writeReady,true);assert(progressCapture.audioFrames>0);assert.equal(progressCapture.context.executionTarget,'mac');await resourcesStopped(page);
+  await tree(page, mobile);await page.locator('.task-label').filter({hasText: 'Fixture task B'}).click();if (mobile) await page.waitForFunction(() => document.querySelector('.sidebar').getBoundingClientRect().right <= 1);
   await record(page);await page.locator('#voice-cancel').click();await resourcesStopped(page);assert.equal(await page.locator('#composer-input').inputValue(), 'Task B saved input');
   await record(page);await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', {configurable: true, get: () => true});Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => 'hidden'});
@@ -94,7 +99,7 @@ async function run(name, viewport) {
   await record(page);await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));await resourcesStopped(page);assert.equal(await page.locator('#composer-input').inputValue(), 'Task B saved input');
   await page.locator('#composer-input').scrollIntoViewIfNeeded();await layout(page, name + ' final');await page.screenshot({path: output + '-' + name + '-final.png'});
   await page.goto('http://127.0.0.1:' + server.address().port + '/denied', {waitUntil: 'networkidle'});await page.waitForFunction(() => !document.querySelector('#voice-button').disabled);await page.locator('#voice-button').scrollIntoViewIfNeeded();await page.locator('#voice-button').click();await page.waitForFunction(() => document.querySelector('#voice-state-label').textContent.includes('权限被拒绝'));await resourcesStopped(page);
-  results.push({name, frozenProjectAndTask: true, preexistingDraftPreserved: true, exactPcmFrames: true, permissionDenial: true, abortIgnoresLateFinal: true, matchingCapturePreventsSubmit: true, hiddenReleasesResources: true, pagehideReleasesResources: true});
+  results.push({name, frozenProjectAndTask: true, preexistingDraftPreserved: true, exactPcmFrames: true, progressCapture: true, permissionDenial: true, abortIgnoresLateFinal: true, matchingCapturePreventsSubmit: true, hiddenReleasesResources: true, pagehideReleasesResources: true});
   await context.close();
 }
 try {

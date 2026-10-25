@@ -85,7 +85,7 @@ export async function startControlRuntime({config,createBridge=createMcpProxyBri
    voiceTransport=createVoiceTransport({server:app.server,publicOrigin:config.publicOrigin,authorizeUpgrade:authorizeVoiceUpgrade,resolveContext,registerUpgrade:false,maxConnections:1,providerFactory:async options=>{
     voiceProviderState='connecting';
     const bound=executionTargets.getTarget(options.context.executionTarget);
-    const tools=createVoiceTools({adapter:bound.adapter,context:options.context,voiceSessionId:options.voiceSessionId,captureId:options.captureId,authorize:options.authorizeTool,onStart:()=>options.onEvent({type:'tool.started'}),onResult:result=>options.onEvent({type:'tool.result',result})});
+    const tools=createVoiceTools({adapter:bound.adapter,context:options.context,voiceSessionId:options.voiceSessionId,captureId:options.captureId,authorize:options.authorizeTool,onStart:()=>options.onEvent({type:'tool.started'}),onProgress:result=>options.onEvent({type:'task.progress',result}),onResult:result=>options.onEvent({type:'tool.result',result})});
     const provider=await factory({...options,tools,onEvent:event=>{if(event.type==='error')voiceProviderState='failed';options.onEvent(event);}});
     return {...provider,async connect(){try{const report=await provider.connect();voiceProviderState='ready';return report;}catch{voiceProviderState='failed';throw Error('Voice provider unavailable');}}};
    }});

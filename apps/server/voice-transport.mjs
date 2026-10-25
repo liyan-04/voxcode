@@ -7,6 +7,14 @@ const plain=value=>value&&typeof value==='object'&&!Array.isArray(value);
 const sameFormat=value=>plain(value)&&Object.keys(value).length===4&&Object.entries(INPUT).every(([key,v])=>value[key]===v);
 const bounded=(promise,ms)=>{let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Voice operation timed out')),ms);})]).finally(()=>clearTimeout(timer));};
 const closeProvider=provider=>{try{provider?.close();}catch{ /* Cleanup cannot retain admission or throw from socket callbacks. */ }};
+const progressStatuses=new Set(['draft','queued','running','cancelling']);
+const progressResult=(value,context)=>{
+ if(!value||typeof value!=='object'||Array.isArray(value)||value.executionTarget!==context.executionTarget||value.projectId!==context.projectId||!id(value.taskId)||!id(value.requestId)||!progressStatuses.has(value.status)||!Number.isSafeInteger(value.revision)||value.revision<1)return null;
+ const result={executionTarget:value.executionTarget,projectId:value.projectId,taskId:value.taskId,requestId:value.requestId,status:value.status,revision:value.revision};
+ for(const [key,limit] of [['title',200],['error',500]])if(typeof value[key]==='string')result[key]=value[key].slice(0,limit);
+ if(Number.isSafeInteger(value.exitCode))result.exitCode=value.exitCode;
+ return result;
+};
 
 export function createVoiceTransport({server,publicOrigin,authorizeUpgrade,resolveContext,providerFactory,path='/ws/voice',maxConnections=8,operationTimeoutMs=10000,maxCaptureMs=30000,maxSessionMs=300000,maxBufferedBytes=65536,tailTimeoutMs=20000,registerUpgrade=true}={}) {
   const origin=new URL(publicOrigin);
@@ -52,6 +60,11 @@ export function createVoiceTransport({server,publicOrigin,authorizeUpgrade,resol
         return send(event.data,true);
       }
       if(event?.type==='tool.started')send({type:'tool.started',captureId:entry.id});
+      else if(event?.type==='task.progress'){
+        const result=progressResult(event.result,context);
+        if(!result||Buffer.byteLength(JSON.stringify(result))>8000)return fail('voice_progress_invalid');
+        send({type:'task.progress',captureId:entry.id,result});
+      }
       else if(event?.type==='tool.result'&&plain(event.result)&&Buffer.byteLength(JSON.stringify(event.result))<=24000)send({type:'tool.result',captureId:entry.id,result:event.result});
       else if(['stt.partial','stt.final'].includes(event?.type)&&typeof event.text==='string')send({type:event.type,captureId:entry.id,text:event.text.slice(0,4000)});
       else if(event?.type==='assistant.event'&&['start','stop','sentence_start'].includes(event.state))send({type:'assistant.event',captureId:entry.id,state:event.state,...(typeof event.text==='string'?{text:event.text.slice(0,4000)}:{}),...(event.aborted===true?{aborted:true}:{})});

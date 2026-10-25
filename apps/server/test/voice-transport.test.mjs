@@ -4,6 +4,7 @@ import {createServer} from 'node:http';
 import {once} from 'node:events';
 import WebSocket from 'ws';
 import {createVoiceTransport} from '../voice-transport.mjs';
+import {createVoiceTools} from '../voice-tools.mjs';
 
 async function fixture(t, extra={}) {
   const providers=[];const server=createServer();
@@ -18,6 +19,27 @@ async function fixture(t, extra={}) {
 }
 async function until(fn){for(let i=0;i<100;i++){if(fn())return;await new Promise(r=>setTimeout(r,5));}assert.fail('condition timed out');}
 async function start(f){const c=await f.connect();c.send({type:'session.start',requestId:'s1',context:{projectId:'allowed',contextVersion:1}});await until(()=>c.messages.some(x=>x.type==='session.ready'));c.send({type:'capture.start',requestId:'c1',captureId:'capture-1',contextVersion:1,format:{codec:'pcm_s16le',sampleRate:16000,channels:1,frameMs:20}});await until(()=>c.messages.some(x=>x.type==='capture.ready'));return c;}
+test('authenticated socket receives authoritative admission while the MCP result remains pending',async t=>{
+ let task,pending,settled=false,starts=0,confirms=0;
+ const f=await fixture(t,{resolveContext:({context})=>({executionTarget:'mac',projectId:context.projectId,contextVersion:1}),providerFactory:options=>{
+  const adapter={startTask:async input=>{starts++;task={id:'actual-task',projectId:'allowed',revision:1,status:'draft',turns:[{requestId:input.requestId,status:'draft',revision:1}]};return {taskId:task.id};},getTask:async()=>structuredClone(task),confirmTask:async()=>{confirms++;task.status='running';task.revision=2;Object.assign(task.turns[0],{status:'running',revision:2});}};
+  const tools=createVoiceTools({adapter,context:{...options.context,executionTarget:'mac'},voiceSessionId:options.voiceSessionId,captureId:options.captureId,authorize:options.authorizeTool,onProgress:result=>options.onEvent({type:'task.progress',result}),onResult:result=>options.onEvent({type:'tool.result',result}),waitMs:500,pollMs:5});
+  return {async connect(){return {input:{codec:'pcm_s16le',sampleRate:16000,channels:1,frameMs:20},writeReady:true};},start(){},sendAudio(){pending??=tools[0].invoke({prompt:'slow fixture'}).then(value=>{settled=true;return value;});},close(){}};
+ }});
+ const c=await start(f);c.ws.send(Buffer.alloc(640));await until(()=>c.messages.some(event=>event.type==='task.progress'));
+ const receipt=c.messages.find(event=>event.type==='task.progress');assert.equal(receipt.captureId,'capture-1');assert.equal(receipt.result.taskId,'actual-task');assert.equal(receipt.result.status,'running');assert.equal(receipt.result.revision,2);assert.equal(settled,false);assert(!c.messages.some(event=>event.type==='tool.result'));
+ task.status='completed';task.turns[0].status='completed';await pending;await until(()=>c.messages.some(event=>event.type==='tool.result'));assert.equal(starts,1);assert.equal(confirms,1);c.ws.close();
+});
+test('task progress is bounded to frozen context and rejected after capture abort',async t=>{
+ const f=await fixture(t,{resolveContext:({context})=>({executionTarget:'mac',projectId:context.projectId,contextVersion:1})}),c=await start(f),provider=f.providers[0];
+ const result={executionTarget:'mac',projectId:'allowed',taskId:'actual',requestId:'r',status:'running',revision:2,title:'x'.repeat(400),output:'private output',args:'private arguments'};
+ provider.emit({type:'task.progress',result});await until(()=>c.messages.some(event=>event.type==='task.progress'));
+ const receipt=c.messages.find(event=>event.type==='task.progress').result;assert.equal(receipt.title.length,200);assert.equal(receipt.output,undefined);assert.equal(receipt.args,undefined);
+ c.send({type:'capture.abort',requestId:'abort',captureId:'capture-1'});await until(()=>c.messages.some(event=>event.type==='capture.aborted'));provider.emit({type:'task.progress',result});await new Promise(resolve=>setTimeout(resolve,10));assert.equal(c.messages.filter(event=>event.type==='task.progress').length,1);c.ws.close();
+ for(const mismatch of [{executionTarget:'server'},{projectId:'foreign'},{requestId:''},{revision:0},{status:'outcome_unknown'}]){
+  const other=await fixture(t,{resolveContext:({context})=>({executionTarget:'mac',projectId:context.projectId,contextVersion:1})}),client=await start(other),closed=once(client.ws,'close');other.providers[0].emit({type:'task.progress',result:{...result,...mismatch}});await closed;assert(!client.messages.some(event=>event.type==='task.progress'));
+ }
+});
 test('bound provider tool authorization expires on abort and rechecks project ownership',async t=>{
  let options,allowed=true;
  const f=await fixture(t,{resolveContext:({context})=>allowed?context:null,providerFactory:input=>{options=input;return {async connect(){return {input:{codec:'pcm_s16le',sampleRate:16000,channels:1,frameMs:20},writeReady:true};},start(){},stop(){},abort(){},close(){}};}});

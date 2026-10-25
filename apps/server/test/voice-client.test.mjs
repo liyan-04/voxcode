@@ -290,6 +290,35 @@ test('MCP voice timeout never replays a submission and instructs result reconcil
   assert.equal(f.states.at(-1).reason, 'execution_timeout');assert.equal(f.transcripts.length, 0);
   assert.equal(wire.socket.sent.filter(value => typeof value === 'string' && JSON.parse(value).type === 'capture.start').length, 1);
 });
+test('early task progress preserves pending speech and binds new task and request identities',async t=>{
+ const progress=[],results=[],f=fixture({noToolGraceMs:5,onProgress:(value,target)=>progress.push({value,target}),onResult:value=>results.push(value)});t.after(()=>f.client.close());
+ const wire=await ready(f,{executionTarget:'mac',projectId:'project-a',draftKey:'mac::project-a::new:'},{writeReady:true});await f.client.stop();
+ wire.socket.receive({type:'capture.stopped',captureId:wire.capture.captureId,seq:3});
+ wire.socket.receive({type:'stt.final',captureId:wire.capture.captureId,text:'slow development instruction',seq:4});
+ const value={executionTarget:'mac',projectId:'project-a',taskId:'admitted',requestId:'request-a',status:'running',revision:2};
+ wire.socket.receive({type:'task.progress',captureId:'foreign',result:value,seq:100});
+ wire.socket.receive({type:'task.progress',captureId:wire.capture.captureId,result:value,seq:5});
+ wire.socket.receive({type:'task.progress',captureId:wire.capture.captureId,result:value,seq:5});
+ assert.equal(progress.length,1);assert.equal(progress[0].target.draftKey,'mac::project-a::new:');assert.deepEqual(results,[]);
+ wire.socket.receive({type:'assistant.event',captureId:wire.capture.captureId,state:'stop',seq:6});
+ await new Promise(resolve=>setTimeout(resolve,10));assert.equal(f.client.active,true);assert.equal(f.transcripts.length,0);
+ wire.socket.receive({type:'tool.result',captureId:wire.capture.captureId,result:{...value,status:'completed'},seq:7});
+ wire.socket.receive({type:'assistant.event',captureId:wire.capture.captureId,state:'stop',seq:8});assert.equal(f.client.active,false);assert.equal(results[0].taskId,'admitted');
+});
+test('progress rejects malformed, mismatched and changed task or request identities',async()=>{
+ const valid={executionTarget:'mac',projectId:'project-a',taskId:'task-a',requestId:'request-a',status:'running',revision:2};
+ for(const mismatch of [{executionTarget:'server'},{projectId:'foreign'},{taskId:'foreign'},{requestId:''},{revision:0},{status:'outcome_unknown'}]){
+  const progress=[],f=fixture({onProgress:value=>progress.push(value)}),wire=await ready(f,undefined,{writeReady:true});
+  wire.socket.receive({type:'task.progress',captureId:wire.capture.captureId,result:{...valid,...mismatch},seq:3});
+  assert.equal(f.states.at(-1).reason,'invalid_event');assert.deepEqual(progress,[]);assert.equal(f.client.active,false);
+ }
+ for(const mismatch of [{taskId:'other'},{requestId:'other'}]){
+  const f=fixture(),wire=await ready(f,{projectId:'project-a',draftKey:'mac::project-a::new:'},{writeReady:true});
+  wire.socket.receive({type:'task.progress',captureId:wire.capture.captureId,result:valid,seq:3});
+  wire.socket.receive({type:'tool.result',captureId:wire.capture.captureId,result:{...valid,...mismatch,status:'completed'},seq:4});
+  assert.equal(f.states.at(-1).reason,'invalid_event');assert.equal(f.client.active,false);
+ }
+});
 test('MCP voice decodes negotiated PCM into ordered bounded browser playback', async t => {
   class PlaybackAudio extends Audio {
     constructor() {super();this.currentTime = 0;this.played = [];}

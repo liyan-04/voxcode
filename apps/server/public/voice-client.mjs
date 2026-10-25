@@ -2,7 +2,7 @@ const format = Object.freeze({codec: 'pcm_s16le', sampleRate: 16000, channels: 1
 const id = value => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,128}$/u.test(value);
 const stopped = () => Object.assign(Error('Voice capture ended'), {voiceReason: 'aborted'});
 
-export function createVoiceClient({endpoint, mediaDevices = globalThis.navigator?.mediaDevices, AudioContextImpl = globalThis.AudioContext ?? globalThis.webkitAudioContext, AudioWorkletNodeImpl = globalThis.AudioWorkletNode, WebSocketImpl = globalThis.WebSocket, uuid = () => globalThis.crypto.randomUUID(), onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onResult = () => {}, onAssistant = () => {}, executionTimeoutMs = 180000, noToolGraceMs = 2000, startTimeoutMs = 15000, finalTimeoutMs = 20000, captureTimeoutMs = 29000, maxFrames = 1450} = {}) {
+export function createVoiceClient({endpoint, mediaDevices = globalThis.navigator?.mediaDevices, AudioContextImpl = globalThis.AudioContext ?? globalThis.webkitAudioContext, AudioWorkletNodeImpl = globalThis.AudioWorkletNode, WebSocketImpl = globalThis.WebSocket, uuid = () => globalThis.crypto.randomUUID(), onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onProgress = () => {}, onResult = () => {}, onAssistant = () => {}, executionTimeoutMs = 180000, noToolGraceMs = 2000, startTimeoutMs = 15000, finalTimeoutMs = 20000, captureTimeoutMs = 29000, maxFrames = 1450} = {}) {
   if (!mediaDevices?.getUserMedia || !AudioContextImpl || !AudioWorkletNodeImpl || !WebSocketImpl || ![startTimeoutMs, finalTimeoutMs, executionTimeoutMs, noToolGraceMs, captureTimeoutMs, maxFrames].every(value => Number.isSafeInteger(value) && value > 0) || captureTimeoutMs > 30000 || maxFrames > 1500) throw Error('Browser voice capture unavailable');
   const url = new URL(endpoint ?? '/ws/voice', globalThis.location?.href);
   if (!endpoint) url.protocol = url.protocol === 'https:' ? 'wss:' : url.protocol === 'http:' ? 'ws:' : url.protocol;
@@ -90,9 +90,15 @@ export function createVoiceClient({endpoint, mediaDevices = globalThis.navigator
       finish(session);
     } else if (event.type === 'tool.started' && event.captureId === session.captureId && session.writeReady) {
       clearTimeout(session.noToolTimer);session.toolPending = true;notify('processing', null, session.target);
+    } else if (event.type === 'task.progress' && event.captureId === session.captureId && session.writeReady) {
+      const result = event.result;
+      const validStatus = ['draft', 'queued', 'running', 'cancelling'].includes(result?.status);
+      if (!result || typeof result !== 'object' || Array.isArray(result) || result.executionTarget !== session.target.executionTarget || result.projectId !== session.target.projectId || !id(result.taskId) || !id(result.requestId) || !validStatus || !Number.isSafeInteger(result.revision) || result.revision < 1 || session.target.taskId && result.taskId !== session.target.taskId || session.progressTaskId && (result.taskId !== session.progressTaskId || result.requestId !== session.progressRequestId)) return fail(session, 'invalid_event');
+      session.progressTaskId ??= result.taskId;session.progressRequestId ??= result.requestId;session.toolPending = true;clearTimeout(session.noToolTimer);notify('processing', null, session.target);
+      try {onProgress(result, session.target);} catch {return fail(session, 'result_unavailable');}
     } else if (event.type === 'tool.result' && event.captureId === session.captureId && session.writeReady) {
       const result = event.result;
-      if (!result || typeof result !== 'object' || Array.isArray(result) || result.executionTarget !== session.target.executionTarget || result.projectId !== session.target.projectId || result.taskId !== undefined && !id(result.taskId) || session.target.taskId && result.taskId !== session.target.taskId) return fail(session, 'invalid_event');
+      if (!result || typeof result !== 'object' || Array.isArray(result) || result.executionTarget !== session.target.executionTarget || result.projectId !== session.target.projectId || result.taskId !== undefined && !id(result.taskId) || session.target.taskId && result.taskId !== session.target.taskId || session.progressTaskId && (result.taskId !== session.progressTaskId || result.requestId !== undefined && result.requestId !== session.progressRequestId)) return fail(session, 'invalid_event');
       clearTimeout(session.noToolTimer);session.toolPending = false;session.hasResult = true;
       const terminal = ['completed','failed','cancelled','interrupted','waiting_approval','quarantined'].includes(result.status);
       const rejected = ['busy','revision_conflict','offline','project_unavailable','task_hidden','task_deleted','invalid_parent','capacity','expired','request_conflict','rejected'].includes(result.status);
@@ -112,7 +118,7 @@ export function createVoiceClient({endpoint, mediaDevices = globalThis.navigator
     if (active) return false;
     if (!id(target?.projectId) || typeof target.draftKey !== 'string' || !target.draftKey.length || target.draftKey.length > 512 || /[\x00-\x1f\x7f]/u.test(target.draftKey) || target.taskId !== undefined && !id(target.taskId) || target.parentTaskId !== undefined && !id(target.parentTaskId) || target.taskId && target.parentTaskId) throw Error('A fixed voice draft target is required');
     if (target.executionTarget !== undefined && !['mac', 'server'].includes(target.executionTarget)) throw Error('A fixed voice draft target is required');
-    const session = {playback: new Set(), target: Object.freeze({executionTarget: 'mac', ...target}), contextVersion: ++contextVersion, sessionRequestId: uuid(), captureId: uuid(), phase: 'permission', lastSeq: -1, frames: 0, finalText: '', stopped: false};
+    const session = {playback: new Set(), target: Object.freeze({executionTarget: 'mac', ...target}), contextVersion: ++contextVersion, sessionRequestId: uuid(), captureId: uuid(), phase: 'permission', lastSeq: -1, frames: 0, finalText: '', stopped: false, progressTaskId: null, progressRequestId: null};
     session.ready = new Promise(resolve => {session.resolveReady = resolve;});session.cancelled = new Promise(resolve => {session.cancel = resolve;});
     const live = promise => Promise.race([promise, session.cancelled.then(() => {throw stopped();})]);
     active = session;notify('permission', null, session.target);
