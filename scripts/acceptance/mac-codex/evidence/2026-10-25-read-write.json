@@ -1,0 +1,34 @@
+{
+  "verifiedAt": "2026-10-25T07:05:51.601Z",
+  "evidenceClass": "live",
+  "platform": "darwin-arm64",
+  "node": "v26.0.0",
+  "codex": "0.164.0-alpha.11.1",
+  "productionMcpTools": 8,
+  "read": {
+    "randomizedContentMatched": true,
+    "inputSha256": "1f822b5bba58101b949b47bbcf4bdcb7f30b62c72382ba9e78648834b89ec578",
+    "filesUnchanged": true,
+    "requestReplay": "passed"
+  },
+  "write": {
+    "confirmation": "private local Unix socket",
+    "draftDidNotExecute": true,
+    "beforeTestExit": 1,
+    "afterTestExit": 0,
+    "testUnchanged": true,
+    "changedFiles": ["sum.mjs"],
+    "beforeSha256": "2d864757af083c7a572b6928d3316fd110ebcc6e15a2f9e5c7189bf78152ec22",
+    "afterSha256": "c01a4dda8409c0ac1b53b9223b8700f9be4a9024245cf8ec125ceebf4f7f5709",
+    "change": "export const sum = (a, b) => a - b; -> export const sum = (a, b) => a + b;",
+    "startAndConfirmReplay": "passed"
+  },
+  "sandbox": {
+    "workspaceWriteInside": "passed",
+    "readOnlyWriteDenied": "passed",
+    "workspaceWriteOutsideDenied": "passed"
+  },
+  "activeTasksAfterVerification": 0,
+  "quarantinedAfterVerification": false,
+  "notVerified": ["microphone", "phone", "outdoor", "desktop-chat-control", "same-uid-file-read-isolation", "runtime-result-snapshots"]
+}
