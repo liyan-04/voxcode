@@ -1,5 +1,25 @@
 # Progress and verification
 
+## 2026-10-25: dual execution target source milestone (Issue #128)
+
+- Fixed Mac/server selection now routes every project/task request through one
+  request-local adapter and registry, with separate replay identities and no
+  fallback. Login and authenticated inventory do not wait for either executor.
+- Final submission uncertainty regressions preserve the original identity after
+  committed mutations and failed detail reads. Root and architecture reviews
+  pass for the frozen implementation; reports are under `docs/reviews/`.
+- On integrated master `9038762`, coordinator focused checks passed 59/59 and
+  complete Node/policy/voice coverage collection passed 394/394. The exact
+  `9038762` baseline passed 370/370 after installing its missing Mac Agent
+  dependency; the initial incomplete-dependency baseline failed and was discarded.
+- Exact-baseline Node coverage gate passed: changed lines 99/99 (100%),
+  branches 178/190 (93.68%); overall lines 2282/2326 and branches 2427/2809
+  both increased from the baseline. No coverage policy was changed.
+- This is local controlled HTTP/Unix RPC evidence. Page selection, Linux
+  executor provisioning, live Codex/Linx and physical phone acceptance remain
+  separate. Issue #129 heartbeat configuration has no observed scheduler run;
+  actual release deployment was performed directly by deployment_ops.
+
 ## 2026-10-25: incremental browser control delivery
 
 - PR #133 merged direct task submission into master `9d2402a`: one request

@@ -28,8 +28,9 @@ export async function loadControlConfiguration({path,uid=process.getuid?.(),node
  try{
  if(!Number.isInteger(uid)||uid<=0||Number(nodeVersion.split('.')[0])<22||process.env.NODE_TLS_REJECT_UNAUTHORIZED==='0')invalid();
  const config=JSON.parse(await readControlFile(path,{uid}));
- const fields=['host','port','publicOrigin','revision','deviceId','userId','deviceRoot','tlsKeyFile','tlsCertFile','loginSecretFile','mcpEndpointFile','voiceFile'];
+ const fields=['host','port','publicOrigin','revision','deviceId','userId','deviceRoot','tlsKeyFile','tlsCertFile','loginSecretFile','mcpEndpointFile','voiceFile','serverTaskSocket'];
  if(!config||typeof config!=='object'||Array.isArray(config)||Object.keys(config).some(key=>!fields.includes(key))||!validId(config.deviceId)||!validId(config.userId)||!validId(config.revision)||!isAbsolute(config.deviceRoot??'')||resolve(config.deviceRoot)!==config.deviceRoot)invalid();
+ if(config.serverTaskSocket!==undefined&&(typeof config.serverTaskSocket!=='string'||!isAbsolute(config.serverTaskSocket)||resolve(config.serverTaskSocket)!==config.serverTaskSocket||Buffer.byteLength(config.serverTaskSocket)>100||/[\x00-\x1f\x7f]/u.test(config.serverTaskSocket)))invalid();
  const origin=new URL(config.publicOrigin);
  if(origin.protocol!=='https:'||origin.origin!==config.publicOrigin||origin.username||origin.password||!isIP(config.host)||!Number.isSafeInteger(config.port)||config.port<1024||config.port>65535||Number(origin.port||443)!==config.port)invalid();
  const key=await readControlFile(config.tlsKeyFile,{uid}),cert=await readControlFile(config.tlsCertFile,{uid,privateFile:false});

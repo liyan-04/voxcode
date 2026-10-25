@@ -14,6 +14,14 @@ test('control config validates TLS and private files without requiring server Co
  const config={host:'127.0.0.1',port:9899,publicOrigin:'https://127.0.0.1:9899',revision:'fixture-98',deviceId:'mac',userId:'owner',deviceRoot:join(root,'state'),tlsKeyFile:key,tlsCertFile:cert,loginSecretFile:login};
  await writeFile(path,JSON.stringify(config),{mode:0o600});
  const loaded=await loadControlConfiguration({path});assert.equal(loaded.deviceId,'mac');assert.equal(loaded.taskSocket,undefined);assert.equal(loaded.loginSecret,'synthetic-long-login');
+ const serverTaskSocket=join(root,'not-yet-running.sock');
+ await writeFile(path,JSON.stringify({...config,serverTaskSocket}));
+ assert.equal((await loadControlConfiguration({path})).serverTaskSocket,serverTaskSocket);
+ for(const socket of ['relative.sock','/private/tmp/../tmp/tasks.sock','/tmp/tasks.sock\n','/tmp/'+ 'x'.repeat(110),'',null]){
+  await writeFile(path,JSON.stringify({...config,serverTaskSocket:socket}));
+  await assert.rejects(loadControlConfiguration({path}),error=>error.message==='Invalid private control configuration');
+ }
+ await writeFile(path,JSON.stringify(config));
  await assert.rejects(loadControlConfiguration({path,uid:0}));
  await chmod(login,0o644);await assert.rejects(loadControlConfiguration({path}));await chmod(login,0o600);
  await writeFile(path,JSON.stringify({...config,publicOrigin:'http://127.0.0.1:9899'}));await assert.rejects(loadControlConfiguration({path}));
