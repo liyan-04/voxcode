@@ -53,6 +53,12 @@ export function createHttpServer({adapter,mcp,projectRegistry,legacyProjectId,tl
    }
    if(url.pathname.startsWith('/api/'))return json(res,404,{error:'not found'});
    if(url.pathname==='/mcp'&&mcp)return mcp(req,res);
+   if(req.method==='GET'&&['/voice-client.mjs','/voice-worklet.js'].includes(url.pathname)){
+    if(req.url!==url.pathname)return json(res,404,{error:'not found'});
+    let file;try{file=await readFile(join(new URL(publicDir).pathname,url.pathname.slice(1)));}catch{return json(res,404,{error:'not found'});}
+    res.writeHead(200,{'content-type':'application/javascript; charset=utf-8','x-content-type-options':'nosniff','cache-control':'no-store'});return res.end(file);
+   }
+   if(req.method==='GET'&&/\.(?:m?js)$/iu.test(url.pathname))return json(res,404,{error:'not found'});
    if(req.method==='GET'){const file=await readFile(join(new URL(publicDir).pathname,'index.html'));res.writeHead(200,{'content-type':'text/html; charset=utf-8'});return res.end(file);}
    return json(res,404,{error:'not found'});
  }catch(e){return json(res,e.message==='body too large'?413:e.code==='offline'?503:['revision_conflict','request_conflict','busy','quarantined','outcome_unknown'].includes(e.code)?409:400,{error:e.message==='body too large'?'body too large':'request failed',...(e.code==='outcome_unknown'?{code:'outcome_unknown',...(validRequestId(e.operationId)?{operationId:e.operationId}:{}),...(validRequestId(e.requestId)?{requestId:e.requestId}:{})}:e.code==='offline'?{code:'offline'}:{})});}};
