@@ -1,9 +1,10 @@
 import {createHash, randomUUID} from 'node:crypto';
-import {open, mkdir, rename, lstat,unlink} from 'node:fs/promises';
+import {open, mkdir, rename} from 'node:fs/promises';
 import {dirname, isAbsolute} from 'node:path';
 import {validateCommandEnvelope,validId,stableJson,readMethods,MAX_COMMAND_BYTES,MAX_RESULT_BYTES} from '../../packages/control-protocol/index.mjs';
 import WebSocket from 'ws';
 import {assertPrivateParent,readPrivateJson} from './private-files.mjs';
+import {acquireLedgerLock} from './ledger-lock.mjs';
 
 const MAX_FRAME = MAX_COMMAND_BYTES;
 const TYPES = ['task_rpc', 'switch_task', 'focus_window', 'open_project'];
@@ -17,18 +18,14 @@ async function ledger(stateFile, deviceId, maxEntries) {
  const parent = dirname(stateFile);
  await mkdir(parent, {recursive:true, mode:0o700});
  await assertPrivateParent(stateFile);
- const lockPath=`${stateFile}.lock`;
- let lock;
- try{lock=await open(lockPath,'wx',0o600);}catch{throw Error('ledger lock exists or unavailable; reconcile ownership manually');}
- const ownedLock=await lock.stat();
+ const lock=await acquireLedgerLock({stateFile,deviceId});
  let released=false,pendingSave=Promise.resolve(),committed;
  async function release(){
   if(released)return;
   released=true;await pendingSave;
-  try{const current=await lstat(lockPath);if(current.ino===ownedLock.ino&&current.dev===ownedLock.dev)await unlink(lockPath);}catch(error){if(error.code!=='ENOENT')throw error;}finally{await lock.close();}
+  await lock.release();
  }
  try{
- await lock.writeFile(JSON.stringify({version:1,deviceId,pid:process.pid,startedAt:new Date().toISOString()}));await lock.sync();
  let data = {version:1, deviceId, revision:1, entries:{}};
  try {
   data=await readPrivateJson(stateFile,{maxBytes:8*1024*1024});
@@ -38,6 +35,7 @@ async function ledger(stateFile, deviceId, maxEntries) {
   if(released)return Promise.reject(Error('ledger lock released'));
   const operation=pendingSave.then(async()=>{
   if(released)throw Error('ledger lock released');
+  await lock.assertHeld();
   const raw=JSON.stringify(data);
   if(Buffer.byteLength(raw)>8*1024*1024)throw Error('ledger byte limit');
   const temp = `${stateFile}.${randomUUID()}.tmp`;
