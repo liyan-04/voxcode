@@ -89,6 +89,60 @@ Local artifacts, outside the repository:
 
 `git diff --check` passed.
 
+## Lost Acknowledgement Regression Repair
+
+The independent architecture review found that the original retry fixture
+failed before server admission. It missed a response lost after the server
+had completed the turn: polling loaded revision 6 while the original request
+used revision 3, and the page then generated a new request ID for the same
+instruction.
+
+The page now freezes an unresolved submission's complete payload, request ID
+and original source text. Polling and target switches cannot change that
+identity. An unchanged retry replays the original request. Edited input is
+preserved and cannot replace the unresolved operation; a visible "核对上次发送"
+action replays the original payload without changing the editor. After a
+successful replay, the unresolved operation is released and a later explicit
+Send can create a new turn from the edited text. This is a recovery action,
+not a confirmation step for a new instruction. It also remains available if
+the selected task is already running, because durable request replay must
+precede a fresh-turn state check on the server.
+The recovery action replaces the voice button in the composer tools while
+unresolved, keeping it visible beside Send even on a short landscape screen.
+
+Network failures, 5xx, outcome_unknown, offline and busy preserve the original
+request. The older HTTP contract collapses several admission/conflict errors
+into an untyped 409, so that response is conservatively retained as well.
+Other explicit 4xx failures release the rejected payload. A 409 that never
+admits the request may remain blocked until backend reconciliation provides
+a definitive outcome; the UI never silently converts it into a new request.
+Pending submission identities remain in the current page's memory, as before;
+this repair does not claim reload or browser-restart recovery.
+
+Three new focused tests were first run against the reviewed source: 12 passed,
+3 failed. They reproduced the revision/request-ID mismatch, edited-input
+redispatch and loss of identity after partial admission responses. The fixed
+focused command above then passed 41 tests with no failures.
+
+The browser fixture now completes and records the synthetic server operation,
+then uses Playwright route.fetch followed by route.abort to lose only the
+response visible to the page. A plain socket reset was insufficient because
+Chromium could internally retry it before reporting a fetch failure. The
+fixture waits for the newer full-detail poll, blocks edited redispatch,
+replays the original identity without adding a turn, preserves edited input,
+and then explicitly submits that input as a later new turn.
+
+The final browser run passed desktop 1440x900, phone 390x844, narrow 320x740
+and landscape 844x390, with no page errors or horizontal document overflow.
+Recovery-button bounds are checked against the viewport and fixed tab bar;
+narrow and landscape recovery screenshots were visually inspected. Outputs:
+`/private/tmp/workspace-conversations-124-lost-ack-results.json` and
+`/private/tmp/workspace-conversations-124-lost-ack-{desktop,mobile,narrow,landscape}-{running,recovery,final}.png`.
+This remains a local synthetic HTTP/browser fixture, with no real Codex or
+provider operation. The final focused run passed 41 tests; `git diff --check`
+passed. Independent rereview, backend integration and live/device validation
+remain coordinator gates.
+
 ## Limits And Handoff
 
 This increment changes only the page, new focused UI tests/browser fixture,

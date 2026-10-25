@@ -20,3 +20,17 @@ Dependencies and residual limits: direct-submit backend #126 must precede
 production use. Login currently combines authentication with loading projects;
 the requested independent login and server/Mac selector are the next distinct
 increment. Project creation and device MCP are not implemented by this PR.
+
+## Recovery follow-up
+
+The second review reproduced a lost response after execution: a newer polled
+revision changed the continuation fingerprint and could send a duplicate turn.
+execution_target_ui fixed the page and added three regressions, including an
+actual lost acknowledgement after commit and edited-input recovery. Coordinator
+inspected the final diff and reran the same focused command: 41 passed.
+Final index.html SHA256:
+`ab937c4fb26fa75b0e5efeec86966b13e8a527cc35436ea3e06b1d0924421609`.
+No remaining blocking finding. Recovery reuses the original request and payload
+regardless of newer task revisions. A visible composer action reconciles that
+request while preserving edits. This action recovers transport uncertainty;
+ordinary sends still execute directly. PR #133 supplies the merged backend.

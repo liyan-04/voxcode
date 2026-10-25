@@ -76,6 +76,29 @@ test('uncertain continuation retries preserve the exact request after switching 
  let attempts=0;const f=await fixture({post:async(call,get,set)=>{if(++attempts===1)throw Error('synthetic disconnect');const next=running(get());set(next);return response(next);}});f.input('fix spacing');await f.submit();assert.equal(f.get('#composer-input').value,'fix spacing');
  f.run("openTarget({projectId:'b'});openTarget({projectId:'a',selected:'one'},{fetch:false})");await f.submit();assert.equal(f.writes.length,2);assert.deepEqual(f.writes[0],f.writes[1]);assert.equal(f.snapshot().turns.length,2);
 });
+test('lost acknowledgement after commit replays the original request after a newer full-detail poll',async()=>{
+ const receipts=new Map();const f=await fixture({post:async(call,get,set)=>{
+  if(receipts.has(call.payload.requestId))return response(get());
+  const next=running(get(),call.payload.prompt);next.status='completed';next.revision=get().revision+3;next.turns.at(-1).status='completed';set(next);receipts.set(call.payload.requestId,true);
+  if(receipts.size===1)throw Error('response lost after commit');return response(next);
+ }});f.input('fix spacing');await f.submit();await f.run('refresh()');await flush();assert.equal(f.snapshot().revision,6);assert.equal(f.snapshot().turns.length,2);
+ await f.submit();assert.deepEqual(f.writes[1],f.writes[0]);assert.equal(f.snapshot().turns.length,2);assert.equal(f.get('#composer-input').value,'');
+ f.input('later intentional turn');await f.submit();assert.equal(f.snapshot().turns.length,3);assert.notEqual(f.writes[2].payload.requestId,f.writes[0].payload.requestId);assert.equal(f.writes[2].payload.revision,6);
+});
+test('edited input waits for visible original-request recovery and survives successful reconciliation',async()=>{
+ let attempted=false;const f=await fixture({post:async(call,get,set)=>{
+  if(attempted)return response(get());attempted=true;const next={...running(get(),call.payload.prompt),status:'completed',revision:6};set(next);throw Error('response lost after commit');
+ }});f.input('fix spacing');await f.submit();await f.run('refresh()');await flush();f.input('later edited instruction');await f.submit();
+ assert.equal(f.writes.length,1);assert.equal(f.get('#composer-input').value,'later edited instruction');assert.equal(f.get('#submission-recovery').hidden,false);assert.equal(f.get('#retry-submission').disabled,false);
+ await f.get('#retry-submission').onclick();assert.deepEqual(f.writes[1],f.writes[0]);assert.equal(f.get('#composer-input').value,'later edited instruction');assert.equal(f.get('#submission-recovery').hidden,true);
+ await f.submit();assert.equal(f.writes[2].payload.prompt,'later edited instruction');assert.notEqual(f.writes[2].payload.requestId,f.writes[0].payload.requestId);
+});
+test('partial admission responses preserve original identity until recovery succeeds',async()=>{
+ for(const [status,code] of [[409,'busy'],[409,undefined],[503,'offline'],[409,'outcome_unknown']]){
+  let attempted=false;const f=await fixture({post:async(call,get,set)=>{if(!attempted){attempted=true;set({...get(),status:'running',revision:4});return response({code},status);}return response({...get(),status:'completed',revision:6});}});f.input('fix spacing');await f.submit();await f.run('refresh()');await flush();f.input('new edited text');await f.submit();assert.equal(f.writes.length,1,`${status} ${code}`);
+  await f.get('#retry-submission').onclick();assert.deepEqual(f.writes[1],f.writes[0]);assert.equal(f.get('#composer-input').value,'new edited text');
+ }
+});
 test('late detail from an old target and older execution versions cannot replace current content',async()=>{
  const gate=deferred(),f=await fixture({read:()=>gate.promise}),loading=f.run("loadTask('one','a')");f.run("openTarget({projectId:'b'},{fetch:false})");gate.resolve(response(initial()));await loading;assert.equal(f.run('state.snapshot'),null);assert.equal(f.run('state.projectId'),'b');
  const old=await fixture({task:running(initial()),read:async()=>response(initial())});await old.run("loadTask('one','a')");assert.equal(old.snapshot().revision,5);assert.equal(old.snapshot().turns.length,2);

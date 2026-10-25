@@ -34,7 +34,7 @@ const server=createServer(async(req,res)=>{
  let body='';for await(const chunk of req)body+=chunk;const payload=JSON.parse(body);requests.push({path:url.pathname,payload});
  if(receipts.has(payload.requestId))return json(res,200,receipts.get(payload.requestId));
  if(!task||payload.projectId!==task.projectId)return json(res,404,{});
- if(failNext){failNext=false;return json(res,503,{code:'outcome_unknown',operationId:'fixture-unknown'});}
+ const loseAcknowledgement=failNext;failNext=false;
  if(delayNext){delayNext=false;await new Promise(resolve=>releaseDelayed=resolve);releaseDelayed=null;}
  if(url.pathname.endsWith('/continue')){
   assert.deepEqual(Object.keys(payload).sort(),['projectId','prompt','requestId','revision']);assert.equal(payload.revision,task.revision);assert(['completed','cancelled','failed'].includes(task.status));
@@ -42,6 +42,7 @@ const server=createServer(async(req,res)=>{
  }else if(url.pathname.endsWith('/confirm')){assert.equal(task.status,'draft');assert.equal(payload.revision,task.revision);task.status='running';task.revision++;}
  else if(url.pathname.endsWith('/cancel')){task.status='cancelled';task.revision++;}
  else return json(res,404,{});
+ if(loseAcknowledgement){task.status='completed';task.revision++;task.output='Committed before lost acknowledgement';task.turns.at(-1).status='completed';}
  const result=structuredClone(task);receipts.set(payload.requestId,result);return json(res,200,result);
 });
 server.on('connection',socket=>{sockets.add(socket);socket.once('close',()=>sockets.delete(socket));});
@@ -52,9 +53,9 @@ async function layout(page,name){
  const viewport=page.viewportSize(),bounds=await page.evaluate(()=>{
   const box=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
   const bad=[...document.querySelectorAll('#messages .message-body,#messages pre,#messages .event-file')].filter(node=>node.scrollWidth>node.clientWidth+1).map(node=>node.className);
-  return {width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,composer:box('#composer-form'),messages:box('#messages'),tabs:box('.task-navigation'),bad};
+  return {width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,composer:box('#composer-form'),messages:box('#messages'),tabs:box('.task-navigation'),recovery:document.querySelector('#submission-recovery').hidden?null:box('#retry-submission'),bad};
  });
- assert.equal(bounds.width,viewport.width);assert.equal(bounds.height,viewport.height);assert.deepEqual(bounds.bad,[]);assert(bounds.composer.left>=0&&bounds.composer.right<=viewport.width);assert(bounds.composer.bottom<=viewport.height);assert(bounds.composer.top>=bounds.tabs.bottom);assert(bounds.messages.bottom<=bounds.composer.top);results.push({name,bounds});
+ assert.equal(bounds.width,viewport.width);assert.equal(bounds.height,viewport.height);assert.deepEqual(bounds.bad,[]);assert(bounds.composer.left>=0&&bounds.composer.right<=viewport.width);assert(bounds.composer.bottom<=viewport.height);assert(bounds.composer.top>=bounds.tabs.bottom);assert(bounds.messages.bottom<=bounds.composer.top);if(bounds.recovery){assert(bounds.recovery.top>=bounds.tabs.bottom);assert(bounds.recovery.bottom<=viewport.height);assert(bounds.recovery.left>=0&&bounds.recovery.right<=viewport.width);}results.push({name,bounds});
 }
 async function run(name,viewport){
  tasks=initial();receipts.clear();const start=requests.length,mobile=viewport.width<=700,context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile}),page=await context.newPage();page.setDefaultTimeout(12000);page.on('pageerror',error=>errors.push(error.message));
@@ -65,14 +66,18 @@ async function run(name,viewport){
  await page.waitForFunction(()=>document.querySelector('#messages').textContent.includes('Actual synthetic command output'));const text=await page.locator('#messages').textContent();for(const value of ['Original request','Original result','Adjust the original result','Live fixture result','src/','退出码 0'])assert(text.includes(value),value);
  assert.equal(await page.locator('#messages button').filter({hasText:'停止任务'}).count(),1);await layout(page,name+' running');await page.screenshot({path:output+'-'+name+'-running.png'});
  tasks[0].status='completed';tasks[0].revision++;tasks[0].output='Completed fixture result';await page.waitForFunction(()=>document.querySelector('#messages').textContent.includes('Completed fixture result'));assert.equal(await page.locator('#send-button').isDisabled(),false);
- failNext=true;await page.locator('#composer-input').fill('Retry safely');await page.locator('#send-button').click();await page.waitForFunction(()=>document.querySelector('#feedback').textContent.includes('结果未知'));const failed=requests.at(-1);assert.equal(await page.locator('#composer-input').inputValue(),'Retry safely');
- await page.locator('#send-button').click();await page.waitForFunction(()=>document.querySelector('#detail-status').textContent==='执行中');assert.deepEqual(requests.at(-1),failed);assert.equal(tasks[0].turns.length,3);
+ await page.route('**/api/tasks/one/continue',async route=>{await route.fetch();await route.abort('failed');},{times:1});
+ failNext=true;await page.locator('#composer-input').fill('Retry safely');await page.locator('#send-button').click();await page.waitForFunction(()=>document.querySelector('#feedback').textContent.includes('网络连接中断'));const failed=requests.at(-1);assert.equal(await page.locator('#composer-input').inputValue(),'Retry safely');
+ await page.waitForFunction(()=>document.querySelector('#messages').textContent.includes('Committed before lost acknowledgement'));assert.equal(tasks[0].turns.length,3);assert(tasks[0].revision>failed.payload.revision);
+ await page.locator('#composer-input').fill('Later edited turn');const beforeRecovery=requests.length;await page.locator('#send-button').click();await page.waitForFunction(()=>document.querySelector('#feedback').textContent.includes('核对上次发送'));assert.equal(requests.length,beforeRecovery);assert.equal(await page.locator('#retry-submission').isVisible(),true);await layout(page,name+' recovery');await page.screenshot({path:output+'-'+name+'-recovery.png'});
+ await page.locator('#retry-submission').click();await page.waitForFunction(()=>document.querySelector('#submission-recovery').hidden);assert.deepEqual(requests.at(-1),failed);assert.equal(tasks[0].turns.length,3);assert.equal(await page.locator('#composer-input').inputValue(),'Later edited turn');
+ await page.locator('#send-button').click();await page.waitForFunction(()=>document.querySelector('#detail-status').textContent==='执行中');assert.equal(requests.at(-1).payload.prompt,'Later edited turn');assert.notEqual(requests.at(-1).payload.requestId,failed.payload.requestId);assert.equal(tasks[0].turns.length,4);
  await page.locator('#messages button').filter({hasText:'停止任务'}).click();await page.waitForFunction(()=>document.querySelector('#detail-status').textContent==='已停止');
  delayNext=true;await page.locator('#composer-input').fill('Delayed Alpha follow-up');await page.locator('#send-button').click();await page.waitForFunction(()=>document.querySelector('#send-button').disabled);while(!releaseDelayed)await new Promise(resolve=>setTimeout(resolve,5));
  await chooseProject(page,'Fixture Beta',mobile);await page.locator('#composer-input').fill('Preserve Beta input');releaseDelayed();await page.waitForFunction(()=>document.querySelector('#send-button').textContent.includes('发送')&&!document.querySelector('#send-button').disabled);assert.equal(await page.locator('#composer-input').inputValue(),'Preserve Beta input');assert.equal(await page.locator('#breadcrumb-project').textContent(),'Fixture Beta');
  await chooseTask(page,'legacy');await page.waitForFunction(()=>document.querySelector('#messages').textContent.includes('Saved original request'));const before=requests.length;await page.locator('#composer-input').fill('Preserve later input');assert.equal(requests.length,before);await page.locator('.conversation-execute button').click();await page.waitForFunction(()=>document.querySelector('#detail-status').textContent==='执行中');assert.equal(requests.at(-1).path,'/api/tasks/legacy/confirm');assert.equal(await page.locator('#composer-input').inputValue(),'Preserve later input');
  await layout(page,name+' final');await page.screenshot({path:output+'-'+name+'-final.png'});assert(requests.slice(start).every(request=>request.path!=='/api/tasks/one/confirm'));
- results.push({name,directSend:true,sameSession:true,fullHistorySurvivesSummaries:true,selectedTaskPolling:true,realEventFields:true,uncertainRetryIdentity:true,delayedTargetPreserved:true,legacyRunsOnlyOnClick:true});await context.close();
+ results.push({name,directSend:true,sameSession:true,fullHistorySurvivesSummaries:true,selectedTaskPolling:true,realEventFields:true,lostAcknowledgementAfterCommit:true,uncertainRetryIdentity:true,editedInputSurvivesRecovery:true,laterNewTurn:true,delayedTargetPreserved:true,legacyRunsOnlyOnClick:true});await context.close();
 }
 try{
  server.listen(0,'127.0.0.1');await once(server,'listening');browser=await chromium.launch({headless:true,...(process.env.VOXCODE_PLAYWRIGHT_EXECUTABLE?{executablePath:process.env.VOXCODE_PLAYWRIGHT_EXECUTABLE}:{})});
