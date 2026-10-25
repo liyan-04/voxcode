@@ -100,7 +100,7 @@ npm ci --ignore-scripts --prefix apps/relay
 VOXCODE_PROJECT=/srv/authorized-test-project
 VOXCODE_DATA=/srv/voxcode-private/state
 VOXCODE_PORT=8787
-VOXCODE_RELAY_URL=wss://100.100.81.209:9899/connector
+VOXCODE_RELAY_URL=wss://203.0.113.10:9899/connector
 VOXCODE_MACHINE_ID=existing-authorized-machine-id
 VOXCODE_MACHINE_KEY=private-existing-machine-key
 VOXCODE_TLS_CA=/srv/executor-config/reviewed-public-ca.pem

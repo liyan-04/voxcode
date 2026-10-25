@@ -9,6 +9,6 @@
   "taskGroup": "voxcode-rpc",
   "taskSocket": "/run/voxcode-task/rpc.sock",
   "identityVerified": false,
-  "healthOrigin": "https://100.100.81.209:9899",
+  "healthOrigin": "https://203.0.113.10:9899",
   "healthCaFile": "/opt/voxcode/shared/config/health-ca.pem"
 }

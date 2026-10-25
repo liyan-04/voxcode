@@ -29,7 +29,7 @@
 - Freeze task target at recording start. Deduplicate mutations using requestId.
 - Default four execution slots, configurable 1–8; each task has at most one active turn. Separate worktrees, data directories and immutable result artifacts. Stopping/waiting-approval turns retain their slots; lowering the limit only affects future dispatch.
 - Native remote transport uses TLS on the fixed IP with explicit certificate trust; no domain or existing HTTPS is required from the user. Do not accept arbitrary certificates or send remote control credentials over plaintext.
-- Deployment and isolated validation are authorized on vm6 through liyan-server. Current entry is `https://100.100.81.209:9899`, reached by the user's phone VPN; strict TLS/IP SAN and reviewed CA remain mandatory. Confirm ownership of the existing9899process before any update; if unrelated, stop and notify. An occupied port is never implicit permission to replace it. Linux/live/device/outdoor checks remain required.
+- Deployment and isolated validation are authorized on vm6 through liyan-server. Current entry is `https://203.0.113.10:9899`, reached by the user's phone VPN; strict TLS/IP SAN and reviewed CA remain mandatory. Confirm ownership of the existing9899process before any update; if unrelated, stop and notify. An occupied port is never implicit permission to replace it. Linux/live/device/outdoor checks remain required.
 - Cancellation is asynchronous and never implies rollback.
 - Execution completion, operation approval and user acceptance are distinct.
 - Do not expose preview files, extra ports or the server filesystem without authorization.

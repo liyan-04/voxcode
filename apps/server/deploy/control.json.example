@@ -1,7 +1,7 @@
 {
-  "host": "100.100.81.209",
+  "host": "203.0.113.10",
   "port": 9899,
-  "publicOrigin": "https://100.100.81.209:9899",
+  "publicOrigin": "https://203.0.113.10:9899",
   "revision": "replace-with-reviewed-commit",
   "userId": "owner",
   "deviceId": "mac",

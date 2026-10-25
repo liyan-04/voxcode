@@ -194,7 +194,7 @@
 ## 2026-10-24: delivery target clarification
 - Corrected the delivery wording after user clarification: the target is the combined loop of a native app installed on a real iPhone **and** that same build controlling Codex on the company Mac through the public Relay/Connector path. Neither a simulator demo nor an install-only result closes the project.
 - G4 device evidence and G5 outdoor evidence must identify the same signed build, device/iOS version, relay endpoint, Mac connector and Codex requestId. Current local state has neither a signed iPhone build nor a live public/outdoor run; these gates remain blocked by the missing Xcode/signing and deferred deployment resources.
-- A deployment attempt using the authorized `liyan-server` workflow reached `100.100.81.209` but SSH authentication returned `Permission denied (publickey,password)` before any command ran. No files, processes or ports were changed. The local relay package remains ready for a later authenticated attempt; the public link is still unverified.
+- A deployment attempt using the authorized `liyan-server` workflow reached `203.0.113.10` but SSH authentication returned `Permission denied (publickey,password)` before any command ran. No files, processes or ports were changed. The local relay package remains ready for a later authenticated attempt; the public link is still unverified.
 
 ## 2026-10-24: architect collaboration and post-merge cleanup policy
 - Added [the architect collaboration and cleanup policy](architecture/cleanup-policy.md): GitHub PRs remain the merge/evidence source; Issues/Projects coordinate active work; `docs/architecture/` and `docs/progress.md` retain durable decisions and evidence.
