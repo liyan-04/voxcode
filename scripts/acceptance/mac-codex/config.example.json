@@ -1,0 +1,13 @@
+{
+  "runtimeRoot": "/absolute/voxcode/apps/server",
+  "connectionFile": "/absolute/private/linx.json",
+  "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
+  "codexHome": "/absolute/private/codex-home",
+  "dataDir": "/absolute/private/task-state",
+  "socketPath": "/absolute/private/task-state/owner.sock",
+  "statusPort": 51241,
+  "projects": [
+    {"id": "voice", "name": "Mac read fixture", "root": "/absolute/fixtures/read", "enabled": true, "sandbox": "read-only"},
+    {"id": "write", "name": "Mac write fixture", "root": "/absolute/fixtures/write", "enabled": true, "sandbox": "workspace-write"}
+  ]
+}
