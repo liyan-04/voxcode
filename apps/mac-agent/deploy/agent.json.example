@@ -1,0 +1,7 @@
+{
+  "endpoint": "wss://voxcode.example.invalid/agent",
+  "deviceId": "mac-registered-device",
+  "stateFile": "/Users/REPLACE/Library/Application Support/VoxCode/agent/ledger.json",
+  "keychainService": "voxcode.mac-agent",
+  "keychainAccount": "mac-registered-device"
+}
