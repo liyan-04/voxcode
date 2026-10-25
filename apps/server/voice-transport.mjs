@@ -26,11 +26,11 @@ export function createVoiceTransport({server,publicOrigin,authorizeUpgrade,resol
       const auth=await bounded(Promise.resolve().then(()=>authorizeUpgrade(req)),operationTimeoutMs);
       if(closing||!plain(auth)||!id(auth.ownerId)||!Number.isSafeInteger(auth.expiresAt)||auth.expiresAt<=Date.now()||owners.has(auth.ownerId)||socket.destroyed)return reject(socket,403);
       owners.add(auth.ownerId);
-      try{wss.handleUpgrade(req,socket,head,ws=>connected(ws,auth));}catch{owners.delete(auth.ownerId);reject(socket,400);}
+      try{wss.handleUpgrade(req,socket,head,ws=>connected(ws,auth,req));}catch{owners.delete(auth.ownerId);reject(socket,400);}
     }catch{reject(socket,403);}finally{pendingUpgrades--;pendingSockets.delete(socket);}
   }
   if(registerUpgrade)server.on('upgrade',upgrade);
-  function connected(ws,auth){
+  function connected(ws,auth,req){
     const session={ws};sessions.add(session);
     let closed=false,context,requestedContext,voiceSessionId,capture,sequence=0,queue=Promise.resolve(),queuedBytes=0,queuedCount=0,rateStart=Date.now(),messageCount=0;
     const requests=new Map(),captureIds=new Set();
@@ -80,6 +80,8 @@ export function createVoiceTransport({server,publicOrigin,authorizeUpgrade,resol
         const authorizeTool=async()=>{
           const active=()=>!closed&&capture===entry&&['recording','stopped'].includes(entry.state)&&Date.now()<auth.expiresAt;
           if(!active())return false;
+          const renewed=await bounded(Promise.resolve().then(()=>authorizeUpgrade(req)),operationTimeoutMs);
+          if(!active()||renewed?.ownerId!==auth.ownerId||renewed.expiresAt<=Date.now())return false;
           const refreshed=await bounded(Promise.resolve(resolveContext({ownerId:auth.ownerId,context:structuredClone(requestedContext)})),operationTimeoutMs);
           return active()&&JSON.stringify(refreshed)===JSON.stringify(context);
         };

@@ -94,14 +94,17 @@ export function createVoiceClient({endpoint, mediaDevices = globalThis.navigator
       const result = event.result;
       if (!result || typeof result !== 'object' || Array.isArray(result) || result.executionTarget !== session.target.executionTarget || result.projectId !== session.target.projectId || result.taskId !== undefined && !id(result.taskId) || session.target.taskId && result.taskId !== session.target.taskId) return fail(session, 'invalid_event');
       clearTimeout(session.noToolTimer);session.toolPending = false;session.hasResult = true;
+      const terminal = ['completed','failed','cancelled','interrupted','waiting_approval','quarantined'].includes(result.status);
+      const rejected = ['busy','revision_conflict','offline','project_unavailable','task_hidden','task_deleted','invalid_parent','capacity','expired','request_conflict','rejected'].includes(result.status);
+      session.completionReason = result.status === 'outcome_unknown' ? 'outcome_unknown' : rejected ? 'rejected' : terminal ? 'voice_complete' : result.status === 'no_task' ? 'spoken_answer' : null;
       try {onResult(result, session.target);} catch {return fail(session, 'result_unavailable');}
     } else if (event.type === 'assistant.event' && event.captureId === session.captureId && session.writeReady) {
       if (!['start', 'sentence_start', 'stop'].includes(event.state) || event.text !== undefined && (typeof event.text !== 'string' || event.text.length > 4000)) return fail(session, 'invalid_event');
       try {onAssistant(event, session.target);} catch {}
       if (event.state !== 'stop') {clearTimeout(session.noToolTimer);if (session.phase !== 'recording') notify('speaking', null, session.target);}
       else if (session.stopped && !session.toolPending) {
-        if (session.hasResult) completeSpeech(session, 'voice_complete');
-        else if (session.finalText) {clearTimeout(session.noToolTimer);session.noToolTimer = setTimeout(() => {if (current(session) && !session.toolPending) completeSpeech(session, 'spoken_answer');}, noToolGraceMs);}
+        if (session.completionReason) completeSpeech(session, session.completionReason);
+        else if (!session.hasResult && session.finalText) {clearTimeout(session.noToolTimer);session.noToolTimer = setTimeout(() => {if (current(session) && !session.toolPending) completeSpeech(session, 'spoken_answer');}, noToolGraceMs);}
       }
     } else if (event.type === 'capture.stopped' && event.captureId === session.captureId && session.phase === 'stopping') {session.stopped = true;finish(session);}
   };

@@ -26,6 +26,11 @@ test('bound provider tool authorization expires on abort and rechecks project ow
  allowed=false;assert.equal(await options.authorizeTool(),false);allowed=true;
  c.send({type:'capture.abort',requestId:'abort',captureId:'capture-1'});await until(()=>c.messages.some(x=>x.type==='capture.aborted'));assert.equal(await options.authorizeTool(),false);c.ws.close();
 });
+test('evicted authenticated phone session cannot keep invoking voice tools',async t=>{
+ let live=true,options;
+ const f=await fixture(t,{authorizeUpgrade:()=>live?{ownerId:'user',expiresAt:Date.now()+60000}:null,providerFactory:input=>{options=input;return {async connect(){return {input:{codec:'pcm_s16le',sampleRate:16000,channels:1,frameMs:20},writeReady:true};},start(){},close(){}};}});
+ const c=await start(f);assert.equal(await options.authorizeTool(),true);live=false;assert.equal(await options.authorizeTool(),false);c.ws.close();
+});
 
 test('duplex audio uses frozen authorized context and stop never cancels a task',async t=>{const f=await fixture(t);const c=await start(f);c.ws.send(Buffer.alloc(640));await until(()=>c.messages.some(Buffer.isBuffer));assert.equal(f.providers[0].frames.length,1);assert.equal(f.providers[0].context.projectId,'allowed');assert(c.messages.some(x=>x.type==='stt.final'&&x.captureId==='capture-1'));assert(c.messages.some(x=>x.type==='capture.ready'&&x.writeReady===false));c.send({type:'capture.stop',requestId:'stop-1',captureId:'capture-1'});await until(()=>c.messages.some(x=>x.type==='capture.stopped'));assert.equal(f.providers[0].stopped,true);assert.equal(f.providers[0].closed,false);c.ws.close();});
 test('upgrade rejects unauthenticated and cross-origin clients before creating providers',async t=>{const f=await fixture(t);for(const headers of [{Origin:'http://127.0.0.1'},{Origin:'https://evil.example',Cookie:'session=good'},{Cookie:'session=good'}]){const ws=new WebSocket(f.url,{headers});ws.on('error',()=>{});const [,response]=await once(ws,'unexpected-response');assert.equal(response.statusCode,403);response.resume();ws.terminate();}assert.equal(f.providers.length,0);});

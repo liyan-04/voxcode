@@ -291,7 +291,12 @@ function saveVoiceTranscript(text,target){
 }
 function voiceExecutionTarget(){return state.executionTarget??state.executionHost??'mac';}
 function receiveVoiceResult(result,target){
- const sameTarget=voiceExecutionTarget()===target.executionTarget&&state.projectId===target.projectId&&draftKey()===target.draftKey;
+ if(result.status==='outcome_unknown'&&typeof result.operationId==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(result.operationId)){
+  const key=target.executionTarget+':'+result.operationId;
+  unknownOperations.set(key,{id:result.operationId,target:target.executionTarget});persistOperations(target.executionTarget);
+  if(target.executionTarget===state.executionTarget){unknownOperation=key;renderRecovery();$('#operation-message').textContent='操作结果未知';}
+ }
+ const sameTarget=voiceExecutionTarget()===target.executionTarget&&state.projectId===target.projectId&&(draftKey()===target.draftKey||result.taskId&&state.selected===result.taskId);
  if(!sameTarget){feedback('语音结果已返回「'+target.label+'」，当前视图保持不变。');return;}
  if(result.taskId&&['draft','queued','running','cancelling','cancelled','completed','failed','interrupted'].includes(result.status)){
   receiveTask({...result,id:result.taskId},target.projectId);

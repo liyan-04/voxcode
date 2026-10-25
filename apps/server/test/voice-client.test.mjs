@@ -330,3 +330,21 @@ test('a delayed MCP call after a spoken preamble retains the session for its rea
   wire.socket.receive({type: 'tool.started', captureId: wire.capture.captureId, seq: 6});
   await new Promise(resolve => setTimeout(resolve, 20));assert.equal(f.client.active, true);assert.equal(f.transcripts.length, 0);
 });
+
+test('nonterminal tool speech keeps the session for result queries until terminal speech', async t => {
+ for (const status of ['running','queued','draft','cancelling']) {
+  const f=fixture();t.after(()=>f.client.close());const wire=await ready(f,undefined,{writeReady:true});await f.client.stop();
+  wire.socket.receive({type:'capture.stopped',captureId:wire.capture.captureId,seq:3});
+  wire.socket.receive({type:'tool.result',captureId:wire.capture.captureId,result:{executionTarget:'mac',projectId:'project-a',taskId:'task-a',status},seq:4});
+  wire.socket.receive({type:'assistant.event',captureId:wire.capture.captureId,state:'stop',seq:5});assert.equal(f.client.active,true,status+' is not completion');
+  wire.socket.receive({type:'tool.started',captureId:wire.capture.captureId,seq:6});
+  wire.socket.receive({type:'tool.result',captureId:wire.capture.captureId,result:{executionTarget:'mac',projectId:'project-a',taskId:'task-a',status:'completed'},seq:7});
+  wire.socket.receive({type:'assistant.event',captureId:wire.capture.captureId,state:'stop',seq:8});assert.equal(f.client.active,false);assert.equal(f.states.at(-1).reason,'voice_complete');
+ }
+});
+test('unknown outcome speech ends with reconciliation reason, never success',async t=>{
+ const f=fixture();t.after(()=>f.client.close());const wire=await ready(f,undefined,{writeReady:true});await f.client.stop();
+ wire.socket.receive({type:'capture.stopped',captureId:wire.capture.captureId,seq:3});
+ wire.socket.receive({type:'tool.result',captureId:wire.capture.captureId,result:{executionTarget:'mac',projectId:'project-a',taskId:'task-a',status:'outcome_unknown',operationId:'operation-a'},seq:4});
+ wire.socket.receive({type:'assistant.event',captureId:wire.capture.captureId,state:'stop',seq:5});assert.equal(f.client.active,false);assert.equal(f.states.at(-1).reason,'outcome_unknown');
+});
