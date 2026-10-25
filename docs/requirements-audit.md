@@ -1,6 +1,6 @@
 # Requirements audit: what must actually work
 
-Current2026-10-24 update: [server execution](architecture/server-execution.md) supersedes the mandatory company-Mac and unresolved-AirPlay assumptions in the historical audit below. Native iPhone talks only to vm6; server hosts Linx and Codex. Strict TLS, phone VPN routing, signing/install, actual provider/model tasks, isolation and inspectable current-version acceptance remain gates. User-provided Linux preflight is not an authenticated model run; coordinator SSH checks did not execute because approval returned401.
+Current2026-10-25 update: [phone/mac/Linx current architecture](architecture/phone-mac-linx-current.md) supersedes the old server-only, native-phone and Relay assumptions in the historical audit below. Selected-target execution, device-MCP, real provider/model tasks, isolation and inspectable current-version acceptance remain gates. User-provided Linux preflight is not an authenticated model run; coordinator SSH checks did not execute because approval returned401.
 
 Date: 2026-10-23. This audit separates a plausible design, implemented source, fixture verification and real device verification.
 

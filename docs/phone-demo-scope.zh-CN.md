@@ -1,6 +1,6 @@
 # VoxCode 手机演示版方案
 
-> 当前范围更新（2026-10-24）：用户选择“iPhone只连接服务器，服务器接灵矽并运行本机Codex”，且不限制AirPlay协议。详见[服务器架构](architecture/server-execution.md)及[实现分工](architecture/server-execution-plan.md)。下面2026-10-23的公司Mac部署描述为历史范围；当前执行项目、依赖和检查在服务器，入口为严格TLS的`100.100.81.209:9899`（手机户外使用用户VPN）。原生签名安装、真实语音、20任务/4默认名额可配1–8、结果与人工验收要求保留。
+> 历史范围说明（2026-10-24）：本文记录旧的原生手机演示方案。当前实现以[手机、Mac 与 Linx 当前架构](architecture/phone-mac-linx-current.md)、[Mac Agent 控制面合同](architecture/mac-agent-control.md)和实际代码树为准；本文中的原生 iOS、旧 Relay、固定公网地址和草稿确认步骤不再是当前实现入口。
 
 日期：2026-10-23。用户确认“手机上打开 app 演示就可以”。本文是当前首版范围，替代早期完整方案中的网页预览、Mac 工作台和大屏必交要求。目标能力仍需实际验证，不代表已经完成。
 
