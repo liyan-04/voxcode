@@ -17,7 +17,7 @@ async function fixture({tasks = [], storage = new Map()} = {}) {
   }
   const nodes = new Map(), session = new Map(), calls = [], get = selector => {if (!nodes.has(selector)) nodes.set(selector, new Node());return nodes.get(selector);};
   const store = values => ({getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, String(value)), removeItem: key => values.delete(key)});
-  const context = vm.createContext({console, structuredClone, Date, Math, performance, setTimeout, clearTimeout, setInterval() {}, clearInterval() {}, crypto: {randomUUID: () => 'fixture-id'}, localStorage: store(storage), sessionStorage: store(session),
+  const context = vm.createContext({console, structuredClone, Date, Math, performance, URLSearchParams, setTimeout, clearTimeout, setInterval() {}, clearInterval() {}, crypto: {randomUUID: () => 'fixture-id'}, localStorage: store(storage), sessionStorage: store(session),
     document: {querySelector: get, querySelectorAll: () => [], createElement: () => new Node(), createElementNS: () => new Node(), addEventListener() {}, body: new Node()}, window: {addEventListener() {}, innerWidth: 1440, innerHeight: 900},
     fetch: async (path, options = {}) => {
       calls.push({path, method: options.method ?? 'GET'});
@@ -28,7 +28,7 @@ async function fixture({tasks = [], storage = new Map()} = {}) {
   vm.runInContext(html.split('<script>')[1].split('</script>')[0], context);
   const run = source => vm.runInContext(source, context);
   context.fixtureTasks = structuredClone(tasks);
-  run("state.authenticated=true;state.projects=[{id:'a',name:'Alpha',enabled:true},{id:'b',name:'Beta',enabled:true}];state.tasks=fixtureTasks;state.projectId='a';render();");
+  run("state.authenticated=true;state.inventoryKnown=true;state.targets=[{id:'mac',configured:true,online:true,available:true}];state.projects=[{id:'a',name:'Alpha',enabled:true},{id:'b',name:'Beta',enabled:true}];state.tasks=fixtureTasks;state.projectId='a';render();");
   return {run, get, calls, storage, session, setTasks: rows => {context.fixtureTasks = structuredClone(rows);run('state.tasks=fixtureTasks;render()');}, ids: () => get('#task-tabs').children.map(row => row.getAttribute('data-task-id')).filter(Boolean)};
 }
 const task = (id, projectId, extra = {}) => ({id, projectId, title: 'Fixture ' + id, status: 'completed', createdAt: '2026-10-20T00:00:00Z', ...extra});
@@ -40,7 +40,7 @@ test('default project selection contributes every task without an opened-tab cap
 });
 test('explicit multi-selection and no selection persist without changing current target or saved draft', async () => {
   const tasks = [task('a1', 'a'), task('b1', 'b')], storage = new Map(), f = await fixture({tasks, storage});
-  f.run("$('#composer-input').value='Alpha draft';setTabProject('a',false)");assert.deepEqual(f.ids(), ['b1']);assert.equal(f.run('state.projectId'), 'a');assert.equal(f.session.get('voxcode:draft:a::new:'), 'Alpha draft');
+  f.run("$('#composer-input').value='Alpha draft';setTabProject('a',false)");assert.deepEqual(f.ids(), ['b1']);assert.equal(f.run('state.projectId'), 'a');assert.equal(f.session.get('voxcode:draft:mac::a::new:'), 'Alpha draft');
   f.run("setTabProject('b',false)");assert.deepEqual(f.ids(), []);assert.match(f.get('#task-tabs').children[0].textContent, /选择项目/);
   const reloaded = await fixture({tasks, storage});assert.deepEqual(reloaded.ids(), []);assert.equal(reloaded.run('state.tabProjects.size'), 0);
   reloaded.run("setTabProject('a',true);setTabProject('b',true)");assert.deepEqual(reloaded.ids(), ['a1', 'b1']);
@@ -74,8 +74,8 @@ test('active archive and trash classes apply equally to all selected project tab
 test('switching selected tabs preserves draft text and a frozen voice target', async () => {
   const f = await fixture({tasks: [task('a1', 'a'), task('b1', 'b')]});
   f.run("openTarget({projectId:'a',selected:'a1'},{fetch:false});$('#composer-input').value='Task A input';voiceClient={active:true};voiceStatus={state:'recording',target:{draftKey:draftKey()}};openTarget({projectId:'b',selected:'b1'},{fetch:false})");
-  assert.equal(f.session.get('voxcode:draft:a::a1'), 'Task A input');assert.equal(f.run('voiceStatus.target.draftKey'), 'a::a1');
-  f.run("$('#composer-input').value='Task B input';setTabProject('a',false);setTabProject('a',true);openTarget({projectId:'a',selected:'a1'},{fetch:false})");assert.equal(f.get('#composer-input').value, 'Task A input');assert.equal(f.session.get('voxcode:draft:b::b1'), 'Task B input');
+  assert.equal(f.session.get('voxcode:draft:mac::a::a1'), 'Task A input');assert.equal(f.run('voiceStatus.target.draftKey'), 'mac::a::a1');
+  f.run("$('#composer-input').value='Task B input';setTabProject('a',false);setTabProject('a',true);openTarget({projectId:'a',selected:'a1'},{fetch:false})");assert.equal(f.get('#composer-input').value, 'Task A input');assert.equal(f.session.get('voxcode:draft:mac::b::b1'), 'Task B input');
 });
 test('overflow controls reflect scroll position and move the visible task strip', async () => {
   const f = await fixture({tasks: [task('a1', 'a')]}), box = f.get('#task-tabs');box.clientWidth = 400;box.scrollWidth = 1600;

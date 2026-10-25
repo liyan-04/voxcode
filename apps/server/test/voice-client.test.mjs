@@ -56,6 +56,13 @@ test('voice capture freezes context and sends PCM only after negotiated readines
   const sent = wire.socket.sent.length;wire.worklet.port.onmessage?.({data: new ArrayBuffer(640)});assert.equal(wire.socket.sent.length, sent);
   assert.equal(f.track.stopped, true);assert.equal(Audio.instances.at(-1).closed, true);
 });
+test('voice wire context freezes the execution target and defaults legacy callers to Mac', async t => {
+ const legacy=fixture();t.after(()=>legacy.client.close());const old=await ready(legacy);assert.equal(old.session.context.executionTarget,'mac');
+ const f=fixture();t.after(()=>f.client.close());const target={executionTarget:'server',projectId:'same',taskId:'one',draftKey:'server::same::one'};const wire=await ready(f,target);target.executionTarget='mac';assert.equal(wire.session.context.executionTarget,'server');await f.client.stop();wire.socket.receive({type:'capture.stopped',captureId:wire.capture.captureId,seq:3});wire.socket.receive({type:'stt.final',captureId:wire.capture.captureId,text:'server transcript',seq:4});assert.equal(f.transcripts[0].target.executionTarget,'server');
+});
+test('unknown execution targets reject before opening voice resources', async()=>{
+ const f=fixture();for(const executionTarget of ['other','',null,{},'server?mac'])await assert.rejects(f.client.start({executionTarget,projectId:'same',draftKey:'same::new'}),/fixed voice draft target/);assert.equal(f.client.active,false);
+});
 test('only the latest matching final is committed to the original draft after stopping', async t => {
   const f = fixture();t.after(() => f.client.close());const wire = await ready(f);
   wire.socket.receive({type: 'stt.final', captureId: 'other', text: 'wrong task', seq: 3});

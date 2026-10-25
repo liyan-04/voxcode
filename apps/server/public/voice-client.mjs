@@ -65,8 +65,8 @@ export function createVoiceClient({endpoint, mediaDevices = globalThis.navigator
   };
   async function start(target) {
     if (active) return false;
-    if (!id(target?.projectId) || typeof target.draftKey !== 'string' || !target.draftKey.length || target.draftKey.length > 512 || /[\x00-\x1f\x7f]/u.test(target.draftKey) || target.taskId !== undefined && !id(target.taskId) || target.parentTaskId !== undefined && !id(target.parentTaskId) || target.taskId && target.parentTaskId) throw Error('A fixed voice draft target is required');
-    const session = {target: Object.freeze({...target}), contextVersion: ++contextVersion, sessionRequestId: uuid(), captureId: uuid(), phase: 'permission', lastSeq: -1, frames: 0, finalText: '', stopped: false};
+    if (!id(target?.projectId) || target.executionTarget !== undefined && !['mac', 'server'].includes(target.executionTarget) || typeof target.draftKey !== 'string' || !target.draftKey.length || target.draftKey.length > 512 || /[\x00-\x1f\x7f]/u.test(target.draftKey) || target.taskId !== undefined && !id(target.taskId) || target.parentTaskId !== undefined && !id(target.parentTaskId) || target.taskId && target.parentTaskId) throw Error('A fixed voice draft target is required');
+    const session = {target: Object.freeze({...target, executionTarget: target.executionTarget ?? 'mac'}), contextVersion: ++contextVersion, sessionRequestId: uuid(), captureId: uuid(), phase: 'permission', lastSeq: -1, frames: 0, finalText: '', stopped: false};
     session.ready = new Promise(resolve => {session.resolveReady = resolve;});session.cancelled = new Promise(resolve => {session.cancel = resolve;});
     const live = promise => Promise.race([promise, session.cancelled.then(() => {throw stopped();})]);
     active = session;notify('permission', null, session.target);
@@ -92,7 +92,7 @@ export function createVoiceClient({endpoint, mediaDevices = globalThis.navigator
       session.phase = 'session';notify('connecting', null, session.target);
       session.socket = new WebSocketImpl(url.href);session.socket.binaryType = 'arraybuffer';
       session.socket.onopen = () => {
-        const context = {projectId: session.target.projectId, contextVersion: session.contextVersion, ...(session.target.taskId ? {taskId: session.target.taskId} : {}), ...(session.target.parentTaskId ? {parentTaskId: session.target.parentTaskId} : {})};
+        const context = {executionTarget: session.target.executionTarget, projectId: session.target.projectId, contextVersion: session.contextVersion, ...(session.target.taskId ? {taskId: session.target.taskId} : {}), ...(session.target.parentTaskId ? {parentTaskId: session.target.parentTaskId} : {})};
         try {send(session, {type: 'session.start', requestId: session.sessionRequestId, context});} catch {fail(session, 'connection_failed');}
       };
       session.socket.onmessage = event => receive(session, event.data);
