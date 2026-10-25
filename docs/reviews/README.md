@@ -24,7 +24,7 @@ initial reviews below apply only to their original snapshots.
 
 ## Phone-demo scope and architect role
 
-Two independent document-only [reviews](phone-demo-scope.md) cover the scope reduction and architect coordination rules. Three findings were fixed; both targeted rereviews reported no residual findings or conflicts. These checks do not approve the implementations above. The architect's [ARCH-003 checkpoint](../architecture/checkpoint-2026-10-24.md) is additional to component reviews. The original Relay security reviewer was unavailable for final Mac follow-up; an independent platform/security reviewer completed it. The iOS reviewer reported the voice criteria defect, then final second voice review was reassigned to that independent reviewer while iOS closed its own fixes. Implementers did not approve their own components.
+Two independent document-only [reviews](phone-demo-scope.md) cover the historical scope reduction and architect coordination rules. Three findings were fixed; both targeted rereviews reported no residual findings or conflicts. These checks do not approve the implementations above. The dated ARCH-003 checkpoint was historical integration evidence and has been removed from the current architecture entry points. The original Relay security reviewer was unavailable for final Mac follow-up; an independent platform/security reviewer completed it. The iOS reviewer reported the voice criteria defect, then final second voice review was reassigned to that independent reviewer while iOS closed its own fixes. Implementers did not approve their own components.
 
 ## Historical initial reports
 

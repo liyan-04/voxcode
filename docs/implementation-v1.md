@@ -1,12 +1,14 @@
-# Approved MVP Implementation Plan
+# Historical MVP Implementation Plan
 
-> 2026-10-24 scope update: [server architecture](architecture/server-execution.md) and [the server implementation plan](architecture/server-execution-plan.md) govern current work. Native iPhone connects only to vm6; server-hosted Linx and Codex replace the mandatory company-Mac execution path. AirPlay is not a user constraint. Tasks55–57 own server delivery, iOS adaptation and current Linx protocol; historical Mac/deferred-deployment/base-branch wording below is retained for prior implementation evidence, not current instructions. All new PRs target master. Actual Linux/live/signed-device/outdoor acceptance is still required.
+> Current scope: [current architecture](architecture/current.md), [the workspace contract](architecture/voice-code-workspace-contract.md) and [task/history boundaries](architecture/task-state-and-history.md) govern work in `apps/server`. The protected Unix-socket task runtime is the current executable boundary; HTTP/MCP and browser voice modules remain separately composable and require live acceptance. Historical phone-demo, Mac, Relay and native iOS wording below is retained only as prior evidence, not current setup guidance.
 
-> For agentic workers: use subagent-driven-development. A dedicated architect coordinates the iOS, Mac and Relay developers; see docs/architecture/README.md. Coordinator owns shared contract application, integration and commits. User approved continuation on 2026-10-23; deployment remains deferred.
+> For agentic workers: use the repository Issue/PR workflow and the current architecture index at `docs/architecture/README.md`. The coordinator owns shared contract application, integration and commits. Deployment and live acceptance remain separate gates.
 
-**Goal:** Complete the native phone-to-Mac voice development and evidence loop under the approved scope.
-**Architecture:** Native SwiftUI app, one public relay and one Mac launch entry point containing the outbound connector/task/result modules. Codex App Server and Linx AI remain dependencies. Interactive generated-site preview and a full Mac workbench are deferred.
-**Tech Stack:** Node >=22, SwiftUI iOS 17+, Codex App Server, PCM/Opus, pinned dependencies.
+> The detailed task lists below are retained as historical evidence from the phone-demo work. They do not define current writable paths or runtime behavior; use `docs/architecture/current.md` and `docs/architecture/voice-code-workspace-contract.md` for current work.
+
+**Goal:** Complete the server-hosted task workspace and its evidence loop under the current contract.
+**Architecture:** Protected `apps/server/task-cli.mjs` runtime backed by Codex CLI, with separately composable HTTP/MCP modules and the browser voice workspace contract. Interactive preview, multi-tenant isolation and live deployment remain explicit follow-up gates.
+**Tech Stack:** Node.js 22+, Codex CLI, server-side Linx integration, pinned dependencies.
 **Spec:** docs/phone-demo-scope.zh-CN.md supersedes the historical broader proposal. Interfaces: docs/contract.md v1, using the phone-demo subset; preview routes are deferred.
 
 ## Global Constraints

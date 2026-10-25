@@ -1,6 +1,6 @@
 # Contributing to VoxCode
 
-Applies equally to humans, the coordinator and AI workers. Read [AGENTS.md](AGENTS.md), the approved [implementation plan](docs/implementation-v1.md) and [agent workflow](docs/agent-collaboration.md) before editing. User instructions take precedence; record material scope changes in the plan or a decision record.
+Applies equally to humans, the coordinator and AI workers. Read [AGENTS.md](AGENTS.md), the [current architecture](docs/architecture/current.md), the [workspace contract](docs/architecture/voice-code-workspace-contract.md) and [agent workflow](docs/agent-collaboration.md) before editing. User instructions take precedence; record material scope changes in a decision record.
 
 ## Branches and change boundaries
 

@@ -2,13 +2,13 @@
 
 This file is coordinator-owned. Implementers propose changes before changing a shared field.
 
-Current delivery scope: docs/phone-demo-scope.zh-CN.md. The first demo uses native task/results/voice views. Preview routes, preview cookie transport, WKWebView and onPreview publication below are reserved future interfaces, not phone-demo implementation or acceptance requirements; optional preview fields may remain null.
+Current delivery scope: [current architecture](architecture/current.md), the [browser voice workspace contract](architecture/voice-code-workspace-contract.md) and [task/history boundaries](architecture/task-state-and-history.md). The current executable boundary is the protected server task runtime; HTTP, MCP and voice modules are separately composable and must not be described as deployed until live acceptance exists.
 
-Current deployment: [server execution](architecture/server-execution.md). Native iPhone connects only to the server; the same server hosts Relay, the existing loopback Bridge/Connector/voice runtime and local stdio Codex. Historical “Mac” module/metric wording below identifies this retained execution runtime, not a required separate company Mac. HTTP shapes and authentication are unchanged. Linx uses the current documented WebSocket plus device-MCP protocol with a server-hosted software device; it is distinct from cloud HTTP/SSE MCP and third-party business SSE callbacks. No callback identity header is user authorization.
+The server owns the Codex CLI, project authorization and provider credentials. Browser clients use the authenticated server APIs defined below; they do not connect directly to Codex or Linx. Historical phone-demo, Mac, Relay and native iOS transport designs were removed from the architecture entry points and remain only in dated review records.
 
-## Phone duplex WSS
+## Voice transport
 
-Required current design: [phone-duplex-wss.md](architecture/phone-duplex-wss.md), Issue62. Authenticated `/api/stream` carries simultaneous audio and real task/voice event pushes; HTTPS below retains pairing, durable mutations, full snapshots and evidence. This is a pending protocol extension, not implemented by the existing HTTP audio/event routes or the separate machine `/connector` WSS. The design freezes authentication, ordering, replay, limits, interruption and disconnect behavior before implementation.
+The browser voice session, context binding and MCP correlation rules are defined by [the workspace contract](architecture/voice-code-workspace-contract.md). Do not revive the removed native-phone or Relay-specific stream designs from historical documents.
 
 ## HTTP
 All `/api/*` except health and pair require `Authorization: Bearer <sessionToken>`.
@@ -17,7 +17,7 @@ JSON errors: `{ "error": { "code": "string", "message": "string" } }`.
 - GET /api/health -> `{name:"VoxCode", version:"0.1.0", codexAvailable:boolean, voiceConfigured:boolean}`; no secrets.
 - POST /api/pair `{code:string}` -> `{sessionToken:string}`. Expiring local pairing code, rate limited.
 - GET /api/settings -> `Settings` (authenticated).
-- GET /api/monitor -> `MonitorSnapshot` (authenticated; fixed loopback Mac origin, optionally forwarded through the paired Relay/Connector).
+- GET /api/monitor -> `MonitorSnapshot` (authenticated server aggregate; availability and freshness must be explicit).
 - POST /api/settings `{requestId,executionLimit}` -> `Settings`; durable replay, integer 1–8. Default four. Lowering does not stop existing turns.
 - GET /api/tasks -> `{tasks:Task[]}`.
 - POST /api/tasks `{requestId,title,prompt}` -> `{task:Task}`. Selected server project only.
@@ -30,7 +30,7 @@ JSON errors: `{ "error": { "code": "string", "message": "string" } }`.
 - POST /api/tasks/:id/criteria/:criterionId `{requestId,version,decision:"pass"|"fail",note?}` -> `{task:Task}`; manual criteria only, completed current version. Reject accept while required criteria remain failed/unverified.
 
 Settings: `{executionLimit:integer,maxExecutionLimit:8,maxTasks:32,activeExecutions:integer,queuedTasks:integer,recoveryRequired:boolean}`.
-MonitorSnapshot: `{generatedAt:ISODate,uptimeSeconds:number,executionLimit:integer,maxTasks:32,activeExecutions:integer,recoveryRequired:boolean,counts:{queued,running,waiting_approval,waiting_input,stopping,interrupted,failed,completed,accepted},memory:{rssBytes:integer,heapUsedBytes:integer}}`. Counts are nonnegative integers; completed excludes accepted tasks. Use actual task-state names from design.md for the counts, including zero values. These are current aggregates, not durable throughput counters. Do not include task IDs/titles, prompts, paths, raw events, credentials or per-task labels. The native status page obtains this JSON through existing paired authorization. Add optional `readiness:{codexAvailable:boolean,voiceConfigured:boolean}` (presence/configuration only, never proof of a successful live model/voice session) and Relay-only optional `relay:{connected:boolean,uptimeSeconds:number,inFlight:integer,requestsTotal:integer,responsesTotal:integer,errorsTotal:integer,timeoutsTotal:integer,latencySamples:integer,latencyP50Ms:number|null,latencyP95Ms:number|null}`. Relay adds its metrics only after a successful authorized Mac monitor response and projects the fixed Mac fields. Counters restart with Relay: requestsTotal counts finished HTTP responses including public/rejected/offline requests, responsesTotal counts <400, errorsTotal counts >=400, timeoutsTotal counts504. Durations use monotonic ingress-to-finish times over the last128 finished HTTP requests; they are not speech/model/network-only latency. Offline requests return existing errors. The phone retains stale/unknown labeling on failure and clears metrics on identity/simulation changes. See [phone monitor design](architecture/phone-monitor.md).
+MonitorSnapshot: `{generatedAt:ISODate,uptimeSeconds:number,executionLimit:integer,maxTasks:32,activeExecutions:integer,recoveryRequired:boolean,counts:{queued,running,waiting_approval,waiting_input,stopping,interrupted,failed,completed,accepted},memory:{rssBytes:integer,heapUsedBytes:integer}}`. Counts are nonnegative integers; completed excludes accepted tasks. These are current server aggregates, not durable throughput counters. Do not include task IDs/titles, prompts, paths, raw events, credentials or per-task labels. Readiness means configuration presence only, never proof of a successful live model or voice session. A failed read must be visibly stale/unknown and must not erase an otherwise valid task snapshot.
 Create/follow-up bodies may additionally include `criteria:[{text:string,required?:boolean}]` (1–12 items, text <=500 characters). Omitted create criteria produces one manual criterion: confirm the requested result against evidence. Omitted follow-up criteria carries forward the prior conditions with unverified status for the new version.
 
 ## Shapes
