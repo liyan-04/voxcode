@@ -126,6 +126,17 @@ test('Linux adopts only an inspected bootstrap installation with the exact commi
  await f.execute('adopt',{bundle:f.bundle});assert.equal((await f.execute('status')).installed,true);
 });
 
+test('Linux adoption accepts the legacy unit safety directives used by the vm6 bootstrap',async t=>{
+ const f=await fixture(t);await f.execute('install',{bundle:f.bundle});await f.execute('start');
+ await fs.unlink(join(f.config.root,'deployment-state.json'));
+ await fs.writeFile(join(f.config.root,'deployment.json'),JSON.stringify({format:'voxcode-control-bootstrap-v1',revision,service:'voxcode-control.service',serviceUser:'voxcode-control',state:'started'}),{mode:0o600});
+ const unit=join(f.base,'units','voxcode-control.service');
+ const text=await fs.readFile(unit,'utf8');
+ await fs.writeFile(unit,text.replace('Environment=VOXCODE_CONTROL_CONFIG=',`Environment=PATH=${dirname(f.config.node)}:/usr/sbin:/usr/bin:/sbin:/bin\nEnvironment=VOXCODE_CONTROL_CONFIG=`).replace('RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6','RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6\nCapabilityBoundingSet='));
+ await f.execute('adopt',{bundle:f.bundle});
+ assert.equal((await f.execute('status')).installed,true);
+});
+
 test('Linux stop remains available when TLS configuration needs repair',async t=>{
  const f=await fixture(t);await f.execute('install',{bundle:f.bundle});await f.execute('start');
  await fs.writeFile(f.controlConfig,JSON.stringify({...f.control,publicOrigin:'http://127.0.0.1:9899'}));

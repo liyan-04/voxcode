@@ -8,6 +8,12 @@ import {canonical,createLifecycle,exists,inventory,isMain,readJson,runLifecycleC
 import {sha256} from './package.mjs';
 
 export const service='voxcode-control.service';
+function legacyPathValue(ctx,value){
+ if(!value.startsWith('PATH='))return false;
+ const allowed=new Set([dirname(ctx.node),'/usr/sbin','/usr/bin','/sbin','/bin']);
+ const entries=value.slice('PATH='.length).split(':');
+ return entries.length>0&&entries.every(entry=>allowed.has(entry));
+}
 async function processIdentity(pid){
  const info=await fs.stat(`/proc/${pid}`);return {uid:info.uid,exe:await fs.realpath(`/proc/${pid}/exe`),args:(await fs.readFile(`/proc/${pid}/cmdline`)).toString().split('\0').filter(Boolean)};
 }
@@ -86,7 +92,7 @@ export function createLinuxController({run,unitDirectory='/etc/systemd/system',h
    if(await fs.realpath(join(ctx.root,'current'))!==release)throw Error('Adoption source identity mismatch');
    for(const [name,bytes] of source.files){if(name.startsWith('apps/mac-agent/'))continue;await trusted(join(release,name));if(sha256(await fs.readFile(join(release,name)))!==sha256(bytes))throw Error('Adoption source checksum mismatch');}
    await trusted(unit);const text=await fs.readFile(unit,'utf8');
-   const allowed={Unit:['Description','After','Wants'],Service:['Type','User','Group','WorkingDirectory','Environment','ExecStart','Restart','RestartSec','TimeoutStopSec','KillMode','UMask','NoNewPrivileges','PrivateTmp','ProtectSystem','ProtectHome','ReadWritePaths','ReadOnlyPaths','RestrictAddressFamilies'],Install:['WantedBy']};
+   const allowed={Unit:['Description','After','Wants'],Service:['Type','User','Group','WorkingDirectory','Environment','ExecStart','Restart','RestartSec','TimeoutStopSec','KillMode','UMask','NoNewPrivileges','PrivateTmp','ProtectSystem','ProtectHome','ReadWritePaths','ReadOnlyPaths','RestrictAddressFamilies','CapabilityBoundingSet'],Install:['WantedBy']};
    let section;const values={};
    for(const raw of text.split('\n')){
     const line=raw.trim();if(!line||line.startsWith('#'))continue;
@@ -96,7 +102,11 @@ export function createLinuxController({run,unitDirectory='/etc/systemd/system',h
     (values[key]??=[]).push(value);
    }
    const one=key=>values[key]?.length===1?values[key][0]:null;
-   if(one('User')!==ctx.serviceUser||![ctx.serviceUser,String(ctx.serviceGid)].includes(one('Group'))||one('WorkingDirectory')!==join(ctx.root,'current')||![`${ctx.node} ${release}/apps/server/control-cli.mjs start`,`${ctx.node} ${ctx.root}/current/apps/server/control-cli.mjs start`].includes(one('ExecStart'))||!values.Environment?.includes(`VOXCODE_CONTROL_CONFIG=${ctx.controlConfig}`)||values.Environment.some(value=>![`VOXCODE_CONTROL_CONFIG=${ctx.controlConfig}`,'HOME=/var/lib/voxcode-control'].includes(value)))throw Error('Adoption service identity mismatch');
+   const environments=values.Environment??[];
+   const identityValid=one('User')===ctx.serviceUser&&[ctx.serviceUser,String(ctx.serviceGid)].includes(one('Group'))&&one('WorkingDirectory')===join(ctx.root,'current')&&[`${ctx.node} ${release}/apps/server/control-cli.mjs start`,`${ctx.node} ${ctx.root}/current/apps/server/control-cli.mjs start`].includes(one('ExecStart'));
+   const environmentValid=environments.includes(`VOXCODE_CONTROL_CONFIG=${ctx.controlConfig}`)&&environments.every(value=>[`VOXCODE_CONTROL_CONFIG=${ctx.controlConfig}`,'HOME=/var/lib/voxcode-control'].includes(value)||legacyPathValue(ctx,value));
+   const capabilityValid=values.CapabilityBoundingSet===undefined||one('CapabilityBoundingSet')==='';
+   if(!identityValid||!environmentValid||!capabilityValid)throw Error('Adoption service identity mismatch');
    for(const value of [...values.ReadWritePaths??[],...values.ReadOnlyPaths??[]])for(const part of value.match(/"[^"]+"|\S+/gu)??[]){const path=part.replace(/^"|"$/gu,'');if(![ctx.stateDirectory,dirname(ctx.controlConfig),'/var/lib/voxcode-control'].includes(path))throw Error('Unreviewed writable/readable unit path blocks adoption');}
    for(const module of driver.dependencyModules){
     const lock=JSON.parse(await fs.readFile(join(release,module,'package-lock.json')));
