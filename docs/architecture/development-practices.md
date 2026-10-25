@@ -45,7 +45,7 @@ Then：草稿及提交仍绑定录音时的 A/v；B 不收到这条指令。
 
 ## 3. 契约优先：先对齐边界，再并行实现
 
-[docs/contract.md](../contract.md) 是共享接口的权威入口。架构师提出变更，协调者修改共享文件并组织受影响端确认；端侧不得各自发明不兼容字段。变更先形成可引用的契约 revision，再安排并行消费者；依赖未就绪时使用显式标注的 fixture/adapter。
+[voice-code-workspace-contract.md](voice-code-workspace-contract.md) 是当前共享接口的权威入口；`docs/contract.md` 只保留旧 v1 路由作为历史兼容记录。架构师提出变更，协调者修改共享文件并组织受影响消费者确认；各入口不得发明不兼容字段。变更先形成可引用的契约 revision，再安排并行消费者；依赖未就绪时使用显式标注的 fixture/adapter。
 
 跨端任务在 Issue 或契约 PR 中回答：
 

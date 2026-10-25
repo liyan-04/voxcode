@@ -4,7 +4,7 @@ Use [Issue collaboration](issue-collaboration.md) for task ownership, dependenci
 
 ## Start with a bounded task
 
-Read `AGENTS.md`, `CONTRIBUTING.md`, the active implementation plan and relevant contract before editing. Use concise task/decision records, not private chains of thought.
+Read `AGENTS.md`, `CONTRIBUTING.md`, `docs/architecture/current.md`, the workspace contract and relevant implementation notes before editing. Use concise task/decision records, not private chains of thought.
 
 The current topology is the server-only task workspace described in [current architecture](architecture/current.md): `apps/server/task-cli.mjs` owns the protected task runtime, while the HTTP/MCP modules and browser voice contract are composed separately and remain subject to live acceptance. Retained Mac, Relay and native iOS names below are historical ownership labels. The final integration branch is `master`. Start new isolated topic work from current `origin/master` and target PRs at `master`. A retained dirty worktree on a retired branch is a recovery snapshot, not a base for new work; preserve its files and port only reviewed differences into a fresh topic branch.
 
@@ -29,7 +29,7 @@ Keep tasks small enough to verify independently. Parallelize independent paths; 
 | --- | --- |
 | Human product owner | Requirements, scope tradeoffs, final acceptance and authorized external actions |
 | Coordinator | Product/user communication, shared-file integration, ownership enforcement, reproducible verification, scoped commits/PRs |
-| Architect agent | Coordinate the three developers: technical decomposition, interface/dependency decisions, blockers, cross-component checks and integration recommendations |
+| Architect agent | Coordinate server/runtime documentation, interface/dependency decisions, blockers, cross-component checks and integration recommendations |
 | Implementer | Assigned paths, meaningful checks, concise handoff; surface uncertainty and blockers |
 | Independent reviewer | Inspect requirements/code/evidence, report defects and residual risk; do not self-approve |
 
@@ -37,21 +37,20 @@ The user has authorized parallel agent development for this project. Keep concur
 
 The user additionally requires a PR at every verifiable milestone. Follow [milestone publication](milestones.md): the coordinator publishes a scoped Draft PR after relevant checks pass, identifying the implementation agent, primary Issue, task and pending reviews. Review proceeds on that visible snapshot; do not wait until all components finish to publish a combined PR. Keep the source PR draft until the two independent review gates are resolved.
 
-The architect directs the existing iOS, Mac and Relay agents through bounded task briefs and receives their handoffs. See [architect role](architecture/README.md). Contract changes are proposed by the architect and applied to shared files by the coordinator before affected developers proceed. The architect's cross-component check is additional to each component's two independent reviews.
+The architect maintains the current server/runtime documentation and receives bounded implementation handoffs. See [architecture index](architecture/README.md). Contract changes are proposed by the architect and applied to shared files by the coordinator before affected consumers proceed. Architecture checks are additional to required reviews.
 
-Agent roles do not require every agent to stay active continuously. This session has four execution slots including the coordinator: while the architect is actively coordinating, at most two developers can execute; after a checkpoint the architect can become idle so all three developers run concurrently. Never create duplicate workers or silently drop a developer to work around the limit.
+Agent roles do not require every agent to stay active continuously. Respect the available collaboration slots and the server runtime's separate execution-slot policy; never conflate the two.
 
-The user requires independent worktrees for each developer. The coordinator migrates the retained component snapshots into separate component branches/worktrees and keeps the original shared checkout intact. Workers must never run staging, commit, stash, checkout/switch, reset, cleanup or push commands; they may inspect status/diffs. Only the coordinator performs Git mutations. Never remove another agent's untracked files.
+Independent implementation work uses separate worktrees when paths can be isolated. Workers must never run staging, commit, stash, checkout/switch, reset, cleanup or push commands; they may inspect status/diffs. Only the coordinator performs Git mutations. Never remove another agent's untracked files.
 
-Current write boundaries (2026-10-23; update before reallocating):
+Current write boundaries (update before reallocating):
 
 | Owner | Exclusive paths / task |
 | --- | --- |
-| iOS worker | `apps/ios/**`; native task/voice/transport/results UI and core tests |
-| Mac worker | `apps/mac/**`; scheduling, persistent sessions, evidence and acceptance |
-| Relay worker | `apps/relay/**`, `scripts/create-local-tls.*`; TLS and bounded core transport |
-| Architect | Assigned `docs/architecture/**` coordination records; no implementation/shared-contract/Git mutations |
-| Coordinator | Shared docs/contracts/CI, `apps/integration/**`, `packages/voice/**`, benchmark scripts/reports and demo; allocate later audio work explicitly; `apps/preview/**` deferred |
+| Server/runtime worker | `apps/server/**`; task runtime, HTTP/MCP modules, adapters and tests |
+| Voice/workspace worker | Current voice/workspace implementation paths assigned by Issue; provider and browser contracts remain shared interfaces |
+| Architect | `docs/**` architecture and delivery consistency; no implementation/shared-contract/Git mutations without coordinator allocation |
+| Coordinator | Shared docs/contracts, integration, package policy, verification and Git/PR authority |
 
 This table is a coordination record, not a CI-enforced access control list. A worker needing another path sends the coordinator a proposed change and waits for ownership reassignment. Shared documentation is updated from handoffs by the coordinator. Every handoff names actual changed paths so integration can detect overlap.
 
@@ -95,10 +94,10 @@ Before committing, the coordinator stages explicit paths, inspects the staged di
 | `fixture` | Specific behavior against controlled fake dependencies |
 | `local` | Code/tests/build executed locally; name real versus substituted dependencies |
 | `live` | Named real Codex/Linx service was exercised successfully |
-| `device` | Signed native app tested on a named class of iPhone/iOS version |
-| `outdoor` | Real phone cellular/company-Mac path tested through the deployed relay |
+| `device` | A separately authorized client/device environment was tested |
+| `phone-live` | A real phone/browser path was tested against the deployed server |
 
-Use the exact command, result/count, environment and revision. Failed and skipped checks remain visible. A successful unsigned simulator build is not an installable signed IPA. "Implemented", "reviewed", "live-tested" and "accepted" are separate states. Do not invent percentages or equate agent completion with product acceptance.
+Use the exact command, result/count, environment and revision. Failed and skipped checks remain visible. Local or fixture output is not deployed phone-live evidence. "Implemented", "reviewed", "live-tested" and "accepted" are separate states. Do not invent percentages or equate agent completion with product acceptance.
 
 Record durable progress/decisions in `docs/`; keep volatile coordination brief. At interruption, leave a resumable handoff with uncommitted paths, last command/result, pending gates and next step. Retain the original objective and latest user corrections across context changes.
 

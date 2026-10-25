@@ -1,6 +1,8 @@
-# Shared contract v1
+# Historical shared contract v1
 
 This file is coordinator-owned. Implementers propose changes before changing a shared field.
+
+> This v1 route sketch is retained for historical compatibility evidence. The current contract is [voice-code-workspace-contract.md](architecture/voice-code-workspace-contract.md), and the current implementation boundary is [current.md](architecture/current.md). Do not add new code from the legacy routes below without reconciling it with those documents and `apps/server/http-server.mjs`.
 
 Current delivery scope: [current architecture](architecture/current.md), the [browser voice workspace contract](architecture/voice-code-workspace-contract.md) and [task/history boundaries](architecture/task-state-and-history.md). The current executable boundary is the protected server task runtime; HTTP, MCP and voice modules are separately composable and must not be described as deployed until live acceptance exists.
 
