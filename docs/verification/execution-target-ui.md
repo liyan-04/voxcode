@@ -118,7 +118,7 @@ workspace failures overwriting current feedback, then passed after correction.
 node --test apps/server/test/execution-target-ui.test.mjs apps/server/test/workspace-conversations.test.mjs apps/server/test/project-task-tabs.test.mjs apps/server/test/voice-composer.test.mjs apps/server/test/http-server.test.mjs apps/server/test/voice-client.test.mjs
 ```
 
-Final result: 90 passed, 0 failed/cancelled/skipped. This includes 15 page
+Initial selector freeze: 90 passed, 0 failed/cancelled/skipped. This includes 15 page
 regressions, legacy unknown-operation migration, frozen voice context
 validation and the existing loss-of-
 acknowledgement recovery tests. A broader server-suite attempt stopped on
@@ -155,7 +155,45 @@ recovered archive payloads and restore legacy Mac unknown-operation records;
 the focused unit run was repeated after those edits. The recorded four-
 viewport browser run precedes these final small changes.
 
-Independent final review, publication, backend integration, installed-service
-verification and physical-phone acceptance remain coordinator gates. No
-backend, credentials, Git operations or installed services were changed by
+### Metadata Conflict Follow-Up
+
+Independent review reproduced a sticky archive action on the integrated
+`9475435` base: an explicit HTTP 409 `revision_conflict` retained the rejected
+metadata revision/requestId forever, even after polling obtained a newer
+snapshot. Only that typed rejection now clears its pending record durably.
+The next explicit action uses the refreshed metadata revision and a new
+requestId; there is no automatic second dispatch.
+
+Network failures, `outcome_unknown`, `request_conflict` and an untyped 409 keep
+the exact original payload/requestId. If persisting removal fails after either
+a typed rejection or a successful response, the original in-memory record is
+restored as uncertain before any further explicit retry.
+
+Three focused page regressions first produced two failures: the rejected record
+remained sticky, and successful-response storage cleanup lost the original RAM
+identity. After the narrow taskAction fix, the focused command above passes
+93/93 with no failures, skips or cancellations, including 18 page tests. The
+positive case covers both targets, a refreshed revision and one explicit new
+commit. Negative cases cover ambiguous/identity errors and storage cleanup
+failure after both rejection and success. `git diff --check` passes. This
+follow-up changes no layout; the existing browser evidence predates it.
+
+### Coordinator Integration Verification
+
+Integrated with master `fe0d921` and resolved the frozen selector snapshot before
+the final repair. The coordinator independently reran the final focused command
+(93/93) and complete serial suite (414/414), both exit 0. Final real Chromium
+fixture results are `/private/tmp/voxcode-131-final-browser-results.json`, with
+errors=[] across desktop, mobile, narrow and landscape selector scenarios and
+both mobile login scenarios. These final artifacts supersede the earlier
+browser timing limitation above. The narrow recovery screenshot was visually
+checked after the rerun.
+
+Both independent reviews pass and are stored in `docs/reviews/`. Serial exact-
+baseline coverage passes with changed lines 3/3 and branches 20/20, unchanged
+overall line coverage and increased branch coverage. The coordinator reruns the
+coverage gate against the final committed head before publication.
+
+Installed-service verification and physical-phone acceptance remain separate
+gates. No backend, credentials or installed services were changed by
 this implementer.

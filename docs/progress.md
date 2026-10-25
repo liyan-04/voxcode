@@ -1,5 +1,24 @@
 # Progress and verification
 
+## 2026-10-25: execution target selector (Issue #131)
+
+- Added visible Mac/Server selection with independent project/task navigation,
+  drafts, checkbox preferences and request recovery. Every operation freezes its
+  original execution target; late callbacks cannot replace the other workspace.
+- Known-rejected metadata revisions recover on the next explicit action;
+  uncertain outcomes retain their original payload and request identity.
+- Both independent source reviews pass. Coordinator focused checks: 93/93.
+  Complete serial Node/policy/voice tests: 414/414, exit 0. Final real Chromium
+  fixtures passed desktop/mobile/narrow/landscape with no page errors.
+- Identical serial baseline/head coverage passed: changed lines 3/3, branches
+  20/20; overall lines unchanged and branches increased. Exact committed-head
+  gate is required before publication. Evidence is local/fixture, not phone or
+  live Codex/provider acceptance.
+- Gateway fe0d921 was activated at Beijing 21:05:46 with strict TLS, original
+  password login, CSRF and target-isolation checks. Its page predates this
+  selector. Server executor provisioning, native Codex synchronization and
+  project creation remain separate pending capabilities.
+
 ## 2026-10-25: dual execution target source milestone (Issue #128)
 
 - Fixed Mac/server selection now routes every project/task request through one

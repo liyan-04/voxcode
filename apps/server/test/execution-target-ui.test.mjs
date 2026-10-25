@@ -90,6 +90,36 @@ test('late mutation and metadata responses update only their original target and
   const gate=deferred(),f=await targetFixture({request:async(url,options)=>options.method==='POST'&&url.searchParams.get('executionTarget')==='mac'?gate.promise:undefined});selectTask(f);await flush();setInput(f,'Mac original');const old=action==='send'?submit(f):f.run("taskAction(state.snapshot,'archive',{archived:true})");await f.run("switchExecutionTarget('server')");selectTask(f);await flush();setInput(f,'Server edit');assert.equal(f.run('state.loading'),false);const before=f.get('#feedback').textContent;gate.resolve(response({...task('mac'),revision:6,archived:action==='archive'}));await old;await flush();assert.equal(f.run('state.executionTarget'),'server');assert.equal(f.run('state.snapshot.output'),'server output');assert.equal(f.get('#composer-input').value,'Server edit');assert.equal(f.get('#feedback').textContent,before);assert.equal(new URL(f.writes[0].path,'http://fixture.invalid').searchParams.get('executionTarget'),'mac');
  }
 });
+test('typed metadata revision rejection allows a new explicit action with the refreshed revision and request identity',async()=>{
+ for(const target of ['mac','server']){
+  let current=task(target),commits=0;const f=await targetFixture({request:async(url,options)=>{
+   if(url.searchParams.get('executionTarget')!==target)return;
+   if(options.method==='POST'&&url.pathname.endsWith('/archive')){const payload=JSON.parse(options.body);if(payload.metadataRevision!==current.metadataRevision)return response({code:'revision_conflict'},409);commits++;current={...current,archived:payload.archived,metadataRevision:current.metadataRevision+1};return response(current);}
+   if(url.pathname==='/api/tasks')return response({tasks:[current]});if(url.pathname==='/api/tasks/one')return response(current);
+  }});if(target==='server')await f.run("switchExecutionTarget('server')");selectTask(f);await flush();current={...current,metadataRevision:2};await f.run("taskAction(state.snapshot,'archive',{archived:true})");await flush();await flush();
+  assert.equal(f.run('state.snapshot.metadataRevision'),2);assert.equal(f.writes.length,1);assert.equal(commits,0);assert.deepEqual(JSON.parse(f.storage.get('voxcode:pending:'+target)),[]);
+  await f.run("taskAction(state.snapshot,'archive',{archived:true})");assert.equal(commits,1);assert.equal(f.writes.length,2);assert.equal(f.writes[0].payload.metadataRevision,1);assert.equal(f.writes[1].payload.metadataRevision,2);assert.notEqual(f.writes[1].payload.requestId,f.writes[0].payload.requestId);
+ }
+});
+test('ambiguous metadata failures and identity conflicts retain the original payload after a newer snapshot',async()=>{
+ for(const failure of ['network','outcome_unknown','request_conflict','untyped_409']){
+  let current=task('mac'),attempts=0;const f=await targetFixture({request:async(url,options)=>{
+   if(options.method==='POST'&&url.pathname.endsWith('/archive')){current={...current,metadataRevision:2};if(++attempts>1)return response(current);if(failure==='network')throw Error('lost response');return response(failure==='untyped_409'?{}:{code:failure},409);}
+   if(url.pathname==='/api/tasks')return response({tasks:[current]});if(url.pathname==='/api/tasks/one')return response(current);
+  }});selectTask(f);await flush();await f.run("taskAction(state.snapshot,'archive',{archived:true})");await flush();await flush();assert.equal(f.run('state.snapshot.metadataRevision'),2);assert.equal(f.writes.length,1);
+  await f.run("taskAction(state.snapshot,'archive',{archived:true})");assert.equal(f.writes.length,2);assert.deepEqual(f.writes[1],f.writes[0],failure);
+ }
+});
+test('metadata request identity survives storage cleanup failure after rejection or success',async()=>{
+ for(const outcome of ['revision_conflict','succeeded']){
+  let failCleanup=false,current=task('mac'),attempts=0;class Storage extends Map{set(key,value){if(failCleanup&&key==='voxcode:pending:mac'&&JSON.parse(value).length===0)throw Error('storage unavailable');return super.set(key,value);}}
+  const storage=new Storage(),f=await targetFixture({storage,request:async(url,options)=>{
+   if(options.method==='POST'&&url.pathname.endsWith('/archive')){current={...current,metadataRevision:2};if(++attempts===1){failCleanup=true;return outcome==='revision_conflict'?response({code:outcome},409):response(current);}failCleanup=false;return response(current);}
+   if(url.pathname==='/api/tasks')return response({tasks:[current]});if(url.pathname==='/api/tasks/one')return response(current);
+  }});selectTask(f);await flush();await f.run("taskAction(state.snapshot,'archive',{archived:true})");await flush();await flush();assert.equal(f.writes.length,1);assert.equal(JSON.parse(storage.get('voxcode:pending:mac')).length,1);
+  await f.run("taskAction(state.snapshot,'archive',{archived:true})");assert.equal(f.writes.length,2);assert.deepEqual(f.writes[1],f.writes[0],outcome);
+ }
+});
 test('an unresolved committed request survives reload and target changes with its exact original payload',async()=>{
  const receipts=new Map();let current=task('mac'),lost=false;const request=async(url,options)=>{
   if(url.pathname==='/api/tasks'&&options.method!=='POST')return response({tasks:[url.searchParams.get('executionTarget')==='mac'?current:task('server')]});
